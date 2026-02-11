@@ -1,6 +1,7 @@
 import { Menu, Bot, Sparkles, LogOut } from 'lucide-react';
 import type { ConnectionStatus, Session } from '../types';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
+import { LanguageSelector } from './LanguageSelector';
 
 interface Props {
   status: ConnectionStatus;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function Header({ status, sessionKey, onToggleSidebar, activeSessionData, onLogout }: Props) {
+  const t = useT();
   const sessionLabel = sessionKey.split(':').pop() || sessionKey;
 
   return (
@@ -32,6 +34,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
         </div>
       </div>
       <div className="flex items-center gap-2 text-sm">
+        <LanguageSelector />
         {status === 'connected' ? (
           <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-zinc-800/30 px-3 py-1.5">
             <span className="w-2 h-2 rounded-full bg-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />

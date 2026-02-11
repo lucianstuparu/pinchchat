@@ -19,21 +19,34 @@
 - **Priority:** medium
 - **Status:** done
 - **Completed:** 2026-02-11 — commit `99b7db9`
-- **Description:** Ajouter le support i18n (internationalisation) — le projet open-source est en anglais, mais le deploy perso de Nicolas doit rester en français. Soit via une config `.env` (ex: `VITE_LOCALE=fr`), soit via un système de traduction léger. Les strings UI (placeholder input, bouton envoyer, statut connexion, etc.) doivent être configurables.
+- **Description:** i18n support
 
 ## Item #4
 - **Date:** 2026-02-11
 - **Priority:** high
 - **Status:** done
 - **Completed:** 2026-02-11 — commit `36f9480`
-- **Description:** Supprimer le token du build — implémenter un écran de login au runtime
-  - Au premier lancement (ou si pas de credentials en localStorage), afficher un écran de connexion avec :
-    - Champ "Gateway URL" (ex: `ws://192.168.1.14:18789`)
-    - Champ "Token" (password field)
-    - Bouton "Connect"
-  - Stocker les credentials en `localStorage` (pas dans le bundle JS)
-  - Supprimer `VITE_GATEWAY_TOKEN` du `.env.example` et du code
-  - Garder `VITE_GATEWAY_WS_URL` uniquement comme valeur par défaut optionnelle pour pré-remplir le champ URL
-  - Ajouter un bouton "Disconnect" / "Logout" dans le header qui clear le localStorage et revient à l'écran de login
-  - L'écran de login doit suivre le même thème dark neon que le reste de l'app
-  - ⚠️ Après ce changement, le deploy perso (`~/marlbot-chat/.env`) n'a plus besoin de `VITE_GATEWAY_TOKEN` — l'utilisateur entrera le token via l'UI
+- **Description:** Runtime login screen
+
+## Item #5
+- **Date:** 2026-02-11
+- **Priority:** high
+- **Status:** pending
+- **Description:** Ajouter un sélecteur de langue dans l'UI
+  - Un petit toggle/dropdown dans le header ou le login screen pour choisir la langue (EN/FR)
+  - Stocker le choix en localStorage (priorité sur `VITE_LOCALE` et le locale du navigateur)
+  - Ordre de priorité : localStorage > VITE_LOCALE > navigator.language > 'en'
+  - Le changement doit être immédiat (pas de reload nécessaire si possible, sinon reload OK)
+  - Garder ça minimaliste — juste un petit 🌐 ou drapeau dans le header
+
+## Item #6
+- **Date:** 2026-02-11
+- **Priority:** high
+- **Status:** pending
+- **Description:** Installation simplifiée — Docker + oneliner
+  - **Dockerfile** : image légère (nginx:alpine ou similar) qui sert le build statique. Multi-stage : node pour build, nginx pour serve. Pas de secrets dans l'image (tout est runtime via le login screen).
+  - **docker-compose.yml** : exemple simple avec juste le container PinchChat
+  - **Publier l'image sur ghcr.io** : `ghcr.io/marlburrow/pinchchat:latest` — le CI GitHub Actions doit build & push l'image à chaque push sur main
+  - **Oneliner** : `docker run -p 3000:80 ghcr.io/marlburrow/pinchchat:latest` dans le README
+  - Alternative sans Docker : `npx pinchchat` ou un script curl qui télécharge le dernier release (build statique) et lance un serveur
+  - Mettre à jour le README avec les nouvelles méthodes d'installation

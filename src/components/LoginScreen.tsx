@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bot, Sparkles, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 interface Props {
   onConnect: (url: string, token: string) => void;
@@ -29,6 +29,7 @@ export function clearCredentials() {
 }
 
 export function LoginScreen({ onConnect, error, isConnecting }: Props) {
+  const t = useT();
   const defaultUrl = import.meta.env.VITE_GATEWAY_WS_URL || `ws://${window.location.hostname}:18789`;
   const [url, setUrl] = useState(defaultUrl);
   const [token, setToken] = useState('');

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Square, Paperclip, X, FileText } from 'lucide-react';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 interface FileAttachment {
   id: string;
@@ -80,6 +80,7 @@ function formatSize(bytes: number): string {
 }
 
 export function ChatInput({ onSend, onAbort, isGenerating, disabled }: Props) {
+  const t = useT();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);

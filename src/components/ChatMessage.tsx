@@ -7,13 +7,16 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { CodeBlock } from './CodeBlock';
 import { ToolCall } from './ToolCall';
 import { Bot, User, Wrench } from 'lucide-react';
-import { t, locale } from '../lib/i18n';
+import { t, getLocale } from '../lib/i18n';
+import { useLocale } from '../hooks/useLocale';
 // ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
 
-/** Map i18n locale code to BCP-47 locale for Intl formatting */
-const bcp47Locale = locale === 'fr' ? 'fr-FR' : 'en-US';
+function getBcp47(): string {
+  return getLocale() === 'fr' ? 'fr-FR' : 'en-US';
+}
 
 function formatTimestamp(ts: number): string {
+  const bcp47Locale = getBcp47();
   const date = new Date(ts);
   const now = new Date();
   const time = date.toLocaleTimeString(bcp47Locale, { hour: '2-digit', minute: '2-digit' });
@@ -192,6 +195,7 @@ function InternalOnlyMessage({ message }: { message: ChatMessageType }) {
 }
 
 export function ChatMessageComponent({ message }: { message: ChatMessageType }) {
+  useLocale(); // re-render on locale change
   const isUser = message.role === 'user';
 
   // Assistant message with no text content — only tool calls / thinking

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, Terminal, Globe, Search, FileText, Wrench, Code, Database, Image, MessageSquare, Brain, Cpu } from 'lucide-react';
 import hljs from 'highlight.js/lib/common';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 type ToolColor = { border: string; bg: string; text: string; icon: string; glow: string; expandBorder: string; expandBg: string };
 
@@ -149,6 +149,7 @@ function truncate(s: string, max: number): string {
 }
 
 export function ToolCall({ name, input, result }: { name: string; input?: any; result?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const c = getColor(name);
 

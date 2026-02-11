@@ -1,8 +1,11 @@
 /**
- * Lightweight i18n — no external deps.
- * Locale is set via VITE_LOCALE env var (default: "en").
- * Add new languages by adding a record to `messages`.
+ * Lightweight reactive i18n — no external deps.
+ *
+ * Locale priority: localStorage > VITE_LOCALE > navigator.language > 'en'
+ * Changing locale at runtime triggers subscribed React components to re-render.
  */
+
+const STORAGE_KEY = 'pinchchat-locale';
 
 const en = {
   // Login screen
@@ -23,6 +26,7 @@ const en = {
   'header.disconnected': 'Disconnected',
   'header.logout': 'Logout',
   'header.toggleSidebar': 'Toggle sidebar',
+  'header.changeLanguage': 'Change language',
 
   // Chat
   'chat.welcome': 'PinchChat',
@@ -65,6 +69,7 @@ const fr: Record<keyof typeof en, string> = {
   'header.disconnected': 'Déconnecté',
   'header.logout': 'Déconnexion',
   'header.toggleSidebar': 'Afficher/masquer la barre latérale',
+  'header.changeLanguage': 'Changer de langue',
 
   'chat.welcome': 'PinchChat',
   'chat.welcomeSub': 'Envoyez un message pour commencer',
@@ -85,14 +90,69 @@ const fr: Record<keyof typeof en, string> = {
   'time.yesterday': 'Hier',
 };
 
+export type TranslationKey = keyof typeof en;
+
 const messages: Record<string, Record<string, string>> = { en, fr };
 
-const locale = (import.meta.env.VITE_LOCALE as string) || 'en';
-const dict = messages[locale] || messages.en;
+export const supportedLocales = Object.keys(messages) as string[];
+
+/** Labels shown in the language selector */
+export const localeLabels: Record<string, string> = {
+  en: 'EN',
+  fr: 'FR',
+};
+
+function resolveInitialLocale(): string {
+  // 1. localStorage
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored && messages[stored]) return stored;
+  } catch { /* SSR or blocked storage */ }
+
+  // 2. VITE_LOCALE env var
+  const envLocale = (import.meta.env.VITE_LOCALE as string) || '';
+  if (envLocale && messages[envLocale]) return envLocale;
+
+  // 3. navigator.language
+  if (typeof navigator !== 'undefined') {
+    const navLang = navigator.language?.split('-')[0];
+    if (navLang && messages[navLang]) return navLang;
+  }
+
+  // 4. fallback
+  return 'en';
+}
+
+let currentLocale = resolveInitialLocale();
+let dict = messages[currentLocale] || messages.en;
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+/** Subscribe to locale changes. Returns unsubscribe function. */
+export function onLocaleChange(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+/** Get the current locale code */
+export function getLocale(): string {
+  return currentLocale;
+}
+
+/** Switch locale at runtime. Persists to localStorage and notifies subscribers. */
+export function setLocale(loc: string): void {
+  if (!messages[loc] || loc === currentLocale) return;
+  currentLocale = loc;
+  dict = messages[loc];
+  try { localStorage.setItem(STORAGE_KEY, loc); } catch { /* noop */ }
+  listeners.forEach((fn) => fn());
+}
 
 /** Return the translated string for the given key, falling back to English. */
-export function t(key: keyof typeof en): string {
+export function t(key: TranslationKey): string {
   return dict[key] ?? (messages.en as Record<string, string>)[key] ?? key;
 }
 
-export { locale };
+// Keep backward-compat named export
+export { currentLocale as locale };

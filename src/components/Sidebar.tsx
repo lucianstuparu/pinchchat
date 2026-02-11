@@ -1,6 +1,6 @@
 import { MessageSquare, X, Sparkles } from 'lucide-react';
 import type { Session } from '../types';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 interface Props {
   sessions: Session[];
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Props) {
+  const t = useT();
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />}

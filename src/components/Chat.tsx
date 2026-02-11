@@ -4,7 +4,7 @@ import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import type { ChatMessage, ConnectionStatus } from '../types';
 import { Bot } from 'lucide-react';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 interface Props {
   messages: ChatMessage[];
@@ -45,6 +45,7 @@ function hasStreamedText(messages: ChatMessage[]): boolean {
 const SCROLL_THRESHOLD = 150;
 
 export function Chat({ messages, isGenerating, status, onSend, onAbort }: Props) {
+  const t = useT();
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);

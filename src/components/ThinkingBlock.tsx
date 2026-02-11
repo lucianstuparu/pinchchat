@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, Brain } from 'lucide-react';
-import { t } from '../lib/i18n';
+import { useT } from '../hooks/useLocale';
 
 export function ThinkingBlock({ text }: { text: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
