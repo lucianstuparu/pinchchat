@@ -1,0 +1,245 @@
+
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import type { ChatMessage as ChatMessageType, MessageBlock } from '../types';
+import { ThinkingBlock } from './ThinkingBlock';
+import { ToolCall } from './ToolCall';
+import { Bot, User, Wrench } from 'lucide-react';
+// ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
+
+function formatTimestamp(ts: number): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  
+  if (isToday) return time;
+  if (isYesterday) return `Hier ${time}`;
+  return `${date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${time}`;
+}
+
+/** Guess a language hint from content patterns */
+function guessLanguage(lines: string[]): string {
+  const joined = lines.join('\n');
+  if (/^import .+ from ['"]/.test(joined) || /^export (function|const|default|class|interface|type) /.test(joined) || /React\./.test(joined) || /<\w+[\s/>]/.test(joined) && /className=/.test(joined)) return 'tsx';
+  if (/^(import|export|const|let|var|function|class|interface|type) /.test(joined) || /=>\s*{/.test(joined) || /: (string|number|boolean|any)\b/.test(joined)) return 'typescript';
+  if (/^(use |fn |let mut |pub |impl |struct |enum |mod |crate::)/.test(joined) || /-> (Self|Result|Option|Vec|String|bool|i32|u32)/.test(joined)) return 'rust';
+  if (/^(def |class |import |from .+ import |if __name__)/.test(joined) || /self\.\w+/.test(joined) && !/this\./.test(joined)) return 'python';
+  if (/^\s*(server|location|upstream|proxy_pass|listen \d)/.test(joined)) return 'nginx';
+  if (/^\[.*\]\s*$/.test(lines[0] || '') && /=/.test(joined)) return 'ini';
+  if (/^(apiVersion|kind|metadata|spec):/.test(joined)) return 'yaml';
+  if (/^\{/.test(joined.trim()) && /\}$/.test(joined.trim())) return 'json';
+  if (/^#!\/(bin|usr)/.test(joined) || /^\s*(if \[|then|fi|echo |export |source )/.test(joined)) return 'bash';
+  if (/^(<!DOCTYPE|<html|<div|<head|<body)/.test(joined)) return 'html';
+  if (/^\.\w+\s*\{|^@(media|keyframes|import)/.test(joined)) return 'css';
+  if (/^(SELECT|INSERT|CREATE|ALTER|DROP|UPDATE) /i.test(joined)) return 'sql';
+  return '';
+}
+
+/** Detect if a block of lines looks like code */
+function looksLikeCode(lines: string[]): boolean {
+  if (lines.length < 2) return false;
+  let codeSignals = 0;
+  const patterns = [
+    /^(import|export|const|let|var|function|class|interface|type|enum|struct|fn|pub|use|def|from|module|package|namespace)\s/,
+    /[{};]\s*$/,
+    /^\s*(if|else|for|while|return|match|switch|case|break|continue)\b/,
+    /^\s*(\/\/|#|\/\*|\*)/,
+    /[├└│┬─]──/,
+    /^\s+\w+\(.*\)/,
+    /^\s*<\/?[A-Z]\w*/,
+    /=>\s*[{(]/,
+    /\.\w+\(.*\)\s*[;,]?\s*$/,
+  ];
+  for (const line of lines) {
+    for (const pat of patterns) {
+      if (pat.test(line)) { codeSignals++; break; }
+    }
+  }
+  return codeSignals / lines.length > 0.3;
+}
+
+/** Auto-wrap unformatted code/terminal output in fenced code blocks */
+function autoFormatText(text: string): string {
+  // Already has code fences — leave as-is
+  if (text.includes('```')) return text;
+
+  const lines = text.split('\n');
+
+  // If most of the text looks like code, wrap the whole thing
+  const nonEmptyLines = lines.filter(l => l.trim());
+  if (nonEmptyLines.length >= 3 && looksLikeCode(nonEmptyLines)) {
+    const lang = guessLanguage(nonEmptyLines);
+    return '```' + lang + '\n' + text + '\n```';
+  }
+
+  // Otherwise, detect contiguous code blocks within prose
+  const result: string[] = [];
+  let codeBuffer: string[] = [];
+
+  const flushCode = () => {
+    if (codeBuffer.length >= 3 && looksLikeCode(codeBuffer)) {
+      const lang = guessLanguage(codeBuffer);
+      result.push('```' + lang);
+      result.push(...codeBuffer);
+      result.push('```');
+    } else {
+      result.push(...codeBuffer);
+    }
+    codeBuffer = [];
+  };
+
+  const isCodeLine = (line: string): boolean => {
+    return /^[\s]+(import|export|const|let|var|function|return|if|else|for)/.test(line)
+      || /[{};]\s*$/.test(line)
+      || /^\s*(\/\/|#)/.test(line)
+      || /[├└│┬─]──/.test(line)
+      || /^\s+\w+\(.*\)/.test(line);
+  };
+
+  for (const line of lines) {
+    if (isCodeLine(line) || (codeBuffer.length > 0 && (line.trim() === '' || /^\s{2,}/.test(line)))) {
+      codeBuffer.push(line);
+    } else {
+      flushCode();
+      result.push(line);
+    }
+  }
+  flushCode();
+
+  return result.join('\n');
+}
+
+function getTextBlocks(blocks: MessageBlock[]): MessageBlock[] {
+  return blocks.filter(b => b.type === 'text' && b.text.trim());
+}
+
+function getInternalBlocks(blocks: MessageBlock[]): MessageBlock[] {
+  return blocks.filter(b => b.type === 'thinking' || b.type === 'tool_use' || b.type === 'tool_result');
+}
+
+function renderTextBlocks(blocks: MessageBlock[]) {
+  return getTextBlocks(blocks).map((block, i) => (
+    <div key={`text-${i}`} className="markdown-body">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+        {autoFormatText((block as any).text)}
+      </ReactMarkdown>
+    </div>
+  ));
+}
+
+function renderInternalBlocks(blocks: MessageBlock[]) {
+  const elements: React.ReactElement[] = [];
+  const internals = getInternalBlocks(blocks);
+  for (let i = 0; i < internals.length; i++) {
+    const block = internals[i];
+    if (block.type === 'thinking') {
+      elements.push(<ThinkingBlock key={`int-${i}`} text={block.text} />);
+    } else if (block.type === 'tool_use') {
+      const nextBlock = internals[i + 1];
+      const result = nextBlock?.type === 'tool_result' ? nextBlock.content : undefined;
+      elements.push(<ToolCall key={`int-${i}`} name={block.name} input={block.input} result={result} />);
+      if (result !== undefined) i++;
+    } else if (block.type === 'tool_result') {
+      elements.push(<ToolCall key={`int-${i}`} name={block.name || 'tool'} result={block.content} />);
+    }
+  }
+  return elements;
+}
+
+function InternalsSummary({ blocks }: { blocks: MessageBlock[] }) {
+  const internals = getInternalBlocks(blocks);
+  if (internals.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      {renderInternalBlocks(blocks)}
+    </div>
+  );
+}
+
+/** Message with ONLY internal blocks (no text for the user) */
+function InternalOnlyMessage({ message }: { message: ChatMessageType }) {
+  return (
+    <div className="animate-fade-in flex gap-3 px-4 py-1">
+      <div className="shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-xl border border-white/5 bg-zinc-800/30">
+        <Wrench className="h-3 w-3 text-zinc-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="space-y-1">
+          {renderInternalBlocks(message.blocks)}
+        </div>
+        {message.timestamp && (
+          <div className="mt-0.5 text-[10px] text-zinc-600">
+            {formatTimestamp(message.timestamp)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ChatMessageComponent({ message }: { message: ChatMessageType }) {
+  const isUser = message.role === 'user';
+
+  // Assistant message with no text content — only tool calls / thinking
+  if (!isUser && message.blocks.length > 0) {
+    const textBlocks = getTextBlocks(message.blocks);
+    const hasText = textBlocks.length > 0 || (message.isStreaming && message.content?.trim());
+    if (!hasText && !message.isStreaming) {
+      return <InternalOnlyMessage message={message} />;
+    }
+  }
+
+  return (
+    <div className={`animate-fade-in flex gap-3 px-4 py-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+      {/* Avatar */}
+      <div className="shrink-0 mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-zinc-800/40">
+        {isUser
+          ? <User className="h-4 w-4 text-violet-200" />
+          : <Bot className="h-4 w-4 text-cyan-200" />
+        }
+      </div>
+
+      {/* Bubble */}
+      <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
+        <div className={`inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed border border-white/8 max-w-full overflow-hidden ${
+          isUser
+            ? 'bg-gradient-to-b from-zinc-800/70 to-zinc-900/70 text-zinc-200'
+            : 'bg-zinc-800/40 text-zinc-300 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
+        }`}>
+          {/* User-visible text */}
+          {message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                {autoFormatText(message.content)}
+              </ReactMarkdown>
+            </div>
+          )}
+
+          {/* Streaming dots */}
+          {message.isStreaming && (
+            <div className="flex gap-1 mt-2">
+              <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+              <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+              <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+            </div>
+          )}
+
+          {/* Tool calls & thinking (inline) */}
+          {!isUser && <InternalsSummary blocks={message.blocks} />}
+        </div>
+        {message.timestamp && (
+          <div className={`mt-1 text-[11px] text-zinc-500 ${isUser ? 'text-right pr-2' : 'pl-2'}`}>
+            {formatTimestamp(message.timestamp)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,36 @@
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  blocks: MessageBlock[];
+  isStreaming?: boolean;
+  runId?: string;
+}
+
+export type MessageBlock =
+  | { type: 'text'; text: string }
+  | { type: 'thinking'; text: string }
+  | { type: 'tool_use'; name: string; input: any; id?: string }
+  | { type: 'tool_result'; content: string; toolUseId?: string; name?: string };
+
+export interface Session {
+  key: string;
+  label?: string;
+  messageCount?: number;
+  isActive?: boolean;
+  totalTokens?: number;
+  contextTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+
+export interface GatewayState {
+  status: ConnectionStatus;
+  sessions: Session[];
+  activeSession: string;
+  messages: ChatMessage[];
+  isGenerating: boolean;
+}

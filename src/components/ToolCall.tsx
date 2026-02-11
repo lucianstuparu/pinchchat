@@ -1,0 +1,202 @@
+import { useState, useMemo } from 'react';
+import { ChevronRight, ChevronDown, Terminal, Globe, Search, FileText, Wrench, Code, Database, Image, MessageSquare, Brain, Cpu } from 'lucide-react';
+import hljs from 'highlight.js/lib/common';
+
+type ToolColor = { border: string; bg: string; text: string; icon: string; glow: string; expandBorder: string; expandBg: string };
+
+const toolColors: Record<string, ToolColor> = {
+  exec:       { border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-300', icon: 'text-amber-400', glow: 'shadow-[0_0_8px_rgba(245,158,11,0.15)]', expandBorder: 'border-amber-500/20', expandBg: 'bg-amber-950/20' },
+  web_search: { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300', icon: 'text-emerald-400', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]', expandBorder: 'border-emerald-500/20', expandBg: 'bg-emerald-950/20' },
+  web_fetch:  { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300', icon: 'text-emerald-400', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]', expandBorder: 'border-emerald-500/20', expandBg: 'bg-emerald-950/20' },
+  Read:       { border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: 'text-sky-400', glow: 'shadow-[0_0_8px_rgba(14,165,233,0.15)]', expandBorder: 'border-sky-500/20', expandBg: 'bg-sky-950/20' },
+  read:       { border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: 'text-sky-400', glow: 'shadow-[0_0_8px_rgba(14,165,233,0.15)]', expandBorder: 'border-sky-500/20', expandBg: 'bg-sky-950/20' },
+  Write:      { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
+  write:      { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
+  Edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
+  edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
+  browser:    { border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', text: 'text-cyan-300', icon: 'text-cyan-400', glow: 'shadow-[0_0_8px_rgba(6,182,212,0.15)]', expandBorder: 'border-cyan-500/20', expandBg: 'bg-cyan-950/20' },
+  image:      { border: 'border-pink-500/30', bg: 'bg-pink-500/10', text: 'text-pink-300', icon: 'text-pink-400', glow: 'shadow-[0_0_8px_rgba(236,72,153,0.15)]', expandBorder: 'border-pink-500/20', expandBg: 'bg-pink-950/20' },
+  message:    { border: 'border-indigo-500/30', bg: 'bg-indigo-500/10', text: 'text-indigo-300', icon: 'text-indigo-400', glow: 'shadow-[0_0_8px_rgba(99,102,241,0.15)]', expandBorder: 'border-indigo-500/20', expandBg: 'bg-indigo-950/20' },
+  memory_search: { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300', icon: 'text-rose-400', glow: 'shadow-[0_0_8px_rgba(244,63,94,0.15)]', expandBorder: 'border-rose-500/20', expandBg: 'bg-rose-950/20' },
+  memory_get: { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300', icon: 'text-rose-400', glow: 'shadow-[0_0_8px_rgba(244,63,94,0.15)]', expandBorder: 'border-rose-500/20', expandBg: 'bg-rose-950/20' },
+  cron:       { border: 'border-orange-500/30', bg: 'bg-orange-500/10', text: 'text-orange-300', icon: 'text-orange-400', glow: 'shadow-[0_0_8px_rgba(249,115,22,0.15)]', expandBorder: 'border-orange-500/20', expandBg: 'bg-orange-950/20' },
+  sessions_spawn: { border: 'border-teal-500/30', bg: 'bg-teal-500/10', text: 'text-teal-300', icon: 'text-teal-400', glow: 'shadow-[0_0_8px_rgba(20,184,166,0.15)]', expandBorder: 'border-teal-500/20', expandBg: 'bg-teal-950/20' },
+};
+
+const defaultColor: ToolColor = { border: 'border-zinc-500/30', bg: 'bg-zinc-500/10', text: 'text-zinc-300', icon: 'text-zinc-400', glow: 'shadow-[0_0_8px_rgba(161,161,170,0.1)]', expandBorder: 'border-zinc-500/20', expandBg: 'bg-zinc-800/25' };
+
+function getColor(name: string): ToolColor {
+  return toolColors[name] || defaultColor;
+}
+
+const toolIcons: Record<string, React.ReactNode> = {
+  exec: <Terminal size={13} />,
+  web_search: <Globe size={13} />,
+  web_fetch: <Globe size={13} />,
+  search: <Search size={13} />,
+  Read: <FileText size={13} />,
+  read: <FileText size={13} />,
+  Write: <Code size={13} />,
+  write: <Code size={13} />,
+  Edit: <Code size={13} />,
+  edit: <Code size={13} />,
+  browser: <Globe size={13} />,
+  image: <Image size={13} />,
+  message: <MessageSquare size={13} />,
+  database: <Database size={13} />,
+  memory_search: <Brain size={13} />,
+  memory_get: <Brain size={13} />,
+  cron: <Cpu size={13} />,
+  sessions_spawn: <Cpu size={13} />,
+};
+
+function getToolIcon(name: string) {
+  return toolIcons[name] || <Wrench size={13} />;
+}
+
+function truncateResult(result: string, maxLen = 120): string {
+  if (!result) return '';
+  return truncate(result, maxLen);
+}
+
+/** Check if text looks like structured content worth highlighting */
+function isStructured(text: string): boolean {
+  const lines = text.split('\n');
+  if (lines.length < 2) return false;
+  const trimmed = text.trim();
+  // JSON
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) return true;
+  // Code patterns
+  const codePatterns = [/^(import|export|const|let|var|function|class|fn|pub|use|def|from)\s/, /[{};]\s*$/, /^\s*(if|else|for|while|return)\b/, /^\s*(\/\/|#|\/\*)/, /=>\s*[{(]/, /^\s*<\/?[A-Z]/];
+  let hits = 0;
+  for (const line of lines) {
+    for (const pat of codePatterns) {
+      if (pat.test(line)) { hits++; break; }
+    }
+  }
+  if (hits / lines.length > 0.2) return true;
+  // Terminal output (paths, errors, commands)
+  const termPatterns = [/^[/~]/, /^\s*\$\s/, /^[A-Z_]+=/, /error|warning|failed/i, /\.\w{1,4}:\d+/, /├|└|│/];
+  let termHits = 0;
+  for (const line of lines) {
+    for (const pat of termPatterns) {
+      if (pat.test(line)) { termHits++; break; }
+    }
+  }
+  return termHits / lines.length > 0.3;
+}
+
+/** Highlight code using highlight.js, returns HTML string or null */
+function highlightCode(text: string): string | null {
+  if (!text || !isStructured(text)) return null;
+  try {
+    const result = hljs.highlightAuto(text);
+    return result.value;
+  } catch {
+    return null;
+  }
+}
+
+export function HighlightedPre({ text, className }: { text: string; className: string }) {
+  const highlighted = useMemo(() => highlightCode(text), [text]);
+
+  if (highlighted) {
+    return (
+      <pre className={className}>
+        <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+      </pre>
+    );
+  }
+  return <pre className={className}>{text}</pre>;
+}
+
+function getContextHint(name: string, input: any): string | null {
+  if (!input || typeof input !== 'object') return null;
+  switch (name) {
+    case 'exec':
+      return input.command ? truncate(input.command, 60) : null;
+    case 'Read': case 'read':
+    case 'Write': case 'write':
+    case 'Edit': case 'edit':
+      return input.file_path || input.path || null;
+    case 'web_search':
+      return input.query ? truncate(input.query, 50) : null;
+    case 'web_fetch':
+      return input.url ? truncate(input.url, 60) : null;
+    case 'browser':
+      return input.action || null;
+    case 'message':
+      return input.action ? `${input.action}${input.target ? ' → ' + input.target : ''}` : null;
+    case 'memory_search':
+      return input.query ? truncate(input.query, 50) : null;
+    case 'memory_get':
+      return input.path || null;
+    case 'cron':
+      return input.action || null;
+    case 'sessions_spawn':
+      return input.task ? truncate(input.task, 50) : null;
+    case 'image':
+      return input.prompt ? truncate(input.prompt, 50) : null;
+    default:
+      return null;
+  }
+}
+
+function truncate(s: string, max: number): string {
+  const clean = s.replace(/\n/g, ' ').trim();
+  return clean.length <= max ? clean : clean.slice(0, max) + '…';
+}
+
+export function ToolCall({ name, input, result }: { name: string; input?: any; result?: string }) {
+  const [open, setOpen] = useState(false);
+  const c = getColor(name);
+
+  const inputStr = input ? (typeof input === 'string' ? input : JSON.stringify(input, null, 2)) : '';
+  const hint = getContextHint(name, input);
+
+  return (
+    <div className="my-2">
+      {/* Tool use badge */}
+      <button
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-1.5 rounded-2xl border ${c.border} ${c.bg} ${c.glow} px-3 py-1.5 text-xs ${c.text} hover:brightness-125 transition-all max-w-full`}
+      >
+        <span className={c.icon}>{getToolIcon(name)}</span>
+        <span className="font-mono font-semibold shrink-0">{name}</span>
+        {hint && <span className="opacity-60 truncate font-mono text-[11px]">{hint}</span>}
+        {open ? <ChevronDown size={12} className="ml-1 opacity-60" /> : <ChevronRight size={12} className="ml-1 opacity-60" />}
+      </button>
+
+      {/* Result summary (always visible if result exists) */}
+      {result && !open && (
+        <div className="mt-1 text-[11px] text-zinc-400 pl-2 truncate max-w-md">
+          {truncateResult(result)}
+        </div>
+      )}
+
+      {/* Expanded content */}
+      {open && (
+        <div className={`mt-2 rounded-2xl border ${c.expandBorder} ${c.expandBg} p-3 space-y-2`}>
+          {inputStr && (
+            <div>
+              <div className={`text-[11px] ${c.text} opacity-70 mb-1 font-medium`}>Paramètres</div>
+              <HighlightedPre
+                text={inputStr}
+                className="text-xs bg-[#1a1a20]/60 border border-white/5 p-2.5 rounded-xl overflow-x-auto text-zinc-300 font-mono"
+              />
+            </div>
+          )}
+          {result && (
+            <div>
+              <div className={`text-[11px] ${c.text} opacity-70 mb-1 font-medium`}>Résultat</div>
+              <HighlightedPre
+                text={result}
+                className="text-xs bg-[#1a1a20]/60 border border-white/5 p-2.5 rounded-xl overflow-x-auto text-zinc-300 max-h-64 overflow-y-auto font-mono"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
