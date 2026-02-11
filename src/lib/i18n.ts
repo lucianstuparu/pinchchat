@@ -59,6 +59,7 @@ const en = {
   // Message actions
   'message.copy': 'Copy message',
   'message.copied': 'Copied!',
+  'message.retry': 'Resend message',
 
   // Timestamps
   'time.yesterday': 'Yesterday',
@@ -127,6 +128,7 @@ const fr: Record<keyof typeof en, string> = {
 
   'message.copy': 'Copier le message',
   'message.copied': 'Copié !',
+  'message.retry': 'Renvoyer le message',
 
   'time.yesterday': 'Hier',
 

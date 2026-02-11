@@ -112,7 +112,7 @@ export function Chat({ messages, isGenerating, status, onSend, onAbort }: Props)
             </div>
           )}
           {messages.filter(hasVisibleContent).map(msg => (
-            <ChatMessageComponent key={msg.id} message={msg} />
+            <ChatMessageComponent key={msg.id} message={msg} onRetry={!isGenerating ? handleSend : undefined} />
           ))}
           {showTyping && <TypingIndicator />}
           <div ref={bottomRef} />

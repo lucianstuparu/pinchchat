@@ -9,7 +9,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { CodeBlock } from './CodeBlock';
 import { ToolCall } from './ToolCall';
 import { ImageBlock, buildImageSrc } from './ImageBlock';
-import { Bot, User, Wrench, Copy, Check } from 'lucide-react';
+import { Bot, User, Wrench, Copy, Check, RefreshCw } from 'lucide-react';
 import { t, getLocale } from '../lib/i18n';
 import { useLocale } from '../hooks/useLocale';
 // ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
@@ -243,7 +243,7 @@ function getPlainText(message: ChatMessageType): string {
   return message.content;
 }
 
-export function ChatMessageComponent({ message }: { message: ChatMessageType }) {
+export function ChatMessageComponent({ message, onRetry }: { message: ChatMessageType; onRetry?: (text: string) => void }) {
   useLocale(); // re-render on locale change
   const isUser = message.role === 'user';
 
@@ -277,6 +277,17 @@ export function ChatMessageComponent({ message }: { message: ChatMessageType }) 
           {/* Copy button (assistant messages only) */}
           {!isUser && !message.isStreaming && getPlainText(message).trim() && (
             <CopyButton text={getPlainText(message)} />
+          )}
+          {/* Retry button (user messages only) */}
+          {isUser && onRetry && (
+            <button
+              onClick={() => onRetry(getPlainText(message))}
+              className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-white/8 bg-zinc-800/80 backdrop-blur-sm flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:border-cyan-400/30 transition-all opacity-0 group-hover:opacity-100"
+              title={t('message.retry')}
+              aria-label={t('message.retry')}
+            >
+              <RefreshCw size={13} />
+            </button>
           )}
           {/* User-visible text */}
           {message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
