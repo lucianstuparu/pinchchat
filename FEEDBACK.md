@@ -12,7 +12,8 @@
 ## Item #14
 - **Date:** 2026-02-11
 - **Priority:** high
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-11 — commit `84c8e24`
 - **Description:** Progress bars plus sobres dans l'app
   - Les barres de tokens dans la sidebar et le header sont trop disparates : gradient cyan→violet, orange quand >80%, rouge quand >95%. C'est pas cohérent.
   - Adopter un style plus sobre et uniforme : une seule couleur douce (ex: un cyan/bleu soft), qui s'intensifie subtilement quand ça se remplit. Pas de changement de couleur radical.
