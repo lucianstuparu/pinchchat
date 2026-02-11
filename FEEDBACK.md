@@ -33,18 +33,12 @@
 - **Priority:** high
 - **Status:** done
 - **Completed:** 2026-02-11 — commit `9b3aed4`
-- **Description:** Ajouter un sélecteur de langue dans l'UI
-  - Un petit toggle/dropdown dans le header ou le login screen pour choisir la langue (EN/FR)
-  - Stocker le choix en localStorage (priorité sur `VITE_LOCALE` et le locale du navigateur)
-  - Ordre de priorité : localStorage > VITE_LOCALE > navigator.language > 'en'
-  - Le changement doit être immédiat (pas de reload nécessaire si possible, sinon reload OK)
-  - Garder ça minimaliste — juste un petit 🌐 ou drapeau dans le header
+- **Description:** Language selector in header
 
 ## Item #6
 - **Date:** 2026-02-11
 - **Priority:** high
-- **Status:** done
-- **Completed:** 2026-02-11 — commit `5fd7300`
+- **Status:** pending
 - **Description:** Installation simplifiée — Docker + oneliner
   - **Dockerfile** : image légère (nginx:alpine ou similar) qui sert le build statique. Multi-stage : node pour build, nginx pour serve. Pas de secrets dans l'image (tout est runtime via le login screen).
   - **docker-compose.yml** : exemple simple avec juste le container PinchChat
@@ -63,3 +57,32 @@
   - Support des formats courants : png, jpg, gif, webp
   - Les images doivent être cliquables pour voir en taille réelle (lightbox ou nouvel onglet)
   - Garder le style dark theme cohérent (bordures arrondies, pas de fond blanc autour des images)
+
+## Item #8
+- **Date:** 2026-02-11
+- **Priority:** high
+- **Status:** pending
+- **Description:** Intégrer le logo PinchChat
+  - Le logo est déjà dans `public/logo.png`
+  - L'utiliser comme favicon (générer les tailles appropriées ou utiliser le PNG directement)
+  - L'afficher dans le header à côté du titre "PinchChat"
+  - L'afficher sur l'écran de login
+  - L'ajouter dans le README (en haut, centré)
+  - Mettre à jour les meta OG tags pour utiliser le logo
+
+## Item #9
+- **Date:** 2026-02-11
+- **Priority:** high
+- **Status:** pending
+- **Description:** GitHub Pages — landing page / démo
+  - Activer GitHub Pages sur le repo (branche `gh-pages` ou dossier `docs/`)
+  - Créer une landing page simple et stylée (même thème dark neon que l'app) avec :
+    - Le logo PinchChat
+    - Un titre + tagline
+    - Des screenshots/GIFs de l'app
+    - Les features principales
+    - Un bouton "Get Started" qui pointe vers le README / installation
+    - Le oneliner Docker
+  - URL : `https://marlburrow.github.io/pinchchat/`
+  - Ajouter un lien "Website" dans les settings du repo GitHub
+  - Ajouter le workflow GitHub Actions pour déployer automatiquement
