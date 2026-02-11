@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PinchChat — Webchat UI for OpenClaw</title>
+  <meta name="description" content="A sleek, dark-themed webchat UI for OpenClaw. Monitor sessions, stream responses, and inspect tool calls in real-time." />
+  <meta property="og:title" content="PinchChat" />
+  <meta property="og:description" content="A sleek, dark-themed webchat UI for OpenClaw." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/MarlBurroW/pinchchat/main/public/logo.png" />
+  <meta property="og:url" content="https://marlburrow.github.io/pinchchat/" />
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/MarlBurroW/pinchchat/main/public/logo.png" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a2e;
+      --border: #2a2a3e;
+      --text-primary: #e4e4e7;
+      --text-secondary: #a1a1aa;
+      --accent-cyan: #22d3ee;
+      --accent-purple: #a78bfa;
+      --accent-pink: #f472b6;
+      --glow-cyan: rgba(34, 211, 238, 0.15);
+      --glow-purple: rgba(167, 139, 250, 0.15);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Animated background gradient */
+    .bg-gradient {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, var(--glow-cyan), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 60%, var(--glow-purple), transparent),
+        var(--bg-primary);
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 6rem 0 4rem;
+    }
+
+    .hero-logo {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 1.5rem;
+      filter: drop-shadow(0 0 30px rgba(34, 211, 238, 0.3));
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+
+    .hero .tagline {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(34, 211, 238, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-2px);
+    }
+
+    /* Docker oneliner */
+    .oneliner {
+      margin: 3rem auto;
+      max-width: 700px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9rem;
+      color: var(--accent-cyan);
+      text-align: left;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .oneliner::before {
+      content: '$ ';
+      color: var(--accent-purple);
+    }
+
+    .oneliner-label {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Features */
+    .features {
+      padding: 4rem 0;
+    }
+
+    .features h2 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 3rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(34, 211, 238, 0.08);
+    }
+
+    .feature-icon {
+      font-size: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Screenshot section */
+    .screenshot-section {
+      padding: 3rem 0;
+      text-align: center;
+    }
+
+    .screenshot-section h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+    }
+
+    .screenshot-placeholder {
+      background: var(--bg-card);
+      border: 1px dashed var(--border);
+      border-radius: 1rem;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 4rem 0 2rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .hero { padding: 4rem 0 2rem; }
+      .hero h1 { font-size: 2.5rem; }
+      .hero .tagline { font-size: 1.05rem; }
+      .oneliner { font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+
+  <section class="hero">
+    <div class="container">
+      <img src="https://raw.githubusercontent.com/MarlBurroW/pinchchat/main/public/logo.png" alt="PinchChat Logo" class="hero-logo" />
+      <h1>PinchChat</h1>
+      <p class="tagline">A sleek, dark-themed webchat UI for <a href="https://github.com/openclaw/openclaw" style="color: var(--accent-cyan); text-decoration: none;">OpenClaw</a>. Monitor sessions, stream AI responses, and inspect tool calls — all in real-time.</p>
+      <div class="buttons">
+        <a href="https://github.com/MarlBurroW/pinchchat#-quick-start" class="btn btn-primary">🚀 Get Started</a>
+        <a href="https://github.com/MarlBurroW/pinchchat" class="btn btn-secondary">⭐ GitHub</a>
+      </div>
+
+      <p class="oneliner-label" style="margin-top: 3rem;">Run it now with one command:</p>
+      <div class="oneliner">docker run -p 3000:80 ghcr.io/marlburrow/pinchchat:latest</div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="container">
+      <h2>Features</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🌑</div>
+          <h3>Dark Neon Theme</h3>
+          <p>Beautiful dark interface with neon accents, built with Tailwind CSS v4. Easy on the eyes during long sessions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Real-time Streaming</h3>
+          <p>Watch the AI think in real-time with streamed responses. Full WebSocket integration with your OpenClaw gateway.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔧</div>
+          <h3>Tool Call Inspector</h3>
+          <p>Expandable tool call badges with syntax-highlighted JSON. See exactly what your agent is doing.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Token Progress Bars</h3>
+          <p>Track token usage per session in real-time. Stay aware of costs and context window limits.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📋</div>
+          <h3>Session Sidebar</h3>
+          <p>Browse all active sessions with live activity indicators. Switch between conversations instantly.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <h3>Runtime Login</h3>
+          <p>Enter gateway credentials at runtime — no secrets baked into the build. Perfect for shared deployments.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🖼️</div>
+          <h3>Inline Images</h3>
+          <p>Images render inline with a lightbox for full-size viewing. Supports PNG, JPG, GIF, and WebP.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <h3>i18n Support</h3>
+          <p>Multi-language interface with English and French built-in. Easy to extend with new translations.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <h3>Markdown Rendering</h3>
+          <p>Full GitHub Flavored Markdown with syntax-highlighted code blocks, tables, and more.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screenshot-section">
+    <div class="container">
+      <h2>See it in Action</h2>
+      <div class="screenshot-placeholder">
+        📸 Screenshots coming soon — <a href="https://github.com/MarlBurroW/pinchchat/issues" style="color: var(--accent-cyan);">contributions welcome</a>!
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://github.com/MarlBurroW/pinchchat">GitHub</a>
+        <a href="https://github.com/openclaw/openclaw">OpenClaw</a>
+        <a href="https://discord.com/invite/clawd">Community</a>
+        <a href="https://github.com/MarlBurroW/pinchchat/blob/main/LICENSE">MIT License</a>
+      </div>
+      <p>Built with ❤️ for the <a href="https://github.com/openclaw/openclaw">OpenClaw</a> community</p>
+    </div>
+  </footer>
+</body>
+</html>

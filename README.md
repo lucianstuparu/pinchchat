@@ -8,6 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://github.com/MarlBurroW/pinchchat/pkgs/container/pinchchat)
+[![Website](https://img.shields.io/badge/website-GitHub%20Pages-blueviolet)](https://marlburrow.github.io/pinchchat/)
 
 **A sleek, dark-themed webchat UI for [OpenClaw](https://github.com/openclaw/openclaw) — monitor sessions, stream responses, and inspect tool calls in real-time.**
 
