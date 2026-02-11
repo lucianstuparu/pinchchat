@@ -3,9 +3,6 @@ import { genId } from './utils';
 export type GatewayEventHandler = (event: string, payload: any) => void;
 export type GatewayResponseHandler = (id: string, ok: boolean, payload: any) => void;
 
-const WS_URL = import.meta.env.VITE_GATEWAY_WS_URL || `ws://${window.location.hostname}:18789`;
-const AUTH_TOKEN = import.meta.env.VITE_GATEWAY_TOKEN || '';
-
 export class GatewayClient {
   private ws: WebSocket | null = null;
   private pendingRequests = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
@@ -13,6 +10,21 @@ export class GatewayClient {
   private _onStatus: (s: 'disconnected' | 'connecting' | 'connected') => void = () => {};
   private reconnectTimer: any = null;
   private connected = false;
+  private autoReconnect = true;
+
+  private wsUrl: string;
+  private authToken: string;
+
+  constructor(wsUrl?: string, authToken?: string) {
+    this.wsUrl = wsUrl || `ws://${window.location.hostname}:18789`;
+    this.authToken = authToken || '';
+  }
+
+  /** Update credentials (e.g. after login). Does not reconnect automatically. */
+  setCredentials(wsUrl: string, authToken: string) {
+    this.wsUrl = wsUrl;
+    this.authToken = authToken;
+  }
 
   onStatus(fn: (s: 'disconnected' | 'connecting' | 'connected') => void) {
     this._onStatus = fn;
@@ -25,8 +37,9 @@ export class GatewayClient {
 
   connect() {
     if (this.ws) return;
+    this.autoReconnect = true;
     this._onStatus('connecting');
-    this.ws = new WebSocket(WS_URL);
+    this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => { console.log('[GW] WS open'); };
 
@@ -58,7 +71,7 @@ export class GatewayClient {
       this._onStatus('disconnected');
       this.pendingRequests.forEach(p => p.reject(new Error('disconnected')));
       this.pendingRequests.clear();
-      this.scheduleReconnect();
+      if (this.autoReconnect) this.scheduleReconnect();
     };
 
     this.ws.onerror = (e) => { console.log('[GW] WS error', e); };
@@ -75,8 +88,8 @@ export class GatewayClient {
       caps: [],
       commands: [],
       permissions: {},
-      auth: { token: AUTH_TOKEN },
-      locale: 'fr-FR',
+      auth: { token: this.authToken },
+      locale: navigator.language || 'en',
       userAgent: 'pinchchat/1.0.0',
     }).then((res) => {
       console.log('[GW] connected!', res);
@@ -84,6 +97,7 @@ export class GatewayClient {
       this._onStatus('connected');
     }).catch((err) => {
       console.log('[GW] connect failed:', err);
+      this.autoReconnect = false;
       this.disconnect();
     });
   }
@@ -97,6 +111,7 @@ export class GatewayClient {
   }
 
   disconnect() {
+    this.autoReconnect = false;
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     if (this.ws) { this.ws.close(); this.ws = null; }
     this.connected = false;

@@ -1,4 +1,4 @@
-import { Menu, Bot, Sparkles } from 'lucide-react';
+import { Menu, Bot, Sparkles, LogOut } from 'lucide-react';
 import type { ConnectionStatus, Session } from '../types';
 
 interface Props {
@@ -6,9 +6,10 @@ interface Props {
   sessionKey: string;
   onToggleSidebar: () => void;
   activeSessionData?: Session;
+  onLogout?: () => void;
 }
 
-export function Header({ status, sessionKey, onToggleSidebar, activeSessionData }: Props) {
+export function Header({ status, sessionKey, onToggleSidebar, activeSessionData, onLogout }: Props) {
   const sessionLabel = sessionKey.split(':').pop() || sessionKey;
 
   return (
@@ -45,6 +46,16 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData 
             <span className="w-2 h-2 rounded-full bg-red-400/80" />
             <span className="text-xs text-zinc-300 hidden sm:inline">Disconnected</span>
           </div>
+        )}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            aria-label="Disconnect and logout"
+            className="p-2 rounded-2xl hover:bg-white/5 text-zinc-500 hover:text-zinc-300 transition-colors"
+            title="Logout"
+          >
+            <LogOut size={16} />
+          </button>
         )}
       </div>
     </header>

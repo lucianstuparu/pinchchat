@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GatewayClient } from '../lib/gateway';
 import { genIdempotencyKey } from '../lib/utils';
+import { getStoredCredentials, storeCredentials, clearCredentials } from '../components/LoginScreen';
 import type { ChatMessage, MessageBlock, ConnectionStatus, Session } from '../types';
 
 function extractText(message: any): string {
@@ -23,6 +24,10 @@ export function useGateway() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState('agent:main:main');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null); // null = checking
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const isConnectingRef = useRef(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const activeSessionRef = useRef(activeSession);
@@ -30,21 +35,38 @@ export function useGateway() {
   const currentRunIdRef = useRef<string | null>(null);
   const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const client = new GatewayClient();
+  const setupClient = useCallback((wsUrl: string, token: string) => {
+    // Tear down existing client
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+    }
+
+    const client = new GatewayClient(wsUrl, token);
     clientRef.current = client;
 
     client.onStatus((s) => {
       setStatus(s);
       if (s === 'connected') {
+        setAuthenticated(true);
+        setConnectError(null);
+        setIsConnecting(false);
+        isConnectingRef.current = false;
+        storeCredentials(wsUrl, token);
         loadSessions();
         loadHistory(activeSessionRef.current);
+      } else if (s === 'disconnected' && !client.isConnected) {
+        // If we never connected successfully, this is an auth/connection error
+        if (isConnectingRef.current) {
+          setConnectError('Connection failed — check URL and token');
+          setIsConnecting(false);
+          isConnectingRef.current = false;
+          setAuthenticated(false);
+        }
       }
     });
 
     client.onEvent((event, payload) => {
       if (event === 'agent') {
-        // Tool stream events
         handleAgentEvent(payload);
         return;
       }
@@ -52,7 +74,6 @@ export function useGateway() {
 
       const { state, runId, message, errorMessage, sessionKey: evtSession } = payload;
 
-      // Track active/inactive sessions globally
       if (evtSession) {
         if (state === 'delta') {
           setActiveSessions(prev => {
@@ -80,14 +101,12 @@ export function useGateway() {
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant' && last.isStreaming && last.runId === runId) {
-            // Update text block but preserve tool/thinking blocks
             const updated = { ...last };
             updated.content = text;
             const nonTextBlocks = updated.blocks.filter(b => b.type !== 'text');
             updated.blocks = [...nonTextBlocks, { type: 'text' as const, text }];
             return [...prev.slice(0, -1), updated];
           }
-          // Create new streaming message
           const msg: ChatMessage = {
             id: runId + '-' + Date.now(),
             role: 'assistant',
@@ -102,7 +121,6 @@ export function useGateway() {
       } else if (state === 'final') {
         currentRunIdRef.current = null;
         setIsGenerating(false);
-        // Reload full history to get the proper final messages with tool calls etc.
         loadHistory(activeSessionRef.current);
       } else if (state === 'error') {
         currentRunIdRef.current = null;
@@ -133,12 +151,23 @@ export function useGateway() {
       }
     });
 
+    setIsConnecting(true);
+    isConnectingRef.current = true;
+    setConnectError(null);
     client.connect();
-    return () => client.disconnect();
   }, []);
 
+  // On mount: try stored credentials
+  useEffect(() => {
+    const stored = getStoredCredentials();
+    if (stored) {
+      setupClient(stored.url, stored.token);
+    } else {
+      setAuthenticated(false);
+    }
+  }, [setupClient]);
+
   const handleAgentEvent = useCallback((payload: any) => {
-    // Handle tool stream events from agent stream
     if (payload?.stream !== 'tool') return;
     const data = payload.data ?? {};
     const phase = data.phase;
@@ -202,10 +231,8 @@ export function useGateway() {
               for (const block of m.content) {
                 if (block.type === 'text') blocks.push({ type: 'text', text: block.text });
                 else if (block.type === 'thinking') blocks.push({ type: 'thinking', text: block.thinking || block.text || '' });
-                // Anthropic format
                 else if (block.type === 'tool_use') blocks.push({ type: 'tool_use', name: block.name, input: block.input, id: block.id });
                 else if (block.type === 'tool_result') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.tool_use_id });
-                // OpenClaw gateway format (toolCall / toolResult)
                 else if (block.type === 'toolCall') blocks.push({ type: 'tool_use', name: block.name, input: block.arguments || block.input, id: block.id });
                 else if (block.type === 'toolResult') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.toolCallId || block.tool_use_id, name: block.name });
               }
@@ -213,10 +240,8 @@ export function useGateway() {
               blocks.push({ type: 'text', text: m.content });
             }
           }
-          // Map gateway roles to our simplified roles
           const role: 'user' | 'assistant' = m.role === 'user' ? 'user' : 'assistant';
 
-          // toolResult role messages: convert text blocks to tool_result blocks, then merge into previous assistant
           if (m.role === 'toolResult') {
             const toolBlocks: MessageBlock[] = blocks.map(b => {
               if (b.type === 'text') {
@@ -242,7 +267,6 @@ export function useGateway() {
             blocks,
           };
         });
-        // Merge toolResult messages into their preceding assistant message
         const merged: ChatMessage[] = [];
         for (const msg of msgs) {
           if ((msg as any).isToolResult && merged.length > 0 && merged[merged.length - 1].role === 'assistant') {
@@ -251,8 +275,7 @@ export function useGateway() {
               blocks: [...merged[merged.length - 1].blocks, ...msg.blocks],
             };
           } else if ((msg as any).isToolResult) {
-            // Orphan toolResult — skip or show as assistant
-            // skip it
+            // skip orphan
           } else {
             merged.push(msg);
           }
@@ -300,6 +323,23 @@ export function useGateway() {
     loadHistory(key);
   }, [loadHistory]);
 
+  const login = useCallback((url: string, token: string) => {
+    setupClient(url, token);
+  }, [setupClient]);
+
+  const logout = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+      clientRef.current = null;
+    }
+    clearCredentials();
+    setAuthenticated(false);
+    setMessages([]);
+    setSessions([]);
+    setStatus('disconnected');
+    setConnectError(null);
+  }, []);
+
   // Periodic session refresh every 30s
   useEffect(() => {
     if (status !== 'connected') return;
@@ -307,11 +347,14 @@ export function useGateway() {
     return () => clearInterval(interval);
   }, [status, loadSessions]);
 
-  // Merge active state into sessions
   const enrichedSessions = sessions.map(s => ({
     ...s,
     isActive: activeSessions.has(s.key),
   }));
 
-  return { status, messages, sessions: enrichedSessions, activeSession, isGenerating, sendMessage, abort, switchSession, loadSessions };
+  return {
+    status, messages, sessions: enrichedSessions, activeSession, isGenerating,
+    sendMessage, abort, switchSession, loadSessions,
+    authenticated, login, logout, connectError, isConnecting,
+  };
 }
