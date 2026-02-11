@@ -7,6 +7,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 ## [Unreleased]
 
 ### Added
+- **ErrorBoundary** — graceful crash recovery with a user-friendly error screen instead of a blank page (`b61a232`)
+- **Keyboard shortcuts modal** — press `?` to see all available shortcuts (`ae83545`)
+- **Session search filter** — filter sessions in the sidebar with `Ctrl+K` shortcut (`1779709`)
+- **Emoji icons on tool call badges** — visual icons per tool type (🔍 web_search, ⚡ exec, 📖 read, etc.) (`72f7d76`)
+- **Line break support** — messages now preserve single line breaks via remark-breaks (`59104b4`)
 - **Copy button on assistant messages** — one-click copy of the full message text (`dd5b56e`)
 - **Animated UI demo on landing page** — interactive fake chat showing tool call visualization, typing effects, and thinking indicators (`d26c498`)
 - **Connection lost/reconnected banner** — visual feedback when WebSocket connection drops or recovers (`32a2166`)
@@ -25,6 +30,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 - **Contributing guide** — CONTRIBUTING.md with dev setup and PR guidelines (`e34643d`)
 
 ### Changed
+- **Landing page layout** — moved demo to hero section, replaced grid with alternating feature sections (`d118498`)
+- **Token progress bars** — unified with subtle cyan opacity ramp, replacing the multi-color gradient (`84c8e24`)
 - **Features rewrite** — pragmatic feature descriptions in README and landing page, highlighting real differentiators (`f556c8d`)
 - **Architecture diagram** — replaced ASCII art with a Mermaid diagram in the README (`02d2ab3`)
 - **Smart auto-scroll** — only auto-scrolls when the user is near the bottom (`3e7a596`)
@@ -32,6 +39,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 - **Vendor code-splitting** — split React and markdown dependencies into separate chunks, eliminating the 500KB bundle warning (`d7bdf3b`)
 
 ### Fixed
+- **ARIA accessibility** — added ARIA attributes to interactive elements for screen reader support (`78f82fd`)
+- Landing page demo messages left-aligned (inherited text-align:center from hero) (`02e4bcf`)
 - i18n key for 'Parameters' label in tool call expansion (`195ad62`)
 - Sidebar overlay closes on Escape key + aria-hidden for screen readers (`91c22a1`)
 - Corrected `index.html` lang attribute, page title, favicon path, and added SEO meta tags (`24c7d00`)
