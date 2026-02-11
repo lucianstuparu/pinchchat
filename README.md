@@ -77,6 +77,10 @@ Or serve the `dist/` folder with nginx, Caddy, or any static file server.
 
 [MIT](LICENSE) © Nicolas Varrot
 
+## 🤝 Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## 🔗 Links
 
 - [OpenClaw](https://github.com/openclaw/openclaw) — the AI agent platform ClawChat connects to
