@@ -4,6 +4,13 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.11.0] — 2026-02-12
+
+### Added
+- **Relative timestamps in sidebar** — each session shows how recently it was active (2m, 3h, 1d)
+- **Message preview in sidebar** — last message preview shown below session name
+- **Recency sorting** — sessions sorted by most recently updated within pinned/unpinned groups
+
 ## [1.10.0] — 2026-02-12
 
 ### Added
