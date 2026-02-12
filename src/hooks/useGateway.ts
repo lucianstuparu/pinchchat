@@ -388,6 +388,24 @@ export function useGateway() {
     setupClient(url, token);
   }, [setupClient]);
 
+  const deleteSession = useCallback(async (key: string) => {
+    try {
+      await clientRef.current?.send('sessions.delete', { key, deleteTranscript: true });
+    } catch {
+      // Ignore delete failures
+    }
+    // Remove from local state
+    setSessions(prev => prev.filter(s => s.key !== key));
+    // If we deleted the active session, switch to main
+    if (activeSessionRef.current === key) {
+      const mainKey = 'agent:main:main';
+      setActiveSession(mainKey);
+      activeSessionRef.current = mainKey;
+      setMessages([]);
+      loadHistory(mainKey);
+    }
+  }, [loadHistory]);
+
   const logout = useCallback(() => {
     if (clientRef.current) {
       clientRef.current.disconnect();
@@ -416,7 +434,7 @@ export function useGateway() {
 
   return {
     status, messages, sessions: enrichedSessions, activeSession, isGenerating, isLoadingHistory,
-    sendMessage, abort, switchSession, loadSessions,
+    sendMessage, abort, switchSession, loadSessions, deleteSession,
     authenticated, login, logout, connectError, isConnecting,
   };
 }

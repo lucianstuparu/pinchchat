@@ -52,6 +52,9 @@ const en = {
   'sidebar.pin': 'Pin session',
   'sidebar.unpin': 'Unpin session',
   'sidebar.pinned': 'Pinned',
+  'sidebar.delete': 'Delete session',
+  'sidebar.deleteConfirm': 'Delete this session? This cannot be undone.',
+  'sidebar.deleteCancel': 'Cancel',
 
   // Thinking
   'thinking.label': 'Thinking',
@@ -134,6 +137,9 @@ const fr: Record<keyof typeof en, string> = {
   'sidebar.pin': 'Épingler la session',
   'sidebar.unpin': 'Désépingler la session',
   'sidebar.pinned': 'Épinglées',
+  'sidebar.delete': 'Supprimer la session',
+  'sidebar.deleteConfirm': 'Supprimer cette session ? Cette action est irréversible.',
+  'sidebar.deleteCancel': 'Annuler',
 
   'thinking.label': 'Réflexion',
 

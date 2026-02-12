@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Sparkles, Search, Pin } from 'lucide-react';
+import { X, Sparkles, Search, Pin, Trash2 } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { SessionIcon } from './SessionIcon';
@@ -39,17 +39,19 @@ interface Props {
   sessions: Session[];
   activeSession: string;
   onSwitch: (key: string) => void;
+  onDelete: (key: string) => void;
   open: boolean;
   onClose: () => void;
 }
 
-export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Props) {
+export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onClose }: Props) {
   const t = useT();
   const [filter, setFilter] = useState('');
   const [focusIdx, setFocusIdx] = useState(-1);
   const [pinned, setPinned] = useState(getPinnedSessions);
   const [width, setWidth] = useState(getSavedWidth);
   const [dragging, setDragging] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ startX: 0, startW: 0 });
@@ -260,6 +262,14 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
                       >
                         <Pin size={12} className={isPinned ? 'fill-current' : ''} />
                       </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete(s.key); }}
+                        className="shrink-0 p-0.5 rounded-lg transition-all text-zinc-600 opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-red-400"
+                        title={t('sidebar.delete')}
+                        aria-label={t('sidebar.delete')}
+                      >
+                        <Trash2 size={12} />
+                      </button>
                       {s.messageCount != null && (
                         <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/5 text-zinc-500'}`}>
                           {s.messageCount}
@@ -310,6 +320,29 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
       </aside>
       {/* Prevent text selection while dragging */}
       {dragging && <div className="fixed inset-0 z-[60] cursor-col-resize" />}
+      {/* Delete confirmation dialog */}
+      {confirmDelete && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]" onClick={() => setConfirmDelete(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[80] w-72 bg-[#1e1e24] border border-white/10 rounded-2xl p-5 shadow-2xl">
+            <p className="text-sm text-zinc-300 mb-4">{t('sidebar.deleteConfirm')}</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-white/10 text-zinc-400 hover:bg-white/5 transition-colors"
+              >
+                {t('sidebar.deleteCancel')}
+              </button>
+              <button
+                onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); }}
+                className="px-3 py-1.5 text-xs rounded-xl bg-red-500/20 text-red-300 border border-red-500/20 hover:bg-red-500/30 transition-colors"
+              >
+                {t('sidebar.delete')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

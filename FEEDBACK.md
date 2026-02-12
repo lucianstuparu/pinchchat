@@ -268,7 +268,7 @@
 ## Item #30
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** pending
+- **Status:** in-progress
 - **Description:** Supprimer une session depuis la sidebar
 - **Details:**
   - Ajouter un bouton/action pour supprimer une session (clic droit ou icône)

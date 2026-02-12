@@ -12,7 +12,7 @@ const Chat = lazy(() => import('./components/Chat').then(m => ({ default: m.Chat
 export default function App() {
   const {
     status, messages, sessions, activeSession, isGenerating, isLoadingHistory,
-    sendMessage, abort, switchSession,
+    sendMessage, abort, switchSession, deleteSession,
     authenticated, login, logout, connectError, isConnecting,
   } = useGateway();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -79,6 +79,7 @@ export default function App() {
         sessions={sessions}
         activeSession={activeSession}
         onSwitch={switchSession}
+        onDelete={deleteSession}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
