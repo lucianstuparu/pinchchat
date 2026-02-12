@@ -6,6 +6,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 
 ## [Unreleased]
 
+## [1.2.2] — 2026-02-12
+
+Code readability and developer experience polish.
+
+### Added
+- **Language labels on code blocks** — fenced code blocks now show the language name (e.g. "python", "bash") in a subtle label for easier identification (`ae3f683`)
+- **Elapsed time on thinking indicator** — see how long the agent has been thinking with a live counter (`0c95150`)
+
 ## [1.2.1] — 2026-02-12
 
 Small UX and documentation polish.
