@@ -4,6 +4,10 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.15.1] — 2026-02-12
+### Fixed
+- Metadata viewer popup was invisible due to parent `overflow-hidden` — now renders via portal outside the message bubble
+
 ## [1.15.0] — 2026-02-12
 ### Added
 - Message metadata viewer — discreet ℹ️ button on hover shows raw message details (id, role, timestamp, channel, etc.)
