@@ -186,7 +186,8 @@
 ## Item #23
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `73d9e5f`
 - **Description:** Icônes par channel/type dans la liste des sessions (sidebar)
   - Discord → icône Discord
   - Telegram → icône Telegram
