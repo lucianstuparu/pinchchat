@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useGateway } from './hooks/useGateway';
 import { useNotifications } from './hooks/useNotifications';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { Chat } from './components/Chat';
 import { LoginScreen } from './components/LoginScreen';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
+
+const Chat = lazy(() => import('./components/Chat').then(m => ({ default: m.Chat })));
 
 export default function App() {
   const {
@@ -77,7 +78,9 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0" aria-hidden={sidebarOpen ? true : undefined}>
         <Header status={status} sessionKey={activeSession} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} activeSessionData={sessions.find(s => s.key === activeSession)} onLogout={logout} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
         <ConnectionBanner status={status} />
-        <Chat messages={messages} isGenerating={isGenerating} isLoadingHistory={isLoadingHistory} status={status} onSend={sendMessage} onAbort={abort} />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-zinc-500"><div className="animate-pulse text-sm">Loading…</div></div>}>
+          <Chat messages={messages} isGenerating={isGenerating} isLoadingHistory={isLoadingHistory} status={status} onSend={sendMessage} onAbort={abort} />
+        </Suspense>
       </div>
       <KeyboardShortcuts open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
