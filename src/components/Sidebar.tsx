@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { MessageSquare, X, Sparkles, Search } from 'lucide-react';
+import { X, Sparkles, Search } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
+import { SessionIcon } from './SessionIcon';
 
 interface Props {
   sessions: Session[];
@@ -103,7 +104,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
                 }`}
               >
                 <div className="relative">
-                  <MessageSquare size={15} className={isActive ? 'text-cyan-300/70' : s.isActive ? 'text-violet-400/70' : ''} />
+                  <SessionIcon session={s} isActive={s.isActive} isCurrentSession={isActive} />
                   {s.isActive && (
                     <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] animate-pulse" />
                   )}

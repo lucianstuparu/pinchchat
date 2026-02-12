@@ -90,6 +90,8 @@ export function useGateway() {
           contextTokens: s.contextTokens as number | undefined,
           inputTokens: s.inputTokens as number | undefined,
           outputTokens: s.outputTokens as number | undefined,
+          channel: (s.lastChannel || s.channel) as string | undefined,
+          kind: s.kind as string | undefined,
         })));
       }
     } catch {

@@ -24,6 +24,8 @@ export interface Session {
   contextTokens?: number;
   inputTokens?: number;
   outputTokens?: number;
+  channel?: string;
+  kind?: string;
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
