@@ -40,7 +40,7 @@ export default function App() {
     return () => setBaseTitle(undefined);
   }, [activeSession, sessions]);
 
-  // Close sidebar on Escape key, open shortcuts on ?
+  // Keyboard shortcuts: Escape, ?, Alt+↑/↓ for session navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && sidebarOpen) {
       setSidebarOpen(false);
@@ -52,7 +52,18 @@ export default function App() {
       e.preventDefault();
       setShortcutsOpen(true);
     }
-  }, [sidebarOpen, shortcutsOpen]);
+    // Alt+↑ / Alt+↓ — switch to previous/next session
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      if (sessions.length < 2) return;
+      const idx = sessions.findIndex(s => s.key === activeSession);
+      if (idx === -1) return;
+      const next = e.key === 'ArrowUp'
+        ? (idx - 1 + sessions.length) % sessions.length
+        : (idx + 1) % sessions.length;
+      switchSession(sessions[next].key);
+    }
+  }, [sidebarOpen, shortcutsOpen, sessions, activeSession, switchSession]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);

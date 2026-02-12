@@ -99,6 +99,10 @@ export function KeyboardShortcuts({ open, onClose }: Props) {
               label={t('shortcuts.search')}
             />
             <ShortcutRow
+              keys={<><Kbd>Alt</Kbd><span className="text-zinc-600">+</span><Kbd>↑</Kbd><span className="text-zinc-600">/</span><Kbd>↓</Kbd></>}
+              label={t('shortcuts.switchSession')}
+            />
+            <ShortcutRow
               keys={<Kbd>Esc</Kbd>}
               label={t('shortcuts.closeSidebar')}
             />
