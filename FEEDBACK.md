@@ -469,7 +469,8 @@
 ## Item #44
 - **Date:** 2026-02-12
 - **Priority:** high
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `3ca76eb`
 - **Description:** User message styling from #42 needs rework — too dark and off-brand
 - **Details:**
   - The violet tint from #42 is too dark and doesn't fit the color scheme
