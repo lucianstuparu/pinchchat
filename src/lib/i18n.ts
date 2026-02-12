@@ -63,6 +63,7 @@ const en = {
 
   // Timestamps
   'time.yesterday': 'Yesterday',
+  'time.today': 'Today',
 
   // Keyboard shortcuts
   'shortcuts.title': 'Keyboard Shortcuts',
@@ -131,6 +132,7 @@ const fr: Record<keyof typeof en, string> = {
   'message.retry': 'Renvoyer le message',
 
   'time.yesterday': 'Hier',
+  'time.today': "Aujourd'hui",
 
   'shortcuts.title': 'Raccourcis clavier',
   'shortcuts.send': 'Envoyer le message',

@@ -5,6 +5,7 @@ import { TypingIndicator } from './TypingIndicator';
 import type { ChatMessage, ConnectionStatus } from '../types';
 import { Bot, ArrowDown } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
+import { getLocale, type TranslationKey } from '../lib/i18n';
 
 interface Props {
   messages: ChatMessage[];
@@ -39,6 +40,24 @@ function hasStreamedText(messages: ChatMessage[]): boolean {
   const last = messages[messages.length - 1];
   if (last.role !== 'assistant') return false;
   return last.blocks.some(b => b.type === 'text' && b.text.trim().length > 0) || (last.content?.trim().length > 0);
+}
+
+function formatDateSeparator(ts: number, t: (k: TranslationKey) => string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const locale = getLocale();
+  const bcp47 = locale === 'fr' ? 'fr-FR' : 'en-US';
+
+  if (date.toDateString() === now.toDateString()) return t('time.today');
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return t('time.yesterday');
+  return date.toLocaleDateString(bcp47, { weekday: 'long', day: 'numeric', month: 'long', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+}
+
+function getDateKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 /** Threshold in pixels — if the user is within this distance of the bottom, auto-scroll */
@@ -111,9 +130,26 @@ export function Chat({ messages, isGenerating, status, onSend, onAbort }: Props)
               <div className="text-sm mt-1 text-zinc-500">{t('chat.welcomeSub')}</div>
             </div>
           )}
-          {messages.filter(hasVisibleContent).map(msg => (
-            <ChatMessageComponent key={msg.id} message={msg} onRetry={!isGenerating ? handleSend : undefined} />
-          ))}
+          {(() => {
+            let lastDateKey = '';
+            return messages.filter(hasVisibleContent).map(msg => {
+              const dk = getDateKey(msg.timestamp);
+              const showSep = dk !== lastDateKey;
+              lastDateKey = dk;
+              return (
+                <div key={msg.id}>
+                  {showSep && (
+                    <div className="flex items-center gap-3 py-3 px-4 select-none" aria-label={formatDateSeparator(msg.timestamp, t)}>
+                      <div className="flex-1 h-px bg-white/8" />
+                      <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">{formatDateSeparator(msg.timestamp, t)}</span>
+                      <div className="flex-1 h-px bg-white/8" />
+                    </div>
+                  )}
+                  <ChatMessageComponent message={msg} onRetry={!isGenerating ? handleSend : undefined} />
+                </div>
+              );
+            });
+          })()}
           {showTyping && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
