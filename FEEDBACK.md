@@ -303,7 +303,8 @@
 ## Item #33
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** in-progress
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `17ff52a`
 - **Description:** Afficher le nom de l'agent dans l'UI
 - **Details:**
   - Montrer clairement à quel agent on parle (pas juste l'agentId technique)
