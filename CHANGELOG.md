@@ -6,6 +6,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-02-12
+
+### Added
+- **System event detection** — heartbeats, cron triggers, webhooks, and channel events now display as subtle inline notifications instead of full user message bubbles (`581675d`)
+
 ## [1.5.0] — 2026-02-12
 
 ### Added
