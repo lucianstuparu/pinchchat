@@ -4,7 +4,10 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
-## [Unreleased]
+## [1.9.0] — 2026-02-12
+
+### Added
+- **Human-friendly session titles** — header and sidebar now show readable names (Main, Cron, Task + channel) instead of raw UUIDs; falls back to label or cleaned key (`52a1a7f`)
 
 ## [1.8.1] — 2026-02-12
 
