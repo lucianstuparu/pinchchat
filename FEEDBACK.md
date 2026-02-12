@@ -458,7 +458,8 @@
 ## Item #43
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `7388139`
 - **Description:** Textarea scrollbar always visible — should only show on overflow
 - **Details:**
   - The vertical scrollbar in the message input textarea is always displayed
