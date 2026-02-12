@@ -465,3 +465,15 @@
   - It should only appear when the content exceeds the max height (overflow)
   - Use overflow-y: auto instead of overflow-y: scroll on the textarea
   - The scrollbar should be hidden when the textarea hasn't reached its max size
+
+## Item #44
+- **Date:** 2026-02-12
+- **Priority:** high
+- **Status:** pending
+- **Description:** User message styling from #42 needs rework — too dark and off-brand
+- **Details:**
+  - The violet tint from #42 is too dark and doesn't fit the color scheme
+  - Use a lighter, more visible differentiation — try cyan/teal tones instead of violet (matches the existing cyan accent theme)
+  - Could use a lighter background (slightly brighter than assistant messages) or a colored left border
+  - Keep it subtle but clearly distinguishable
+  - Test against the zinc dark theme to make sure it's readable for keratoconus (no harsh contrast)
