@@ -56,12 +56,16 @@ function guessLanguage(lines: string[]): string {
 /** Detect if a block of lines looks like code */
 function looksLikeCode(lines: string[]): boolean {
   if (lines.length < 2) return false;
+  // If text contains markdown formatting, it's probably prose, not code
+  const joined = lines.join('\n');
+  if (/\*\*[^*]+\*\*/.test(joined) || /^#{1,6}\s/m.test(joined) || /^\s*[-*+]\s/m.test(joined)) return false;
   let codeSignals = 0;
   const patterns = [
     /^(import|export|const|let|var|function|class|interface|type|enum|struct|fn|pub|use|def|from|module|package|namespace)\s/,
     /[{};]\s*$/,
     /^\s*(if|else|for|while|return|match|switch|case|break|continue)\b/,
-    /^\s*(\/\/|#|\/\*|\*)/,
+    /^\s*(\/\/|\/\*)/,
+    /^\s*#\s*(?:include|define|ifdef|ifndef|endif|pragma|import)\b/,
     /[├└│┬─]──/,
     /^\s+\w+\(.*\)/,
     /^\s*<\/?[A-Z]\w*/,
@@ -109,7 +113,7 @@ function autoFormatText(text: string): string {
   const isCodeLine = (line: string): boolean => {
     return /^[\s]+(import|export|const|let|var|function|return|if|else|for)/.test(line)
       || /[{};]\s*$/.test(line)
-      || /^\s*(\/\/|#)/.test(line)
+      || /^\s*\/\//.test(line)
       || /[├└│┬─]──/.test(line)
       || /^\s+\w+\(.*\)/.test(line);
   };
