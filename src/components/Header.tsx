@@ -2,6 +2,7 @@ import { Menu, Sparkles, LogOut, Volume2, VolumeOff, Cpu } from 'lucide-react';
 import type { ConnectionStatus, Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { LanguageSelector } from './LanguageSelector';
+import { sessionDisplayName } from '../lib/sessionName';
 
 interface Props {
   status: ConnectionStatus;
@@ -15,7 +16,7 @@ interface Props {
 
 export function Header({ status, sessionKey, onToggleSidebar, activeSessionData, onLogout, soundEnabled, onToggleSound }: Props) {
   const t = useT();
-  const sessionLabel = sessionKey.split(':').pop() || sessionKey;
+  const sessionLabel = activeSessionData ? sessionDisplayName(activeSessionData) : (sessionKey.split(':').pop() || sessionKey);
 
   return (
     <>

@@ -3,6 +3,7 @@ import { X, Sparkles, Search, Pin, Trash2 } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { SessionIcon } from './SessionIcon';
+import { sessionDisplayName } from '../lib/sessionName';
 
 const PINNED_KEY = 'pinchchat-pinned-sessions';
 const WIDTH_KEY = 'pinchchat-sidebar-width';
@@ -125,7 +126,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
     let list = sessions;
     if (filter.trim()) {
       const q = filter.toLowerCase();
-      list = sessions.filter(s => (s.label || s.key).toLowerCase().includes(q));
+      list = sessions.filter(s => sessionDisplayName(s).toLowerCase().includes(q));
     }
     // Sort pinned sessions to top (preserving relative order within each group)
     const pinnedList = list.filter(s => pinned.has(s.key));
@@ -249,7 +250,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="flex-1 truncate">{s.label || s.key}</span>
+                      <span className="flex-1 truncate">{sessionDisplayName(s)}</span>
                       <button
                         onClick={(e) => togglePin(s.key, e)}
                         className={`shrink-0 p-0.5 rounded-lg transition-all ${
