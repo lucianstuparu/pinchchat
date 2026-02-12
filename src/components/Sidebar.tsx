@@ -1,8 +1,24 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Sparkles, Search } from 'lucide-react';
+import { X, Sparkles, Search, Pin } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { SessionIcon } from './SessionIcon';
+
+const PINNED_KEY = 'pinchchat-pinned-sessions';
+
+function getPinnedSessions(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch { /* noop */ }
+  return new Set();
+}
+
+function savePinnedSessions(pinned: Set<string>) {
+  try {
+    localStorage.setItem(PINNED_KEY, JSON.stringify([...pinned]));
+  } catch { /* noop */ }
+}
 
 interface Props {
   sessions: Session[];
@@ -16,8 +32,20 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
   const t = useT();
   const [filter, setFilter] = useState('');
   const [focusIdx, setFocusIdx] = useState(-1);
+  const [pinned, setPinned] = useState(getPinnedSessions);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const togglePin = useCallback((key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinned(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      savePinnedSessions(next);
+      return next;
+    });
+  }, []);
 
   // Keyboard shortcut: Ctrl+K or Cmd+K to focus search when sidebar is open
   useEffect(() => {
@@ -37,12 +65,16 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
   }, []);
 
   const filtered = useMemo(() => {
-    if (!filter.trim()) return sessions;
-    const q = filter.toLowerCase();
-    return sessions.filter(s =>
-      (s.label || s.key).toLowerCase().includes(q)
-    );
-  }, [sessions, filter]);
+    let list = sessions;
+    if (filter.trim()) {
+      const q = filter.toLowerCase();
+      list = sessions.filter(s => (s.label || s.key).toLowerCase().includes(q));
+    }
+    // Sort pinned sessions to top (preserving relative order within each group)
+    const pinnedList = list.filter(s => pinned.has(s.key));
+    const unpinnedList = list.filter(s => !pinned.has(s.key));
+    return [...pinnedList, ...unpinnedList];
+  }, [sessions, filter, pinned]);
 
   return (
     <>
@@ -127,55 +159,75 @@ export function Sidebar({ sessions, activeSession, onSwitch, open, onClose }: Pr
           {filtered.map((s, idx) => {
             const isActive = s.key === activeSession;
             const isFocused = idx === focusIdx;
+            const isPinned = pinned.has(s.key);
+            const isFirstUnpinned = !isPinned && idx > 0 && pinned.has(filtered[idx - 1].key);
             return (
-              <button
-                key={s.key}
-                role="option"
-                aria-selected={isActive}
-                onClick={() => { onSwitch(s.key); onClose(); }}
-                onMouseEnter={() => setFocusIdx(idx)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-sm transition-all mb-1 ${
-                  isActive
-                    ? 'bg-white/5 text-cyan-200 border border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.08)]'
-                    : s.isActive
-                      ? 'bg-violet-500/5 text-violet-200 border border-violet-500/15 shadow-[0_0_10px_rgba(168,85,247,0.06)]'
-                      : 'text-zinc-400 hover:bg-white/5 border border-transparent'
-                } ${isFocused && !isActive ? 'ring-1 ring-cyan-400/30' : ''}`}
-              >
-                <div className="relative">
-                  <SessionIcon session={s} isActive={s.isActive} isCurrentSession={isActive} />
-                  {s.isActive && (
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] animate-pulse" />
-                  )}
-                  {s.hasUnread && !isActive && (
-                    <span className="absolute -top-0.5 -left-0.5 h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.7)]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <span className="flex-1 truncate">{s.label || s.key}</span>
-                    {s.messageCount != null && (
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/5 text-zinc-500'}`}>
-                        {s.messageCount}
-                      </span>
+              <div key={s.key}>
+                {isFirstUnpinned && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 mt-1 mb-1">
+                    <div className="flex-1 h-px bg-white/5" />
+                  </div>
+                )}
+                <button
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => { onSwitch(s.key); onClose(); }}
+                  onMouseEnter={() => setFocusIdx(idx)}
+                  className={`group/item w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-sm transition-all mb-1 ${
+                    isActive
+                      ? 'bg-white/5 text-cyan-200 border border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.08)]'
+                      : s.isActive
+                        ? 'bg-violet-500/5 text-violet-200 border border-violet-500/15 shadow-[0_0_10px_rgba(168,85,247,0.06)]'
+                        : 'text-zinc-400 hover:bg-white/5 border border-transparent'
+                  } ${isFocused && !isActive ? 'ring-1 ring-cyan-400/30' : ''}`}
+                >
+                  <div className="relative">
+                    <SessionIcon session={s} isActive={s.isActive} isCurrentSession={isActive} />
+                    {s.isActive && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] animate-pulse" />
+                    )}
+                    {s.hasUnread && !isActive && (
+                      <span className="absolute -top-0.5 -left-0.5 h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.7)]" />
                     )}
                   </div>
-                  {(() => {
-                    if (!s.contextTokens) return null;
-                    const pct = Math.min(100, ((s.totalTokens || 0) / s.contextTokens) * 100);
-                    const barOpacity = Math.max(0.35, Math.min(1, pct / 100));
-                    const barStyle = { width: `${pct}%`, backgroundColor: `rgba(56, 189, 248, ${barOpacity})` };
-                    return (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <div className="flex-1 h-[3px] rounded-full bg-white/5 overflow-hidden">
-                          <div className="h-full rounded-full" style={barStyle} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="flex-1 truncate">{s.label || s.key}</span>
+                      <button
+                        onClick={(e) => togglePin(s.key, e)}
+                        className={`shrink-0 p-0.5 rounded-lg transition-all ${
+                          isPinned
+                            ? 'text-cyan-400 opacity-80 hover:opacity-100'
+                            : 'text-zinc-600 opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-zinc-400'
+                        }`}
+                        title={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+                        aria-label={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+                      >
+                        <Pin size={12} className={isPinned ? 'fill-current' : ''} />
+                      </button>
+                      {s.messageCount != null && (
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/5 text-zinc-500'}`}>
+                          {s.messageCount}
+                        </span>
+                      )}
+                    </div>
+                    {(() => {
+                      if (!s.contextTokens) return null;
+                      const pct = Math.min(100, ((s.totalTokens || 0) / s.contextTokens) * 100);
+                      const barOpacity = Math.max(0.35, Math.min(1, pct / 100));
+                      const barStyle = { width: `${pct}%`, backgroundColor: `rgba(56, 189, 248, ${barOpacity})` };
+                      return (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex-1 h-[3px] rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full" style={barStyle} />
+                          </div>
+                          <span className="text-[9px] text-zinc-500 tabular-nums shrink-0">{Math.round(pct)}%</span>
                         </div>
-                        <span className="text-[9px] text-zinc-500 tabular-nums shrink-0">{Math.round(pct)}%</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </button>
+                      );
+                    })()}
+                  </div>
+                </button>
+              </div>
             );
           })}
         </div>

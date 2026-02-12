@@ -49,6 +49,9 @@ const en = {
   'sidebar.empty': 'No sessions',
   'sidebar.search': 'Search sessions…',
   'sidebar.noResults': 'No matching sessions',
+  'sidebar.pin': 'Pin session',
+  'sidebar.unpin': 'Unpin session',
+  'sidebar.pinned': 'Pinned',
 
   // Thinking
   'thinking.label': 'Thinking',
@@ -128,6 +131,9 @@ const fr: Record<keyof typeof en, string> = {
   'sidebar.empty': 'Aucune session',
   'sidebar.search': 'Rechercher…',
   'sidebar.noResults': 'Aucun résultat',
+  'sidebar.pin': 'Épingler la session',
+  'sidebar.unpin': 'Désépingler la session',
+  'sidebar.pinned': 'Épinglées',
 
   'thinking.label': 'Réflexion',
 
