@@ -12,6 +12,7 @@ interface Props {
   isGenerating: boolean;
   isLoadingHistory: boolean;
   status: ConnectionStatus;
+  sessionKey?: string;
   onSend: (text: string, attachments?: Array<{ mimeType: string; fileName: string; content: string }>) => void;
   onAbort: () => void;
 }
@@ -64,7 +65,7 @@ function getDateKey(ts: number): string {
 /** Threshold in pixels — if the user is within this distance of the bottom, auto-scroll */
 const SCROLL_THRESHOLD = 150;
 
-export function Chat({ messages, isGenerating, isLoadingHistory, status, onSend, onAbort }: Props) {
+export function Chat({ messages, isGenerating, isLoadingHistory, status, sessionKey, onSend, onAbort }: Props) {
   const t = useT();
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -176,7 +177,7 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, onSend,
           </button>
         </div>
       )}
-      <ChatInput onSend={handleSend} onAbort={onAbort} isGenerating={isGenerating} disabled={status !== 'connected'} />
+      <ChatInput onSend={handleSend} onAbort={onAbort} isGenerating={isGenerating} disabled={status !== 'connected'} sessionKey={sessionKey} />
     </div>
   );
 }

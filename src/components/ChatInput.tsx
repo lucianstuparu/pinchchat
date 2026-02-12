@@ -15,6 +15,7 @@ interface Props {
   onAbort: () => void;
   isGenerating: boolean;
   disabled: boolean;
+  sessionKey?: string;
 }
 
 const MAX_BASE64_CHARS = 300 * 1024; // ~225KB real, well under 512KB WS limit (JSON overhead + base64 bloat)
@@ -79,7 +80,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-export function ChatInput({ onSend, onAbort, isGenerating, disabled }: Props) {
+export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey }: Props) {
   const t = useT();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<FileAttachment[]>([]);
@@ -93,6 +94,15 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled }: Props) {
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
     }
   }, [text]);
+
+  // Auto-focus textarea when session changes or connection becomes active
+  useEffect(() => {
+    if (!disabled && textareaRef.current) {
+      // Small delay to let the DOM settle after session switch
+      const timer = setTimeout(() => textareaRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionKey, disabled]);
 
   const addFiles = useCallback(async (fileList: FileList | File[]) => {
     const newFiles: FileAttachment[] = [];
