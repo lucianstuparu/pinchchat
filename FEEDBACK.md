@@ -179,7 +179,8 @@
 ## Item #22
 - **Date:** 2026-02-12
 - **Priority:** high
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `29482e3`
 - **Description:** CI GitHub Actions en échec — vérifier et réparer en priorité. Le cron doit aussi vérifier l'état de la CI en début de chaque session avant toute autre amélioration. Si la CI est cassée, c'est la priorité #1.
 
 ## Item #23
