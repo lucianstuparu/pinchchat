@@ -393,7 +393,8 @@
 ## Item #38
 - **Date:** 2026-02-12
 - **Priority:** high
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-12 — commit `d9e1b88`
 - **Description:** Session deletion doesn't persist — deleted sessions reappear after page refresh
 - **Details:**
   - The delete session feature (v1.7.0) only deletes from local state/localStorage
