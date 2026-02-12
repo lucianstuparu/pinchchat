@@ -6,6 +6,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventio
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-02-12
+
+New features and mobile fixes.
+
+### Added
+- **Session pinning** — pin important sessions to the top of the sidebar for quick access (`e24378a`)
+- **Model badge** — see which AI model is handling the current session, displayed next to the token progress bar (`96f2883`, `1465ae1`)
+
+### Fixed
+- **Mobile viewport overflow** — chat messages no longer clip on left/right edges on iPhone (`8ef1b42`)
+
 ## [1.3.0] — 2026-02-12
 
 New features improving daily usability.
