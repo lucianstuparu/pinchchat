@@ -4,6 +4,14 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.33.1] — 2026-02-13
+
+### Fixed
+- Service worker cache now busts on each build (version+timestamp in cache name)
+- PWA users no longer get stuck on stale cached assets
+- Auto-reload when new service worker version is detected
+- Periodic SW update check every 30 minutes
+
 ## [1.33.0] — 2026-02-13
 
 ### Added
