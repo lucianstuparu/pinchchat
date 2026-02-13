@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,9 +12,10 @@ import { CodeBlock } from './CodeBlock';
 import { ToolCall } from './ToolCall';
 import { ImageBlock } from './ImageBlock';
 import { buildImageSrc } from '../lib/image';
-import { Bot, User, Wrench, Copy, Check, RefreshCw, Zap, Info } from 'lucide-react';
+import { Bot, User, Wrench, Copy, Check, RefreshCw, Zap, Info, Webhook } from 'lucide-react';
 import { t, getLocale } from '../lib/i18n';
 import { useLocale } from '../hooks/useLocale';
+import { stripWebhookScaffolding, hasWebhookScaffolding } from '../lib/systemEvent';
 // ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
 
 function getBcp47(): string {
@@ -321,13 +322,43 @@ function SystemEventMessage({ message }: { message: ChatMessageType }) {
   );
 }
 
-export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { message: ChatMessageType; onRetry?: (text: string) => void; agentAvatarUrl?: string }) {
+export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatarUrl }: { message: ChatMessageType; onRetry?: (text: string) => void; agentAvatarUrl?: string }) {
   useLocale(); // re-render on locale change
+
+  // Strip webhook/hook scaffolding from user messages before rendering
+  const message = useMemo(() => {
+    if (rawMessage.role !== 'user') return rawMessage;
+    const content = rawMessage.content || '';
+    const textBlocks = getTextBlocks(rawMessage.blocks);
+    const contentHasScaffolding = hasWebhookScaffolding(content);
+    const anyBlockHasScaffolding = textBlocks.some(b =>
+      hasWebhookScaffolding((b as Extract<MessageBlock, { type: 'text' }>).text)
+    );
+    if (!contentHasScaffolding && !anyBlockHasScaffolding) return rawMessage;
+    // Clean the content and blocks
+    const cleaned: ChatMessageType = { ...rawMessage };
+    if (cleaned.content) {
+      cleaned.content = stripWebhookScaffolding(cleaned.content);
+    }
+    if (cleaned.blocks.length > 0) {
+      cleaned.blocks = cleaned.blocks.map(b => {
+        if (b.type === 'text') {
+          const tb = b as Extract<MessageBlock, { type: 'text' }>;
+          return { ...tb, text: stripWebhookScaffolding(tb.text) };
+        }
+        return b;
+      });
+    }
+    return cleaned;
+  }, [rawMessage]);
+
+  const wasWebhookMessage = rawMessage !== message;
+
   const isUser = message.role === 'user';
 
   // System events render as subtle inline notifications
   if (message.isSystemEvent) {
-    return <SystemEventMessage message={message} />;
+    return <SystemEventMessage message={rawMessage} />;
   }
 
   // Assistant message with no text content — only tool calls / thinking
@@ -407,9 +438,15 @@ export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { mes
           {/* Tool calls & thinking (inline) */}
           {!isUser && <InternalsSummary blocks={message.blocks} />}
         </div>
-        {message.timestamp && (
-          <div className={`mt-1 text-[11px] text-pc-text-muted ${isUser ? 'text-right pr-2' : 'pl-2'}`}>
-            {formatTimestamp(message.timestamp)}
+        {(message.timestamp || wasWebhookMessage) && (
+          <div className={`mt-1 flex items-center gap-1.5 text-[11px] text-pc-text-muted ${isUser ? 'justify-end pr-2' : 'pl-2'}`}>
+            {wasWebhookMessage && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-pc-text-faint" title="Webhook message (scaffolding stripped)">
+                <Webhook size={10} className="opacity-60" />
+                <span>webhook</span>
+              </span>
+            )}
+            {message.timestamp && formatTimestamp(message.timestamp)}
           </div>
         )}
       </div>

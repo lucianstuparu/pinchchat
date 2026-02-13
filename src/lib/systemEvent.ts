@@ -27,3 +27,57 @@ export function isSystemEvent(text: string): boolean {
   if (!trimmed) return false;
   return SYSTEM_PATTERNS.some(pat => pat.test(trimmed));
 }
+
+/**
+ * Strip webhook/hook scaffolding from message content.
+ * OpenClaw wraps inbound webhook payloads in security envelopes like:
+ *   [hook:agent task_id=xxx job_id=xxx]
+ *   --- SECURITY NOTICE ---
+ *   ...
+ *   <<<EXTERNAL_UNTRUSTED_CONTENT>>>
+ *   actual message
+ *   <<<END_EXTERNAL_UNTRUSTED_CONTENT>>>
+ *
+ * This extracts the actual user content and returns it clean.
+ * Also strips leading [hook:...] / [cron:...] / [sms-inbound ...] tags
+ * and SECURITY NOTICE blocks when no EXTERNAL_UNTRUSTED_CONTENT delimiters exist.
+ */
+export function stripWebhookScaffolding(text: string): string {
+  const trimmed = text.trim();
+
+  // Extract content between <<<EXTERNAL_UNTRUSTED_CONTENT>>> delimiters
+  const extMatch = trimmed.match(
+    /<<<EXTERNAL_UNTRUSTED_CONTENT>>>\s*([\s\S]*?)\s*<<<END_EXTERNAL_UNTRUSTED_CONTENT>>>/
+  );
+  if (extMatch) {
+    return extMatch[1].trim();
+  }
+
+  // Strip leading bracket tags: [hook:...], [cron:...], [sms-inbound ...], etc.
+  let cleaned = trimmed.replace(/^\[(?:hook|cron|webhook|sms-inbound)[^\]]*\]\s*/i, '');
+
+  // Strip SECURITY NOTICE blocks (--- SECURITY NOTICE --- ... --- END ---)
+  cleaned = cleaned.replace(
+    /---\s*SECURITY NOTICE\s*---[\s\S]*?---\s*END\s*---\s*/i,
+    ''
+  );
+
+  // Strip standalone security notice lines without END marker
+  cleaned = cleaned.replace(
+    /---\s*SECURITY NOTICE\s*---[^\n]*\n(?:.*\n)*?(?=\S)/i,
+    ''
+  );
+
+  // Strip task/job ID lines
+  cleaned = cleaned.replace(/^(?:task_id|job_id|Task|Job)\s*[:=]\s*\S+\s*\n?/gim, '');
+
+  return cleaned.trim() || trimmed;
+}
+
+/**
+ * Check if a message contains webhook scaffolding that should be cleaned.
+ */
+export function hasWebhookScaffolding(text: string): boolean {
+  return /<<<EXTERNAL_UNTRUSTED_CONTENT>>>/.test(text) ||
+    /---\s*SECURITY NOTICE\s*---/i.test(text);
+}

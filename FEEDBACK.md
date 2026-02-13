@@ -518,7 +518,8 @@
 ## Item #48
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-13 — commit `6c19c26`
 - **Description:** Message search — Ctrl+F in conversation history
   - Search bar that filters/highlights messages in the current session
   - Navigate between results (up/down arrows)
