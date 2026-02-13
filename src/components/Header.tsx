@@ -61,7 +61,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
           <button
             onClick={onToggleSound}
             aria-label={soundEnabled ? t('header.soundOff') : t('header.soundOn')}
-            className="p-2 rounded-2xl hover:bg-[var(--pc-hover)] text-pc-text-muted hover:text-pc-text transition-colors"
+            className="hidden sm:block p-2 rounded-2xl hover:bg-[var(--pc-hover)] text-pc-text-muted hover:text-pc-text transition-colors"
             title={soundEnabled ? t('header.soundOff') : t('header.soundOn')}
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeOff size={16} />}
@@ -71,14 +71,14 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
           <button
             onClick={handleExport}
             aria-label={t('header.export')}
-            className="p-2 rounded-2xl hover:bg-[var(--pc-hover)] text-pc-text-muted hover:text-pc-text transition-colors"
+            className="hidden sm:block p-2 rounded-2xl hover:bg-[var(--pc-hover)] text-pc-text-muted hover:text-pc-text transition-colors"
             title={t('header.export')}
           >
             <Download size={16} />
           </button>
         )}
-        <ThemeSwitcher />
-        <LanguageSelector />
+        <span className="hidden sm:contents"><ThemeSwitcher /></span>
+        <span className="hidden sm:contents"><LanguageSelector /></span>
         {status === 'connected' ? (
           <div className="flex items-center gap-2 rounded-2xl border border-pc-border bg-pc-elevated/30 px-3 py-1.5">
             <span className="w-2 h-2 rounded-full bg-[var(--pc-accent)] shadow-[0_0_12px_var(--pc-accent-dim)]" />
