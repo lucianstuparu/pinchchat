@@ -4,6 +4,17 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.36.0] — 2026-02-13
+
+### Added
+- Semantic `<time>` elements on all message timestamps with full-date tooltip on hover
+- Lazy-loaded ReactMarkdown and plugins for faster initial page render
+- Print stylesheet for conversation export
+- GatewayClient WebSocket unit tests (12 tests)
+
+### Documentation
+- Reverse proxy configuration guide (Nginx, Caddy, Traefik)
+
 ## [1.34.1] — 2026-02-13
 
 ### Fixed
