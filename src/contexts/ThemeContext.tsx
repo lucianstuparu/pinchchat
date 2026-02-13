@@ -10,7 +10,8 @@ interface StoredTheme {
   accent: AccentColor;
 }
 
-const themes: Record<ThemeName, Record<string, string>> = {
+type ConcreteTheme = 'dark' | 'light' | 'oled';
+const themes: Record<ConcreteTheme, Record<string, string>> = {
   dark: {
     '--pc-bg-base': '#1e1e24',
     '--pc-bg-surface': '#232329',
@@ -131,12 +132,20 @@ function applyVars(vars: Record<string, string>) {
   }
 }
 
+/** Resolve 'system' to the actual theme based on OS preference. */
+function resolveTheme(name: ThemeName): 'dark' | 'light' | 'oled' {
+  if (name === 'system') {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  return name;
+}
+
 function loadStored(): StoredTheme {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.theme in themes && parsed.accent in accents) return parsed;
+      if ((parsed.theme in themes || parsed.theme === 'system') && parsed.accent in accents) return parsed;
     }
   } catch { /* ignore invalid stored JSON */ }
   return { theme: 'dark', accent: 'cyan' };
@@ -153,7 +162,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((t: ThemeName) => {
     setThemeState(t);
-    applyVars(themes[t]);
+    applyVars(themes[resolveTheme(t)]);
     persist(t, accent);
   }, [accent, persist]);
 
@@ -165,8 +174,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Apply on mount
   useEffect(() => {
-    applyVars({ ...themes[theme], ...accents[accent] });
+    applyVars({ ...themes[resolveTheme(theme)], ...accents[accent] });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen to OS color scheme changes when theme is 'system'
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const handler = () => applyVars(themes[mq.matches ? 'light' : 'dark']);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, accent, setTheme, setAccent }}>

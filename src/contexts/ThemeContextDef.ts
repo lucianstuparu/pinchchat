@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 
-export type ThemeName = 'dark' | 'light' | 'oled';
+export type ThemeName = 'dark' | 'light' | 'oled' | 'system';
 export type AccentColor = 'cyan' | 'violet' | 'emerald' | 'amber' | 'rose' | 'blue';
 
 export interface ThemeContextValue {

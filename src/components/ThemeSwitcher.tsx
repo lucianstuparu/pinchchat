@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Palette, Sun, Moon, Monitor, Check } from 'lucide-react';
+import { Palette, Sun, Moon, Monitor, Laptop, Check } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import type { ThemeName, AccentColor } from '../contexts/ThemeContextDef';
 import { useT } from '../hooks/useLocale';
@@ -7,6 +7,7 @@ import { useT } from '../hooks/useLocale';
 import type { TranslationKey } from '../lib/i18n';
 
 const themeOptions: { value: ThemeName; icon: typeof Sun; labelKey: TranslationKey }[] = [
+  { value: 'system', icon: Laptop, labelKey: 'theme.system' },
   { value: 'dark', icon: Moon, labelKey: 'theme.dark' },
   { value: 'light', icon: Sun, labelKey: 'theme.light' },
   { value: 'oled', icon: Monitor, labelKey: 'theme.oled' },
