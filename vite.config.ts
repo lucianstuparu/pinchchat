@@ -1,13 +1,33 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pkg from './package.json' with { type: 'json' }
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+/** Replace __SW_VERSION__ in sw.js with version+timestamp at build time */
+function swVersionPlugin(): Plugin {
+  const version = `${pkg.version}-${Date.now()}`
+  return {
+    name: 'sw-version',
+    closeBundle() {
+      const swPath = resolve(__dirname, 'dist', 'sw.js')
+      if (existsSync(swPath)) {
+        const content = readFileSync(swPath, 'utf-8')
+        writeFileSync(swPath, content.replace(/__SW_VERSION__/g, version))
+      }
+    },
+  }
+}
 
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), swVersionPlugin()],
   build: {
     rollupOptions: {
       output: {
