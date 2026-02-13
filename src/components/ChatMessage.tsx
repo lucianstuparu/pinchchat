@@ -12,7 +12,7 @@ import { CodeBlock } from './CodeBlock';
 import { ToolCall } from './ToolCall';
 import { ImageBlock } from './ImageBlock';
 import { buildImageSrc } from '../lib/image';
-import { Bot, User, Wrench, Copy, Check, RefreshCw, Zap, Info, Webhook } from 'lucide-react';
+import { Bot, User, Wrench, Copy, Check, RefreshCw, Zap, Info, Webhook, Braces } from 'lucide-react';
 import { t, getLocale } from '../lib/i18n';
 import { useLocale } from '../hooks/useLocale';
 import { stripWebhookScaffolding, hasWebhookScaffolding } from '../lib/systemEvent';
@@ -293,6 +293,48 @@ function MetadataViewer({ metadata }: { metadata?: Record<string, unknown> }) {
   );
 }
 
+function RawJsonToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isOpen ? 'text-pc-accent-light border-[var(--pc-accent-dim)]' : 'text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)]'}`}
+      title={isOpen ? t('message.hideRawJson') : t('message.rawJson')}
+      aria-label={t('message.rawJson')}
+    >
+      <Braces size={13} />
+    </button>
+  );
+}
+
+function RawJsonPanel({ message }: { message: ChatMessageType }) {
+  const [copied, setCopied] = useState(false);
+  const json = JSON.stringify(message, null, 2);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(json).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [json]);
+
+  return (
+    <div className="mt-2 rounded-xl border border-pc-border-strong bg-pc-base/80 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-pc-border bg-pc-elevated/30">
+        <span className="text-[11px] font-medium text-pc-text-muted">Raw JSON</span>
+        <button
+          onClick={handleCopy}
+          className="h-6 w-6 rounded-md flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light transition-colors"
+          title={copied ? t('message.copied') : t('message.copy')}
+        >
+          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+        </button>
+      </div>
+      <pre className="p-3 text-[11px] leading-relaxed text-pc-text-secondary font-mono overflow-auto max-h-80 custom-scrollbar whitespace-pre-wrap break-all">
+        {json}
+      </pre>
+    </div>
+  );
+}
+
 /** Extract plain text from message blocks for clipboard copy */
 function getPlainText(message: ChatMessageType): string {
   if (message.blocks.length > 0) {
@@ -324,6 +366,7 @@ function SystemEventMessage({ message }: { message: ChatMessageType }) {
 
 export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatarUrl }: { message: ChatMessageType; onRetry?: (text: string) => void; agentAvatarUrl?: string }) {
   useLocale(); // re-render on locale change
+  const [showRawJson, setShowRawJson] = useState(false);
 
   // Strip webhook/hook scaffolding from user messages before rendering
   const message = useMemo(() => {
@@ -396,6 +439,7 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
           )}
           <div className={`absolute top-2 ${isUser ? 'left-2' : 'right-10'} flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-10`}>
             <MetadataViewer metadata={message.metadata} />
+            <RawJsonToggle isOpen={showRawJson} onToggle={() => setShowRawJson(o => !o)} />
           </div>
           {/* Retry button (user messages only) */}
           {isUser && onRetry && (
@@ -437,6 +481,9 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
 
           {/* Tool calls & thinking (inline) */}
           {!isUser && <InternalsSummary blocks={message.blocks} />}
+
+          {/* Raw JSON viewer */}
+          {showRawJson && <RawJsonPanel message={rawMessage} />}
         </div>
         {(message.timestamp || wasWebhookMessage) && (
           <div className={`mt-1 flex items-center gap-1.5 text-[11px] text-pc-text-muted ${isUser ? 'justify-end pr-2' : 'pl-2'}`}>

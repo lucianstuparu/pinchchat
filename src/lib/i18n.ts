@@ -75,6 +75,8 @@ const en = {
   'message.copied': 'Copied!',
   'message.retry': 'Resend message',
   'message.metadata': 'Message details',
+  'message.rawJson': 'Raw JSON',
+  'message.hideRawJson': 'Hide raw JSON',
 
   // Timestamps
   'time.yesterday': 'Yesterday',
@@ -179,6 +181,8 @@ const fr: Record<keyof typeof en, string> = {
   'message.copied': 'Copié !',
   'message.retry': 'Renvoyer le message',
   'message.metadata': 'Détails du message',
+  'message.rawJson': 'JSON brut',
+  'message.hideRawJson': 'Masquer le JSON brut',
 
   'time.yesterday': 'Hier',
   'time.today': "Aujourd'hui",
