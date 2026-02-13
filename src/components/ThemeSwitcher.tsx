@@ -72,8 +72,8 @@ export function ThemeSwitcher() {
       {open && createPortal(
         <div
           ref={panelRef}
-          className="fixed z-[9999] w-52 rounded-2xl border border-[var(--pc-border-strong)] bg-[var(--pc-bg-surface)] backdrop-blur-xl shadow-2xl p-3 animate-fade-in"
-          style={{ top: pos.top, right: pos.right }}
+          className="fixed w-52 rounded-2xl border border-[var(--pc-border-strong)] bg-[var(--pc-bg-surface)] shadow-2xl p-3 animate-fade-in"
+          style={{ top: pos.top, right: pos.right, zIndex: 2147483647 }}
         >
           <div className="text-[10px] uppercase tracking-wider text-[var(--pc-text-faint)] font-semibold mb-2">
             {t('theme.mode')}
