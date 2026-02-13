@@ -62,8 +62,8 @@ export function MessageSearch({ open, onClose, onSearch, matchCount }: Props) {
         onChange={e => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={t('search.placeholder')}
-        className="bg-transparent text-sm text-pc-text placeholder:text-pc-text-muted outline-none w-48"
         aria-label={t('search.placeholder')}
+        className="bg-transparent text-sm text-pc-text placeholder:text-pc-text-muted outline-none w-48"
       />
       {query && (
         <span className="text-xs text-pc-text-muted whitespace-nowrap">

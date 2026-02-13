@@ -277,6 +277,9 @@ function resolveInitialLocale(): string {
 let currentLocale = resolveInitialLocale();
 let dict = messages[currentLocale] || messages.en;
 
+// Sync <html lang> on initial load
+try { document.documentElement.lang = currentLocale; } catch { /* SSR */ }
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
@@ -297,6 +300,7 @@ export function setLocale(loc: string): void {
   currentLocale = loc;
   dict = messages[loc];
   try { localStorage.setItem(STORAGE_KEY, loc); } catch { /* noop */ }
+  try { document.documentElement.lang = loc; } catch { /* SSR */ }
   listeners.forEach((fn) => fn());
 }
 
