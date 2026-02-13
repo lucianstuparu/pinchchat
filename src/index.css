@@ -223,7 +223,7 @@ html, body {
   inset: 0;
   pointer-events: none;
   color: var(--pc-text-primary);
-  border: 1px solid transparent;
+  border: none;
   border-radius: 1rem; /* rounded-2xl */
   max-height: 200px;
 }
