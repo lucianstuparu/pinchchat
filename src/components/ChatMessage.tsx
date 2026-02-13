@@ -16,6 +16,13 @@ import { useLocale } from '../hooks/useLocale';
 import { stripWebhookScaffolding, hasWebhookScaffolding } from '../lib/systemEvent';
 // ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
 
+/** Avatar image with fallback to Bot icon on load error */
+function AvatarImg({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <Bot className="h-4 w-4 text-pc-accent-light" />;
+  return <img src={src} alt="Agent" className="h-full w-full object-cover" onError={() => setFailed(true)} />;
+}
+
 function getBcp47(): string {
   return getLocale() === 'fr' ? 'fr-FR' : 'en-US';
 }
@@ -465,7 +472,7 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
           isUser
             ? <User className="h-4 w-4 text-pc-accent-light" />
             : agentAvatarUrl
-              ? <img src={agentAvatarUrl} alt="Agent" className="h-full w-full object-cover" />
+              ? <AvatarImg src={agentAvatarUrl} />
               : <Bot className="h-4 w-4 text-pc-accent-light" />
         ) : null}
       </div>

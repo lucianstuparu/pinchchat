@@ -231,7 +231,7 @@ html, body {
   inset: 0;
   pointer-events: none;
   color: var(--pc-text-primary);
-  border: none;
+  border: 1px solid transparent; /* match textarea border width to keep text aligned */
   border-radius: 1rem; /* rounded-2xl */
   max-height: 200px;
 }
@@ -257,12 +257,12 @@ html, body {
   color: #67e8f9;
   background: var(--pc-accent-glow);
   border-radius: 3px;
-  padding: 0 2px;
+  /* No padding — must match textarea text layout exactly to avoid cursor desync */
 }
 
 .ht-bold {
   color: var(--pc-text-primary);
-  font-weight: 700;
+  /* No font-weight change — bold text is wider and causes cursor desync */
 }
 
 .ht-italic {

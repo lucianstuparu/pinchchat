@@ -75,6 +75,8 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
   const isNearBottomRef = useRef(true);
   const userSentRef = useRef(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const prevMessageCountRef = useRef(messages.length);
 
   const checkIfNearBottom = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -82,6 +84,9 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distanceFromBottom <= SCROLL_THRESHOLD;
     setShowScrollBtn(distanceFromBottom > SCROLL_THRESHOLD * 2);
+    if (distanceFromBottom <= SCROLL_THRESHOLD) {
+      setHasNewMessages(false);
+    }
   }, []);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -97,19 +102,53 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
     return () => el.removeEventListener('scroll', handler);
   }, [checkIfNearBottom]);
 
-  // Auto-scroll when messages change, but only if user is near bottom or just sent a message
+  // Reset state on session switch
+  const prevSessionKeyRef = useRef(sessionKey);
   useEffect(() => {
+    if (sessionKey !== prevSessionKeyRef.current) {
+      prevSessionKeyRef.current = sessionKey;
+      prevMessageCountRef.current = messages.length;
+      setHasNewMessages(false);
+      isNearBottomRef.current = true;
+      // Scroll to bottom on session switch
+      requestAnimationFrame(() => scrollToBottom('instant'));
+    }
+  }, [sessionKey, messages.length, scrollToBottom]);
+
+  // Auto-scroll when messages change, but only if user is near bottom or just sent a message
+  const wasLoadingHistoryRef = useRef(isLoadingHistory);
+  useEffect(() => {
+    const newCount = messages.length;
+    const hadNew = newCount > prevMessageCountRef.current;
+    // Detect history load completion (don't treat as "new messages")
+    const justFinishedLoading = wasLoadingHistoryRef.current && !isLoadingHistory;
+    wasLoadingHistoryRef.current = isLoadingHistory;
+    prevMessageCountRef.current = newCount;
+
+    if (justFinishedLoading) {
+      // History just loaded — scroll to bottom, don't show indicator
+      scrollToBottom('instant');
+      isNearBottomRef.current = true;
+      setHasNewMessages(false);
+      return;
+    }
+
     if (userSentRef.current) {
       // User just sent a message — always scroll to bottom
       userSentRef.current = false;
       scrollToBottom('smooth');
       isNearBottomRef.current = true;
+      setHasNewMessages(false);
       return;
     }
     if (isNearBottomRef.current) {
       scrollToBottom('smooth');
+      setHasNewMessages(false);
+    } else if (hadNew) {
+      // New message arrived while scrolled up
+      setHasNewMessages(true);
     }
-  }, [messages, isGenerating, scrollToBottom]);
+  }, [messages, isGenerating, isLoadingHistory, scrollToBottom]);
 
   // Wrap onSend to flag that user initiated a message
   const handleSend = useCallback((text: string, attachments?: Array<{ mimeType: string; fileName: string; content: string }>) => {
@@ -231,28 +270,32 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
           {showTyping && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
-      </div>
-      {/* Floating action buttons */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
-        {hasToolCalls && (
-          <button
-            onClick={globalState === 'expand-all' ? collapseAll : expandAll}
-            aria-label={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
-            title={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
-            className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-violet-500/10"
-          >
-            {globalState === 'expand-all' ? <ChevronsDownUp size={14} className="text-violet-300" /> : <ChevronsUpDown size={14} className="text-violet-300" />}
-          </button>
-        )}
-        {showScrollBtn && (
-          <button
-            onClick={() => scrollToBottom('smooth')}
-            aria-label={t('chat.scrollToBottom')}
-            className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3.5 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-cyan-500/10"
-          >
-            <ArrowDown size={14} className="text-pc-accent-light" />
-            <span className="hidden sm:inline">{t('chat.scrollToBottom')}</span>
-          </button>
+        {/* Floating action buttons — sticky to bottom of scroll area */}
+        {(hasToolCalls || showScrollBtn || hasNewMessages) && (
+          <div className="sticky bottom-3 z-10 flex justify-center pointer-events-none pb-1">
+            <div className="flex items-center gap-2 pointer-events-auto">
+              {hasToolCalls && (
+                <button
+                  onClick={globalState === 'expand-all' ? collapseAll : expandAll}
+                  aria-label={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
+                  title={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
+                  className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-violet-500/10"
+                >
+                  {globalState === 'expand-all' ? <ChevronsDownUp size={14} className="text-violet-300" /> : <ChevronsUpDown size={14} className="text-violet-300" />}
+                </button>
+              )}
+              {(showScrollBtn || hasNewMessages) && (
+                <button
+                  onClick={() => { scrollToBottom('smooth'); setHasNewMessages(false); }}
+                  aria-label={hasNewMessages ? t('chat.scrollToBottom') : t('chat.scrollDown')}
+                  className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3.5 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-cyan-500/10"
+                >
+                  <ArrowDown size={14} className={hasNewMessages ? 'text-pc-accent-light animate-bounce' : 'text-pc-accent-light'} />
+                  {hasNewMessages && <span className="hidden sm:inline">{t('chat.scrollToBottom')}</span>}
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
       <ChatInput onSend={handleSend} onAbort={onAbort} isGenerating={isGenerating} disabled={status !== 'connected'} sessionKey={sessionKey} />

@@ -671,3 +671,27 @@
 - **Status:** done
 - **Completed:** 2026-02-13 — commit `2f25c45`
 - **Description:** Textarea has an ugly/thick accent-colored border (cyan) visible in the screenshot. The border around the chat input textarea looks bad — it should be more subtle (thin border, muted color, or no visible border at all). The input area should blend cleanly with its container, not have a glowing cyan outline.
+
+## Item #63
+- **Date:** 2026-02-13
+- **Priority:** high
+- **Status:** pending
+- **Description:** "New message" indicator shows when scrolling up even when there are no new messages. The indicator should only appear when an actual new message arrives while scrolled up.
+
+## Item #64
+- **Date:** 2026-02-13
+- **Priority:** high
+- **Status:** pending
+- **Description:** Cursor desync in textarea — the cursor position gets ahead of where characters actually appear (whitespace gap between cursor and text). Likely related to HighlightedTextarea overlay sync issue.
+
+## Item #65
+- **Date:** 2026-02-13
+- **Priority:** high
+- **Status:** pending
+- **Description:** "New message" indicator and expand/collapse toggle overlap with the textarea when it grows (multi-line input). These elements should stay outside/above the textarea area and not overlap.
+
+## Item #66
+- **Date:** 2026-02-13
+- **Priority:** medium
+- **Status:** pending
+- **Description:** Avatar image shows as broken for some deployments. Bardak's instance (deployed by Pelouse) shows a broken image. Works on Nicolas's instance. Likely the avatar URL configured by Pelouse is invalid or blocked. PinchChat should handle broken avatar images gracefully (fallback to initials or default icon).
