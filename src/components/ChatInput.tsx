@@ -222,7 +222,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
 
   return (
     <div
-      className="border-t border-pc-border bg-[var(--pc-bg-input)]/60 backdrop-blur-xl p-4"
+      className="border-t border-pc-border bg-[var(--pc-bg-input)]/60 backdrop-blur-xl p-4 print-hide"
       role="form"
       aria-label={t('chat.inputLabel')}
       onDragOver={handleDragOver}

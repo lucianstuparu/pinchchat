@@ -279,3 +279,89 @@ html, body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ── Print styles ── */
+@media print {
+  /* Hide non-content UI elements */
+  aside[role="navigation"],
+  header[role="banner"],
+  [aria-label="Scroll to bottom"],
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Reset background/colors for printing */
+  body,
+  html,
+  #root,
+  main {
+    background: white !important;
+    color: black !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Main content fills the page */
+  main {
+    flex: 1 !important;
+    overflow: visible !important;
+  }
+
+  /* Messages readable in print */
+  [class*="ChatMessage"],
+  [class*="chat-message"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    color: black !important;
+    border-color: #ccc !important;
+  }
+
+  /* Make message text dark */
+  .text-pc-text,
+  .text-pc-text-secondary,
+  .text-pc-text-muted {
+    color: #222 !important;
+  }
+
+  /* Code blocks print-friendly */
+  pre, code {
+    background: #f5f5f5 !important;
+    color: #333 !important;
+    border: 1px solid #ddd !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+  }
+
+  /* Tool calls: keep them visible but compact */
+  [class*="ToolCall"] {
+    border: 1px solid #ccc !important;
+    background: #fafafa !important;
+    color: #333 !important;
+    break-inside: avoid;
+  }
+
+  /* Remove box shadows and backdrop filters */
+  * {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Links show their URL */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+    word-break: break-all;
+  }
+
+  /* Ensure chat scroll area is fully visible */
+  [class*="overflow-y-auto"],
+  [class*="overflow-y-scroll"] {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+}
