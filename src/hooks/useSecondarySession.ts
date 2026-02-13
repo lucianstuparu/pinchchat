@@ -214,12 +214,14 @@ export function useSecondarySession(
 
   const sendMessage = useCallback(async (text: string, attachments?: Array<{ mimeType: string; fileName: string; content: string }>) => {
     if (!sessionKeyRef.current) return;
+    const msgId = 'user-' + Date.now();
     const userMsg: ChatMessage = {
-      id: 'user-' + Date.now(),
+      id: msgId,
       role: 'user',
       content: text,
       timestamp: Date.now(),
       blocks: [{ type: 'text', text }],
+      sendStatus: 'sending',
     };
     setMessages(prev => [...prev, userMsg]);
     setIsGenerating(true);
@@ -230,7 +232,9 @@ export function useSecondarySession(
         deliver: false,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, sendStatus: 'sent' as const } : m));
     } catch {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, sendStatus: 'error' as const } : m));
       setIsGenerating(false);
     }
   }, [getClient]);

@@ -8,6 +8,8 @@ export interface ChatMessage {
   runId?: string;
   isSystemEvent?: boolean;
   metadata?: Record<string, unknown>;
+  /** Optimistic send status for user messages */
+  sendStatus?: 'sending' | 'sent' | 'error';
 }
 
 export type MessageBlock =

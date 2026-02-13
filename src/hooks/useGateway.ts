@@ -399,12 +399,14 @@ export function useGateway() {
   }, [setupClient]);
 
   const sendMessage = useCallback(async (text: string, attachments?: Array<{ mimeType: string; fileName: string; content: string }>) => {
+    const msgId = 'user-' + Date.now();
     const userMsg: ChatMessage = {
-      id: 'user-' + Date.now(),
+      id: msgId,
       role: 'user',
       content: text,
       timestamp: Date.now(),
       blocks: [{ type: 'text', text }],
+      sendStatus: 'sending',
     };
     setMessages(prev => [...prev, userMsg]);
     setIsGenerating(true);
@@ -417,8 +419,11 @@ export function useGateway() {
         idempotencyKey: genIdempotencyKey(),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
+      // Mark as sent
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, sendStatus: 'sent' as const } : m));
     } catch {
-      // Failed to send — stop generating indicator
+      // Mark as error and stop generating
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, sendStatus: 'error' as const } : m));
       setIsGenerating(false);
     }
   }, []);

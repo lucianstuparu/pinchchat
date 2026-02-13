@@ -370,7 +370,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, onSplit, 
                       if (!s.contextTokens) return null;
                       const pct = Math.min(100, ((s.totalTokens || 0) / s.contextTokens) * 100);
                       const barOpacity = Math.max(0.35, Math.min(1, pct / 100));
-                      const barStyle = { width: `${pct}%`, backgroundColor: `rgba(56, 189, 248, ${barOpacity})` };
+                      const barStyle = { width: `${pct}%`, backgroundColor: `rgba(var(--pc-accent-rgb), ${barOpacity})` };
                       return (
                         <div className="flex items-center gap-1.5 mt-1">
                           <div className="flex-1 h-[3px] rounded-full bg-[var(--pc-hover)] overflow-hidden">

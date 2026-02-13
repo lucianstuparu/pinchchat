@@ -633,3 +633,25 @@
   3. ToolCollapseContext.tsx: same react-refresh/only-export-components issue.
   4. ToolCall.tsx:246: setState in useEffect → react-hooks/set-state-in-effect. Fix: use useSyncExternalStore or useCallback pattern.
   - This is BLOCKING all GitHub Releases and Docker image builds. Fix ASAP.
+
+## Item #59
+- **Date:** 2026-02-13
+- **Priority:** high
+- **Status:** pending
+- **Description:** Optimistic message rendering — messages sent by the user should appear immediately in the chat, not wait for server echo. Currently when the agent is busy processing, user messages can take a long time to appear.
+  - Show the message instantly in the chat (optimistic UI) with a subtle "sending" indicator (e.g. clock icon or dimmed opacity)
+  - When server confirms (echo received), update to "sent" state (e.g. checkmark or full opacity)
+  - If send fails, show error state with retry option
+  - Message should always appear at the bottom of the chat immediately after pressing Send
+  - This is important UX — users think their message didn't go through
+
+## Item #60
+- **Date:** 2026-02-13
+- **Priority:** high
+- **Status:** pending
+- **Description:** Light theme fixes — 4 issues:
+  1. Progress bar colors (sidebar + header) should follow accent color, not hardcoded cyan
+  2. Send button gradient should adapt to theme/accent
+  3. Tool call badges are unreadable in light theme (dark-only Tailwind classes like amber-950, sky-950)
+  4. User message bubble background too subtle in light theme — needs more contrast
+  - Sub-agent working on this (session pinchchat-light-theme-fix)

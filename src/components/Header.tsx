@@ -113,7 +113,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
         if (!ctx) return null;
         const pct = Math.min(100, (total / ctx) * 100);
         const opacity = Math.max(0.35, Math.min(1, pct / 100));
-        const barStyle = { width: `${pct}%`, backgroundColor: `rgba(56, 189, 248, ${opacity})` };
+        const barStyle = { width: `${pct}%`, backgroundColor: `rgba(var(--pc-accent-rgb), ${opacity})` };
         return (
           <div className="px-4 py-1.5 bg-[var(--pc-bg-surface)]/60 border-b border-pc-border flex items-center gap-3">
             {activeSessionData?.model && (

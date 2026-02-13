@@ -13,7 +13,7 @@ import { CodeBlock } from './CodeBlock';
 import { ToolCall } from './ToolCall';
 import { ImageBlock } from './ImageBlock';
 import { buildImageSrc } from '../lib/image';
-import { Bot, User, Wrench, Copy, Check, RefreshCw, Zap, Info, Webhook, Braces } from 'lucide-react';
+import { Bot, User, Wrench, Copy, Check, CheckCheck, RefreshCw, Zap, Info, Webhook, Braces, Clock, AlertCircle } from 'lucide-react';
 import { t, getLocale } from '../lib/i18n';
 import { useLocale } from '../hooks/useLocale';
 import { stripWebhookScaffolding, hasWebhookScaffolding } from '../lib/systemEvent';
@@ -431,7 +431,7 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
   }
 
   return (
-    <div className={`animate-fade-in flex gap-3 px-4 py-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`animate-fade-in flex gap-3 px-4 py-2 ${isUser ? 'flex-row-reverse' : ''} ${message.sendStatus === 'sending' ? 'opacity-70' : ''} ${message.sendStatus === 'error' ? 'opacity-60' : ''}`}>
       {/* Avatar */}
       <div className="shrink-0 mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-pc-border bg-pc-elevated/40 overflow-hidden">
         {isUser
@@ -446,7 +446,7 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
       <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
         <div className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full overflow-hidden ${
           isUser
-            ? 'bg-[var(--pc-user-bubble)] text-pc-text border border-[var(--pc-user-border)]'
+            ? 'bg-[rgba(var(--pc-accent-rgb),0.08)] text-pc-text border border-[rgba(var(--pc-accent-rgb),0.2)]'
             : 'bg-pc-elevated/40 text-pc-text border border-pc-border shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
         }`}>
           {/* Action buttons */}
@@ -461,11 +461,11 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
           {isUser && onRetry && (
             <button
               onClick={() => onRetry(getPlainText(message))}
-              className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)] transition-all opacity-0 group-hover:opacity-100"
+              className={`absolute top-2 right-2 h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)] transition-all ${message.sendStatus === 'error' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
               title={t('message.retry')}
               aria-label={t('message.retry')}
             >
-              <RefreshCw size={13} />
+              <RefreshCw size={13} className={message.sendStatus === 'error' ? 'text-red-400' : ''} />
             </button>
           )}
           {/* User-visible text */}
@@ -510,6 +510,15 @@ export function ChatMessageComponent({ message: rawMessage, onRetry, agentAvatar
               </span>
             )}
             {message.timestamp && formatTimestamp(message.timestamp)}
+            {isUser && message.sendStatus === 'sending' && (
+              <span title="Sending..."><Clock size={10} className="animate-pulse text-pc-text-faint" /></span>
+            )}
+            {isUser && message.sendStatus === 'sent' && (
+              <span title="Sent"><CheckCheck size={10} className="text-pc-accent" /></span>
+            )}
+            {isUser && message.sendStatus === 'error' && (
+              <span title="Failed to send"><AlertCircle size={10} className="text-red-400" /></span>
+            )}
           </div>
         )}
       </div>

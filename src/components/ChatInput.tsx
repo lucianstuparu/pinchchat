@@ -329,7 +329,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
                 onClick={handleSubmit}
                 disabled={(!text.trim() && files.length === 0) || disabled}
                 aria-label={t('chat.send')}
-                className="shrink-0 h-11 px-5 rounded-2xl bg-gradient-to-r from-cyan-500/80 via-indigo-500/70 to-violet-500/80 text-pc-text font-semibold text-sm hover:opacity-90 shadow-[0_8px_24px_rgba(34,211,238,0.1)] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2"
+                className="shrink-0 h-11 px-5 rounded-2xl bg-[var(--pc-accent)] text-white font-semibold text-sm hover:opacity-90 shadow-[0_8px_24px_rgba(var(--pc-accent-rgb),0.15)] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2"
               >
                 <Send size={16} />
                 <span className="hidden sm:inline">{t('chat.send')}</span>

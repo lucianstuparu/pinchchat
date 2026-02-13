@@ -7,30 +7,47 @@ import { useToolCollapse } from '../hooks/useToolCollapse';
 
 type ToolColor = { border: string; bg: string; text: string; icon: string; glow: string; expandBorder: string; expandBg: string };
 
-const toolColors: Record<string, ToolColor> = {
-  exec:       { border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-300', icon: 'text-amber-400', glow: 'shadow-[0_0_8px_rgba(245,158,11,0.15)]', expandBorder: 'border-amber-500/20', expandBg: 'bg-amber-950/20' },
-  web_search: { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300', icon: 'text-emerald-400', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]', expandBorder: 'border-emerald-500/20', expandBg: 'bg-emerald-950/20' },
-  web_fetch:  { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300', icon: 'text-emerald-400', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]', expandBorder: 'border-emerald-500/20', expandBg: 'bg-emerald-950/20' },
-  Read:       { border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: 'text-sky-400', glow: 'shadow-[0_0_8px_rgba(14,165,233,0.15)]', expandBorder: 'border-sky-500/20', expandBg: 'bg-sky-950/20' },
-  read:       { border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: 'text-sky-400', glow: 'shadow-[0_0_8px_rgba(14,165,233,0.15)]', expandBorder: 'border-sky-500/20', expandBg: 'bg-sky-950/20' },
-  Write:      { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
-  write:      { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
-  Edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
-  edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
-  browser:    { border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', text: 'text-pc-accent-light', icon: 'text-pc-accent', glow: 'shadow-[0_0_8px_rgba(6,182,212,0.15)]', expandBorder: 'border-cyan-500/20', expandBg: 'bg-cyan-950/20' },
-  image:      { border: 'border-pink-500/30', bg: 'bg-pink-500/10', text: 'text-pink-300', icon: 'text-pink-400', glow: 'shadow-[0_0_8px_rgba(236,72,153,0.15)]', expandBorder: 'border-pink-500/20', expandBg: 'bg-pink-950/20' },
-  message:    { border: 'border-indigo-500/30', bg: 'bg-indigo-500/10', text: 'text-indigo-300', icon: 'text-indigo-400', glow: 'shadow-[0_0_8px_rgba(99,102,241,0.15)]', expandBorder: 'border-indigo-500/20', expandBg: 'bg-indigo-950/20' },
-  memory_search: { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300', icon: 'text-rose-400', glow: 'shadow-[0_0_8px_rgba(244,63,94,0.15)]', expandBorder: 'border-rose-500/20', expandBg: 'bg-rose-950/20' },
-  memory_get: { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300', icon: 'text-rose-400', glow: 'shadow-[0_0_8px_rgba(244,63,94,0.15)]', expandBorder: 'border-rose-500/20', expandBg: 'bg-rose-950/20' },
-  cron:       { border: 'border-orange-500/30', bg: 'bg-orange-500/10', text: 'text-orange-300', icon: 'text-orange-400', glow: 'shadow-[0_0_8px_rgba(249,115,22,0.15)]', expandBorder: 'border-orange-500/20', expandBg: 'bg-orange-950/20' },
-  sessions_spawn: { border: 'border-teal-500/30', bg: 'bg-teal-500/10', text: 'text-teal-300', icon: 'text-teal-400', glow: 'shadow-[0_0_8px_rgba(20,184,166,0.15)]', expandBorder: 'border-teal-500/20', expandBg: 'bg-teal-950/20' },
+// RGB values for each tool color — used with rgba() for theme-safe rendering
+type ToolRGB = { r: number; g: number; b: number };
+const toolRGBs: Record<string, ToolRGB> = {
+  exec:       { r: 245, g: 158, b: 11 },   // amber
+  web_search: { r: 16, g: 185, b: 129 },    // emerald
+  web_fetch:  { r: 16, g: 185, b: 129 },
+  Read:       { r: 14, g: 165, b: 233 },    // sky
+  read:       { r: 14, g: 165, b: 233 },
+  Write:      { r: 139, g: 92, b: 246 },    // violet
+  write:      { r: 139, g: 92, b: 246 },
+  Edit:       { r: 139, g: 92, b: 246 },
+  edit:       { r: 139, g: 92, b: 246 },
+  browser:    { r: 6, g: 182, b: 212 },     // cyan
+  image:      { r: 236, g: 72, b: 153 },    // pink
+  message:    { r: 99, g: 102, b: 241 },    // indigo
+  memory_search: { r: 244, g: 63, b: 94 },  // rose
+  memory_get: { r: 244, g: 63, b: 94 },
+  cron:       { r: 249, g: 115, b: 22 },    // orange
+  sessions_spawn: { r: 20, g: 184, b: 166 },// teal
 };
+const defaultRGB: ToolRGB = { r: 161, g: 161, b: 170 }; // zinc
 
-const defaultColor: ToolColor = { border: 'border-pc-border-strong', bg: 'bg-pc-elevated/10', text: 'text-pc-text', icon: 'text-pc-text-secondary', glow: 'shadow-[0_0_8px_rgba(161,161,170,0.1)]', expandBorder: 'border-pc-border', expandBg: 'bg-pc-elevated/25' };
+function rgbStr(c: ToolRGB): string { return `${c.r},${c.g},${c.b}`; }
 
-function getColor(name: string): ToolColor {
-  return toolColors[name] || defaultColor;
+function getColorStyles(name: string): { badge: React.CSSProperties; text: React.CSSProperties; expand: React.CSSProperties; glow: string } {
+  const c = toolRGBs[name] || defaultRGB;
+  const rgb = rgbStr(c);
+  return {
+    badge: { borderColor: `rgba(${rgb},0.3)`, backgroundColor: `rgba(${rgb},0.10)` },
+    text: { color: `rgb(${c.r},${c.g},${c.b})` },
+    expand: { borderColor: `rgba(${rgb},0.2)`, backgroundColor: `rgba(${rgb},0.05)` },
+    glow: `shadow-[0_0_8px_rgba(${rgb},0.15)]`,
+  };
 }
+
+// Keep ToolColor type for compatibility but now only used for classes that are theme-safe
+const toolColors: Record<string, ToolColor> = {};
+const defaultColor: ToolColor = { border: '', bg: '', text: '', icon: '', glow: '', expandBorder: '', expandBg: '' };
+
+// toolColors/defaultColor kept for potential future use
+void toolColors; void defaultColor;
 
 const toolEmojis: Record<string, string> = {
   exec: '⚡',
@@ -237,7 +254,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
   const [wrap, setWrap] = useState(true);
   const { globalState, version } = useToolCollapse();
   const lastVersion = useRef(version);
-  const c = getColor(name);
+  const cs = getColorStyles(name);
 
   // Respond to global collapse/expand commands
   useEffect(() => {
@@ -256,7 +273,8 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
       {/* Tool use badge */}
       <button
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 rounded-2xl border ${c.border} ${c.bg} ${c.glow} px-3 py-1.5 text-xs ${c.text} hover:brightness-125 transition-all max-w-full`}
+        className={`inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs hover:brightness-125 transition-all max-w-full ${cs.glow}`}
+        style={{ ...cs.badge, ...cs.text }}
       >
         <span className="text-[13px] leading-none">{getToolEmoji(name)}</span>
         <span className="font-mono font-semibold shrink-0">{name}</span>
@@ -273,10 +291,10 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
 
       {/* Expanded content */}
       {open && (
-        <div className={`mt-2 rounded-2xl border ${c.expandBorder} ${c.expandBg} p-3 space-y-2 overflow-hidden min-w-0`}>
+        <div className="mt-2 rounded-2xl border p-3 space-y-2 overflow-hidden min-w-0" style={cs.expand}>
           {inputStr && (
             <div>
-              <div className={`text-[11px] ${c.text} opacity-70 mb-1 font-medium`}>{t('tool.parameters')}</div>
+              <div className="text-[11px] opacity-70 mb-1 font-medium" style={cs.text}>{t('tool.parameters')}</div>
               <div className="group/tc-block relative">
                 <HighlightedPre
                   text={inputStr}
@@ -292,7 +310,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
             const imageData = extractImageFromResult(result);
             return (
               <div>
-                <div className={`text-[11px] ${c.text} opacity-70 mb-1 font-medium`}>{t('tool.result')}</div>
+                <div className="text-[11px] opacity-70 mb-1 font-medium" style={cs.text}>{t('tool.result')}</div>
                 {imageData ? (
                   <>
                     {imageData.remaining && (
