@@ -4,6 +4,12 @@ All notable changes to PinchChat are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), with [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.34.0] — 2026-02-13
+
+### Added
+- Loading spinner while JS bundles load (CSS-only, no flash of blank screen)
+- Noscript fallback message for users with JavaScript disabled
+
 ## [1.33.1] — 2026-02-13
 
 ### Fixed
