@@ -26,8 +26,10 @@ Thanks for your interest in contributing! 🦞
 
 ## Development
 
-- **Build:** `npm run build` — must pass with 0 errors before submitting a PR
 - **Dev server:** `npm run dev` — starts Vite with hot reload
+- **Lint:** `npm run lint` — must pass with 0 errors and 0 warnings
+- **Test:** `npm test` — runs Vitest unit tests (must all pass)
+- **Build:** `npm run build` — must pass with 0 errors before submitting a PR
 - **Preview:** `npx vite preview` — serve the production build locally
 
 ### Project Structure
@@ -48,7 +50,12 @@ src/
 
 1. Create a feature branch: `git checkout -b feat/my-feature`
 2. Make your changes
-3. Ensure `npm run build` passes with no errors
+3. Ensure all checks pass:
+   ```bash
+   npm run lint    # 0 errors, 0 warnings
+   npm test        # all tests pass
+   npm run build   # 0 errors
+   ```
 4. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
    - `feat:` — new feature
    - `fix:` — bug fix
