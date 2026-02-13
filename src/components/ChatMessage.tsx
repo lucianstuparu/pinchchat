@@ -204,15 +204,15 @@ function InternalsSummary({ blocks }: { blocks: MessageBlock[] }) {
 function InternalOnlyMessage({ message }: { message: ChatMessageType }) {
   return (
     <div className="animate-fade-in flex gap-3 px-4 py-1">
-      <div className="shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-xl border border-white/5 bg-zinc-800/30">
-        <Wrench className="h-3 w-3 text-zinc-500" />
+      <div className="shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-xl border border-pc-border bg-pc-elevated/30">
+        <Wrench className="h-3 w-3 text-pc-text-muted" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="space-y-1">
           {renderInternalBlocks(message.blocks)}
         </div>
         {message.timestamp && (
-          <div className="mt-0.5 text-[10px] text-zinc-600">
+          <div className="mt-0.5 text-[10px] text-pc-text-faint">
             {formatTimestamp(message.timestamp)}
           </div>
         )}
@@ -233,7 +233,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-white/8 bg-zinc-800/80 backdrop-blur-sm flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:border-cyan-400/30 transition-all opacity-0 group-hover:opacity-100"
+      className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)] transition-all opacity-0 group-hover:opacity-100"
       title={copied ? t('message.copied') : t('message.copy')}
       aria-label={t('message.copy')}
     >
@@ -271,18 +271,18 @@ function MetadataViewer({ metadata }: { metadata?: Record<string, unknown> }) {
       <button
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
-        className="h-7 w-7 rounded-lg border border-white/8 bg-zinc-800/80 backdrop-blur-sm flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:border-cyan-400/30 transition-all opacity-0 group-hover:opacity-100"
+        className="h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)] transition-all opacity-0 group-hover:opacity-100"
         title={t('message.metadata')}
         aria-label={t('message.metadata')}
       >
         <Info size={13} />
       </button>
       {open && pos && createPortal(
-        <div ref={panelRef} className="fixed z-[9999] w-72 max-h-64 overflow-auto rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl p-3 text-[11px] text-zinc-400 font-mono leading-relaxed custom-scrollbar" style={{ top: pos.top, left: pos.left, transform: 'translateY(-100%)' }}>
+        <div ref={panelRef} className="fixed z-[9999] w-72 max-h-64 overflow-auto rounded-xl border border-pc-border-strong bg-pc-input/95 backdrop-blur-md shadow-xl p-3 text-[11px] text-pc-text-secondary font-mono leading-relaxed custom-scrollbar" style={{ top: pos.top, left: pos.left, transform: 'translateY(-100%)' }}>
           {Object.entries(metadata).map(([k, v]) => (
             <div key={k} className="flex gap-2 py-0.5">
-              <span className="text-cyan-400/70 shrink-0">{k}:</span>
-              <span className="text-zinc-300 break-all">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+              <span className="text-pc-accent/70 shrink-0">{k}:</span>
+              <span className="text-pc-text break-all">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
             </div>
           ))}
         </div>,
@@ -309,12 +309,12 @@ function SystemEventMessage({ message }: { message: ChatMessageType }) {
 
   return (
     <div className="animate-fade-in flex items-center justify-center gap-2 px-4 py-1.5 my-0.5">
-      <div className="flex items-center gap-1.5 max-w-[85%] rounded-full px-3 py-1 bg-zinc-800/30 border border-white/5">
-        <Zap className="h-3 w-3 text-zinc-500 shrink-0" />
-        <span className="text-[11px] font-medium text-zinc-500 shrink-0">{label}</span>
-        <span className="text-[11px] text-zinc-500 truncate">{display}</span>
+      <div className="flex items-center gap-1.5 max-w-[85%] rounded-full px-3 py-1 bg-pc-elevated/30 border border-pc-border">
+        <Zap className="h-3 w-3 text-pc-text-muted shrink-0" />
+        <span className="text-[11px] font-medium text-pc-text-muted shrink-0">{label}</span>
+        <span className="text-[11px] text-pc-text-muted truncate">{display}</span>
         {message.timestamp && (
-          <span className="text-[10px] text-zinc-600 shrink-0 ml-1">{formatTimestamp(message.timestamp)}</span>
+          <span className="text-[10px] text-pc-text-faint shrink-0 ml-1">{formatTimestamp(message.timestamp)}</span>
         )}
       </div>
     </div>
@@ -343,12 +343,12 @@ export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { mes
   return (
     <div className={`animate-fade-in flex gap-3 px-4 py-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       {/* Avatar */}
-      <div className="shrink-0 mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-zinc-800/40 overflow-hidden">
+      <div className="shrink-0 mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-pc-border bg-pc-elevated/40 overflow-hidden">
         {isUser
-          ? <User className="h-4 w-4 text-cyan-200" />
+          ? <User className="h-4 w-4 text-pc-accent-light" />
           : agentAvatarUrl
             ? <img src={agentAvatarUrl} alt="Agent" className="h-full w-full object-cover" />
-            : <Bot className="h-4 w-4 text-cyan-200" />
+            : <Bot className="h-4 w-4 text-pc-accent-light" />
         }
       </div>
 
@@ -356,8 +356,8 @@ export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { mes
       <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
         <div className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full overflow-hidden ${
           isUser
-            ? 'bg-gradient-to-b from-cyan-800/40 to-cyan-900/25 text-zinc-100 border border-cyan-400/30'
-            : 'bg-zinc-800/40 text-zinc-300 border border-white/8 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
+            ? 'bg-[var(--pc-user-bubble)] text-pc-text border border-[var(--pc-user-border)]'
+            : 'bg-pc-elevated/40 text-pc-text border border-pc-border shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
         }`}>
           {/* Action buttons */}
           {!isUser && !message.isStreaming && getPlainText(message).trim() && (
@@ -370,7 +370,7 @@ export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { mes
           {isUser && onRetry && (
             <button
               onClick={() => onRetry(getPlainText(message))}
-              className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-white/8 bg-zinc-800/80 backdrop-blur-sm flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:border-cyan-400/30 transition-all opacity-0 group-hover:opacity-100"
+              className="absolute top-2 right-2 h-7 w-7 rounded-lg border border-pc-border bg-pc-elevated/80 backdrop-blur-sm flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:border-[var(--pc-accent-dim)] transition-all opacity-0 group-hover:opacity-100"
               title={t('message.retry')}
               aria-label={t('message.retry')}
             >
@@ -408,7 +408,7 @@ export function ChatMessageComponent({ message, onRetry, agentAvatarUrl }: { mes
           {!isUser && <InternalsSummary blocks={message.blocks} />}
         </div>
         {message.timestamp && (
-          <div className={`mt-1 text-[11px] text-zinc-500 ${isUser ? 'text-right pr-2' : 'pl-2'}`}>
+          <div className={`mt-1 text-[11px] text-pc-text-muted ${isUser ? 'text-right pr-2' : 'pl-2'}`}>
             {formatTimestamp(message.timestamp)}
           </div>
         )}

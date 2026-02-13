@@ -37,22 +37,22 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
   };
 
   return (
-    <div className="h-dvh flex items-center justify-center bg-[var(--pc-bg-base)] text-zinc-300 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.02),transparent_50%),radial-gradient(ellipse_at_bottom_right,rgba(99,102,241,0.04),transparent_50%)]">
+    <div className="h-dvh flex items-center justify-center bg-[var(--pc-bg-base)] text-pc-text bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.02),transparent_50%),radial-gradient(ellipse_at_bottom_right,rgba(99,102,241,0.04),transparent_50%)]">
       <div className="w-full max-w-md mx-4">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
           <img src="/logo.png" alt="PinchChat" className="h-20 w-20 drop-shadow-lg" />
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-zinc-200 tracking-wide">{t('login.title')}</h1>
-            <Sparkles className="h-5 w-5 text-cyan-300/60" />
+            <h1 className="text-2xl font-bold text-pc-text tracking-wide">{t('login.title')}</h1>
+            <Sparkles className="h-5 w-5 text-pc-accent-light/60" />
           </div>
-          <p className="text-sm text-zinc-500">{t('login.subtitle')}</p>
+          <p className="text-sm text-pc-text-muted">{t('login.subtitle')}</p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/8 bg-[var(--pc-bg-surface)]/80 backdrop-blur-xl p-6 space-y-5 shadow-2xl shadow-black/30">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-pc-border bg-[var(--pc-bg-surface)]/80 backdrop-blur-xl p-6 space-y-5 shadow-2xl shadow-black/30">
           <div className="space-y-2">
-            <label htmlFor="gateway-url" className="block text-xs font-medium text-zinc-400 uppercase tracking-wider">
+            <label htmlFor="gateway-url" className="block text-xs font-medium text-pc-text-secondary uppercase tracking-wider">
               {t('login.gatewayUrl')}
             </label>
             <input
@@ -61,7 +61,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="ws://192.168.1.14:18789"
-              className="w-full rounded-xl border border-white/8 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all"
+              className="w-full rounded-xl border border-pc-border bg-pc-elevated/50 px-4 py-3 text-sm text-pc-text placeholder:text-pc-text-faint outline-none focus:border-[var(--pc-accent-dim)] focus:ring-1 focus:ring-[var(--pc-accent-glow)] transition-all"
               autoComplete="url"
               disabled={isConnecting}
             />
@@ -73,7 +73,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="gateway-token" className="block text-xs font-medium text-zinc-400 uppercase tracking-wider">
+            <label htmlFor="gateway-token" className="block text-xs font-medium text-pc-text-secondary uppercase tracking-wider">
               {t('login.token')}
             </label>
             <div className="relative">
@@ -83,14 +83,14 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
                 value={token}
                 onChange={e => setToken(e.target.value)}
                 placeholder={t('login.tokenPlaceholder')}
-                className="w-full rounded-xl border border-white/8 bg-zinc-800/50 px-4 py-3 pr-12 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all"
+                className="w-full rounded-xl border border-pc-border bg-pc-elevated/50 px-4 py-3 pr-12 text-sm text-pc-text placeholder:text-pc-text-faint outline-none focus:border-[var(--pc-accent-dim)] focus:ring-1 focus:ring-[var(--pc-accent-glow)] transition-all"
                 autoComplete="current-password"
                 disabled={isConnecting}
               />
               <button
                 type="button"
                 onClick={() => setShowToken(!showToken)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-pc-text-muted hover:text-pc-text transition-colors"
                 tabIndex={-1}
                 aria-label={showToken ? t('login.hideToken') : t('login.showToken')}
               >
@@ -121,7 +121,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
           </button>
         </form>
 
-        <p className="text-center text-xs text-zinc-600 mt-6">
+        <p className="text-center text-xs text-pc-text-faint mt-6">
           {t('login.storedLocally')}
         </p>
       </div>

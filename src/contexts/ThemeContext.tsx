@@ -29,6 +29,9 @@ const themes: Record<ThemeName, Record<string, string>> = {
     '--pc-scrollbar-thumb-hover': '#71717a',
     '--pc-user-bubble': 'rgba(34,211,238,0.06)',
     '--pc-user-border': 'rgba(34,211,238,0.15)',
+    '--pc-hover': 'rgba(255,255,255,0.05)',
+    '--pc-hover-strong': 'rgba(255,255,255,0.08)',
+    '--pc-separator': 'rgba(255,255,255,0.05)',
   },
   light: {
     '--pc-bg-base': '#f4f4f5',
@@ -48,6 +51,9 @@ const themes: Record<ThemeName, Record<string, string>> = {
     '--pc-scrollbar-thumb-hover': '#71717a',
     '--pc-user-bubble': 'rgba(34,211,238,0.08)',
     '--pc-user-border': 'rgba(34,211,238,0.25)',
+    '--pc-hover': 'rgba(0,0,0,0.05)',
+    '--pc-hover-strong': 'rgba(0,0,0,0.08)',
+    '--pc-separator': 'rgba(0,0,0,0.08)',
   },
   oled: {
     '--pc-bg-base': '#000000',
@@ -67,6 +73,9 @@ const themes: Record<ThemeName, Record<string, string>> = {
     '--pc-scrollbar-thumb-hover': '#52525b',
     '--pc-user-bubble': 'rgba(34,211,238,0.05)',
     '--pc-user-border': 'rgba(34,211,238,0.12)',
+    '--pc-hover': 'rgba(255,255,255,0.04)',
+    '--pc-hover-strong': 'rgba(255,255,255,0.06)',
+    '--pc-separator': 'rgba(255,255,255,0.04)',
   },
 };
 

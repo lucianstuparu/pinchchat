@@ -52,7 +52,7 @@ export function SessionIcon({ session, isActive, isCurrentSession }: {
   isCurrentSession?: boolean;
 }) {
   const size = 15;
-  const baseClass = isCurrentSession ? 'text-cyan-300/70' : isActive ? 'text-violet-400/70' : '';
+  const baseClass = isCurrentSession ? 'text-pc-accent-light/70' : isActive ? 'text-violet-400/70' : '';
 
   // Detect cron sessions from key pattern
   const isCron = session.key.includes(':cron:');

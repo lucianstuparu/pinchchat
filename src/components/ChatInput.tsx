@@ -214,7 +214,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
 
   return (
     <div
-      className="border-t border-white/8 bg-[var(--pc-bg-input)]/60 backdrop-blur-xl p-4"
+      className="border-t border-pc-border bg-[var(--pc-bg-input)]/60 backdrop-blur-xl p-4"
       role="form"
       aria-label={t('chat.inputLabel')}
       onDragOver={handleDragOver}
@@ -222,26 +222,26 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
       onDrop={handleDrop}
     >
       <div className="max-w-4xl mx-auto">
-        <div className={`rounded-3xl border bg-[var(--pc-bg-surface)]/40 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-colors ${isDragOver ? 'border-cyan-400/40 bg-cyan-400/5' : 'border-white/8'}`}>
+        <div className={`rounded-3xl border bg-[var(--pc-bg-surface)]/40 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-colors ${isDragOver ? 'border-[var(--pc-accent-dim)] bg-[var(--pc-accent-glow)]' : 'border-pc-border'}`}>
           {/* File previews */}
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 px-1">
               {files.map(f => (
-                <div key={f.id} className="group relative flex items-center gap-2 rounded-2xl border border-white/8 bg-zinc-800/50 px-3 py-2 text-xs text-zinc-400">
+                <div key={f.id} className="group relative flex items-center gap-2 rounded-2xl border border-pc-border bg-pc-elevated/50 px-3 py-2 text-xs text-pc-text-secondary">
                   {f.preview ? (
                     <img src={f.preview} alt="" className="h-8 w-8 rounded-lg object-cover" />
                   ) : (
-                    <FileText size={16} className="text-zinc-500 shrink-0" />
+                    <FileText size={16} className="text-pc-text-muted shrink-0" />
                   )}
                   <div className="min-w-0 max-w-[120px]">
-                    <div className="truncate text-zinc-300">{f.file.name}</div>
-                    <div className="text-[10px] text-zinc-500">{formatSize(f.file.size)}</div>
+                    <div className="truncate text-pc-text">{f.file.name}</div>
+                    <div className="text-[10px] text-pc-text-muted">{formatSize(f.file.size)}</div>
                   </div>
                   <button
                     onClick={() => removeFile(f.id)}
-                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-zinc-700 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-pc-elevated border border-pc-border-strong flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
                   >
-                    <X size={10} className="text-zinc-200" />
+                    <X size={10} className="text-pc-text" />
                   </button>
                 </div>
               ))}
@@ -253,7 +253,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="shrink-0 h-11 w-11 rounded-2xl border border-white/8 bg-zinc-800/30 flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-white/5 transition-colors disabled:opacity-30"
+              className="shrink-0 h-11 w-11 rounded-2xl border border-pc-border bg-pc-elevated/30 flex items-center justify-center text-pc-text-secondary hover:text-pc-accent-light hover:bg-[var(--pc-hover)] transition-colors disabled:opacity-30"
               title={t('chat.attachFile')}
               aria-label={t('chat.attachFile')}
             >
@@ -278,7 +278,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
               aria-label={t('chat.inputLabel')}
               disabled={disabled}
               rows={1}
-              className="flex-1 bg-transparent resize-none rounded-2xl border border-white/8 bg-zinc-900/35 px-4 py-3 text-sm text-zinc-300 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all max-h-[200px]"
+              className="flex-1 bg-transparent resize-none rounded-2xl border border-pc-border bg-pc-input/35 px-4 py-3 text-sm text-pc-text placeholder:text-pc-text-muted outline-none focus:ring-2 focus:ring-[var(--pc-accent-dim)] transition-all max-h-[200px]"
             />
             {isGenerating ? (
               <button
@@ -293,7 +293,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
                 onClick={handleSubmit}
                 disabled={(!text.trim() && files.length === 0) || disabled}
                 aria-label={t('chat.send')}
-                className="shrink-0 h-11 px-5 rounded-2xl bg-gradient-to-r from-cyan-500/80 via-indigo-500/70 to-violet-500/80 text-zinc-900 font-semibold text-sm hover:opacity-90 shadow-[0_8px_24px_rgba(34,211,238,0.1)] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2"
+                className="shrink-0 h-11 px-5 rounded-2xl bg-gradient-to-r from-cyan-500/80 via-indigo-500/70 to-violet-500/80 text-pc-text font-semibold text-sm hover:opacity-90 shadow-[0_8px_24px_rgba(34,211,238,0.1)] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2"
               >
                 <Send size={16} />
                 <span className="hidden sm:inline">{t('chat.send')}</span>

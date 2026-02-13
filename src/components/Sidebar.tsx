@@ -142,18 +142,18 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />}
-      <aside role="navigation" aria-label="Sessions" className={`fixed lg:relative top-0 left-0 h-full bg-[var(--pc-bg-base)]/95 border-r border-white/8 z-50 transform ${dragging ? '' : 'transition-transform'} lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'} flex flex-col backdrop-blur-xl`} style={{ width: `${width}px` }}>
-        <div className="h-14 flex items-center justify-between px-4 border-b border-white/8">
+      <aside role="navigation" aria-label="Sessions" className={`fixed lg:relative top-0 left-0 h-full bg-[var(--pc-bg-base)]/95 border-r border-pc-border z-50 transform ${dragging ? '' : 'transition-transform'} lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'} flex flex-col backdrop-blur-xl`} style={{ width: `${width}px` }}>
+        <div className="h-14 flex items-center justify-between px-4 border-b border-pc-border">
           <div className="flex items-center gap-2">
             <div className="relative">
               <div className="absolute -inset-1.5 rounded-xl bg-gradient-to-r from-cyan-400/15 to-violet-500/15 blur-lg" />
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-white/8 bg-zinc-800/50">
-                <Sparkles className="h-4 w-4 text-cyan-200" />
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-pc-border bg-pc-elevated/50">
+                <Sparkles className="h-4 w-4 text-pc-accent-light" />
               </div>
             </div>
-            <span className="font-semibold text-sm text-zinc-200 tracking-wide">{t('sidebar.title')}</span>
+            <span className="font-semibold text-sm text-pc-text tracking-wide">{t('sidebar.title')}</span>
           </div>
-          <button onClick={onClose} className="lg:hidden p-1.5 rounded-xl hover:bg-white/5 text-zinc-400 transition-colors">
+          <button onClick={onClose} className="lg:hidden p-1.5 rounded-xl hover:bg-[var(--pc-hover)] text-pc-text-secondary transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -162,7 +162,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
         {sessions.length > 3 && (
           <div className="px-2 pt-2">
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-pc-text-muted" />
               <input
                 ref={searchRef}
                 type="text"
@@ -170,12 +170,12 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                 onChange={e => updateFilter(e.target.value)}
                 placeholder={t('sidebar.search')}
                 aria-label={t('sidebar.search')}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-white/8 bg-zinc-800/30 text-xs text-zinc-300 placeholder:text-zinc-500 outline-none focus:ring-1 focus:ring-cyan-400/30 transition-all"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-pc-border bg-pc-elevated/30 text-xs text-pc-text placeholder:text-pc-text-muted outline-none focus:ring-1 focus:ring-[var(--pc-accent-dim)] transition-all"
               />
               {filter && (
                 <button
                   onClick={() => updateFilter('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-pc-text-muted hover:text-pc-text"
                 >
                   <X size={12} />
                 </button>
@@ -214,10 +214,10 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
           }}
         >
           {sessions.length === 0 && (
-            <div className="px-3 py-8 text-center text-zinc-500 text-sm">{t('sidebar.empty')}</div>
+            <div className="px-3 py-8 text-center text-pc-text-muted text-sm">{t('sidebar.empty')}</div>
           )}
           {sessions.length > 0 && filtered.length === 0 && (
-            <div className="px-3 py-6 text-center text-zinc-500 text-xs">{t('sidebar.noResults')}</div>
+            <div className="px-3 py-6 text-center text-pc-text-muted text-xs">{t('sidebar.noResults')}</div>
           )}
           {filtered.map((s, idx) => {
             const isActive = s.key === activeSession;
@@ -228,7 +228,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
               <div key={s.key}>
                 {isFirstUnpinned && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mt-1 mb-1">
-                    <div className="flex-1 h-px bg-white/5" />
+                    <div className="flex-1 h-px bg-[var(--pc-hover)]" />
                   </div>
                 )}
                 <button
@@ -238,11 +238,11 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                   onMouseEnter={() => setFocusIdx(idx)}
                   className={`group/item w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-sm transition-all mb-1 ${
                     isActive
-                      ? 'bg-white/5 text-cyan-200 border border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.08)]'
+                      ? 'bg-[var(--pc-hover)] text-pc-accent-light border border-pc-border shadow-[0_0_12px_rgba(34,211,238,0.08)]'
                       : s.isActive
                         ? 'bg-violet-500/5 text-violet-200 border border-violet-500/15 shadow-[0_0_10px_rgba(168,85,247,0.06)]'
-                        : 'text-zinc-400 hover:bg-white/5 border border-transparent'
-                  } ${isFocused && !isActive ? 'ring-1 ring-cyan-400/30' : ''}`}
+                        : 'text-pc-text-secondary hover:bg-[var(--pc-hover)] border border-transparent'
+                  } ${isFocused && !isActive ? 'ring-1 ring-[var(--pc-accent-dim)]' : ''}`}
                 >
                   <div className="relative">
                     <SessionIcon session={s} isActive={s.isActive} isCurrentSession={isActive} />
@@ -250,7 +250,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                       <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] animate-pulse" />
                     )}
                     {s.hasUnread && !isActive && (
-                      <span className="absolute -top-0.5 -left-0.5 h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.7)]" />
+                      <span className="absolute -top-0.5 -left-0.5 h-2 w-2 rounded-full bg-[var(--pc-accent)] shadow-[0_0_8px_rgba(34,211,238,0.7)]" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -258,14 +258,14 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                       <span className="flex-1 truncate">{sessionDisplayName(s)}</span>
                       {(() => {
                         const rel = relativeTime(s.updatedAt);
-                        return rel ? <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{rel}</span> : null;
+                        return rel ? <span className="text-[10px] text-pc-text-muted tabular-nums shrink-0">{rel}</span> : null;
                       })()}
                       <button
                         onClick={(e) => togglePin(s.key, e)}
                         className={`shrink-0 p-0.5 rounded-lg transition-all ${
                           isPinned
-                            ? 'text-cyan-400 opacity-80 hover:opacity-100'
-                            : 'text-zinc-600 opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-zinc-400'
+                            ? 'text-pc-accent opacity-80 hover:opacity-100'
+                            : 'text-pc-text-faint opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-pc-text-secondary'
                         }`}
                         title={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
                         aria-label={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
@@ -274,20 +274,20 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDelete(s.key); }}
-                        className="shrink-0 p-0.5 rounded-lg transition-all text-zinc-600 opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-red-400"
+                        className="shrink-0 p-0.5 rounded-lg transition-all text-pc-text-faint opacity-0 group-hover/item:opacity-60 hover:!opacity-100 hover:text-red-400"
                         title={t('sidebar.delete')}
                         aria-label={t('sidebar.delete')}
                       >
                         <Trash2 size={12} />
                       </button>
                       {s.messageCount != null && (
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-cyan-400/10 text-cyan-300' : 'bg-white/5 text-zinc-500'}`}>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-[var(--pc-accent-glow)] text-pc-accent-light' : 'bg-[var(--pc-hover)] text-pc-text-muted'}`}>
                           {s.messageCount}
                         </span>
                       )}
                     </div>
                     {s.lastMessagePreview && (
-                      <p className="text-[11px] text-zinc-500 truncate mt-0.5 leading-tight">{s.lastMessagePreview.replace(/\s+/g, ' ').slice(0, 80)}</p>
+                      <p className="text-[11px] text-pc-text-muted truncate mt-0.5 leading-tight">{s.lastMessagePreview.replace(/\s+/g, ' ').slice(0, 80)}</p>
                     )}
                     {(() => {
                       if (!s.contextTokens) return null;
@@ -296,10 +296,10 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
                       const barStyle = { width: `${pct}%`, backgroundColor: `rgba(56, 189, 248, ${barOpacity})` };
                       return (
                         <div className="flex items-center gap-1.5 mt-1">
-                          <div className="flex-1 h-[3px] rounded-full bg-white/5 overflow-hidden">
+                          <div className="flex-1 h-[3px] rounded-full bg-[var(--pc-hover)] overflow-hidden">
                             <div className="h-full rounded-full" style={barStyle} />
                           </div>
-                          <span className="text-[9px] text-zinc-500 tabular-nums shrink-0">{Math.round(pct)}%</span>
+                          <span className="text-[9px] text-pc-text-muted tabular-nums shrink-0">{Math.round(pct)}%</span>
                         </div>
                       );
                     })()}
@@ -310,17 +310,17 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
           })}
         </div>
         {/* Footer with version */}
-        <div className="px-4 py-3 border-t border-white/8 flex items-center justify-center gap-2">
+        <div className="px-4 py-3 border-t border-pc-border flex items-center justify-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-violet-300/60 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/60 shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--pc-accent-dim)] shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
           <span className="h-1.5 w-1.5 rounded-full bg-indigo-300/50 shadow-[0_0_10px_rgba(99,102,241,0.4)]" />
-          <span className="ml-1 text-[9px] text-zinc-600 select-all" title={`PinchChat v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
+          <span className="ml-1 text-[9px] text-pc-text-faint select-all" title={`PinchChat v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
         </div>
         {/* Resize drag handle */}
         <div
           onMouseDown={startDrag}
           onTouchStart={startDrag}
-          className={`hidden lg:block absolute top-0 right-0 w-1.5 h-full cursor-col-resize group/resize z-10 ${dragging ? 'bg-cyan-400/20' : 'hover:bg-cyan-400/15'} transition-colors`}
+          className={`hidden lg:block absolute top-0 right-0 w-1.5 h-full cursor-col-resize group/resize z-10 ${dragging ? 'bg-[var(--pc-accent-glow)]' : 'hover:bg-[var(--pc-accent-glow)]'} transition-colors`}
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize sidebar"
@@ -328,7 +328,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
           aria-valuemin={MIN_WIDTH}
           aria-valuemax={MAX_WIDTH}
         >
-          <div className={`absolute top-1/2 -translate-y-1/2 right-0 w-0.5 h-8 rounded-full ${dragging ? 'bg-cyan-400/50' : 'bg-white/0 group-hover/resize:bg-cyan-400/30'} transition-colors`} />
+          <div className={`absolute top-1/2 -translate-y-1/2 right-0 w-0.5 h-8 rounded-full ${dragging ? 'bg-[var(--pc-accent-dim)]' : 'bg-transparent group-hover/resize:bg-[var(--pc-accent-dim)]'} transition-colors`} />
         </div>
       </aside>
       {/* Prevent text selection while dragging */}
@@ -337,12 +337,12 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, open, onC
       {confirmDelete && (
         <>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]" onClick={() => setConfirmDelete(null)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[80] w-72 bg-[var(--pc-bg-base)] border border-white/10 rounded-2xl p-5 shadow-2xl">
-            <p className="text-sm text-zinc-300 mb-4">{t('sidebar.deleteConfirm')}</p>
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[80] w-72 bg-[var(--pc-bg-base)] border border-pc-border-strong rounded-2xl p-5 shadow-2xl">
+            <p className="text-sm text-pc-text mb-4">{t('sidebar.deleteConfirm')}</p>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-3 py-1.5 text-xs rounded-xl border border-white/10 text-zinc-400 hover:bg-white/5 transition-colors"
+                className="px-3 py-1.5 text-xs rounded-xl border border-pc-border-strong text-pc-text-secondary hover:bg-[var(--pc-hover)] transition-colors"
               >
                 {t('sidebar.deleteCancel')}
               </button>

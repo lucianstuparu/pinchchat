@@ -17,7 +17,7 @@ const toolColors: Record<string, ToolColor> = {
   write:      { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
   Edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
   edit:       { border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: 'text-violet-400', glow: 'shadow-[0_0_8px_rgba(139,92,246,0.15)]', expandBorder: 'border-violet-500/20', expandBg: 'bg-violet-950/20' },
-  browser:    { border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', text: 'text-cyan-300', icon: 'text-cyan-400', glow: 'shadow-[0_0_8px_rgba(6,182,212,0.15)]', expandBorder: 'border-cyan-500/20', expandBg: 'bg-cyan-950/20' },
+  browser:    { border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', text: 'text-pc-accent-light', icon: 'text-pc-accent', glow: 'shadow-[0_0_8px_rgba(6,182,212,0.15)]', expandBorder: 'border-cyan-500/20', expandBg: 'bg-cyan-950/20' },
   image:      { border: 'border-pink-500/30', bg: 'bg-pink-500/10', text: 'text-pink-300', icon: 'text-pink-400', glow: 'shadow-[0_0_8px_rgba(236,72,153,0.15)]', expandBorder: 'border-pink-500/20', expandBg: 'bg-pink-950/20' },
   message:    { border: 'border-indigo-500/30', bg: 'bg-indigo-500/10', text: 'text-indigo-300', icon: 'text-indigo-400', glow: 'shadow-[0_0_8px_rgba(99,102,241,0.15)]', expandBorder: 'border-indigo-500/20', expandBg: 'bg-indigo-950/20' },
   memory_search: { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300', icon: 'text-rose-400', glow: 'shadow-[0_0_8px_rgba(244,63,94,0.15)]', expandBorder: 'border-rose-500/20', expandBg: 'bg-rose-950/20' },
@@ -26,7 +26,7 @@ const toolColors: Record<string, ToolColor> = {
   sessions_spawn: { border: 'border-teal-500/30', bg: 'bg-teal-500/10', text: 'text-teal-300', icon: 'text-teal-400', glow: 'shadow-[0_0_8px_rgba(20,184,166,0.15)]', expandBorder: 'border-teal-500/20', expandBg: 'bg-teal-950/20' },
 };
 
-const defaultColor: ToolColor = { border: 'border-zinc-500/30', bg: 'bg-zinc-500/10', text: 'text-zinc-300', icon: 'text-zinc-400', glow: 'shadow-[0_0_8px_rgba(161,161,170,0.1)]', expandBorder: 'border-zinc-500/20', expandBg: 'bg-zinc-800/25' };
+const defaultColor: ToolColor = { border: 'border-pc-border-strong', bg: 'bg-pc-elevated/10', text: 'text-pc-text', icon: 'text-pc-text-secondary', glow: 'shadow-[0_0_8px_rgba(161,161,170,0.1)]', expandBorder: 'border-pc-border', expandBg: 'bg-pc-elevated/25' };
 
 function getColor(name: string): ToolColor {
   return toolColors[name] || defaultColor;
@@ -115,7 +115,7 @@ function WrapToggle({ wrap, onToggle }: { wrap: boolean; onToggle: () => void })
   return (
     <button
       onClick={onToggle}
-      className="absolute top-2 right-8 p-1 rounded-lg bg-zinc-700/60 hover:bg-zinc-600/80 border border-white/10 text-zinc-400 hover:text-zinc-200 opacity-0 group-hover/tc-block:opacity-100 transition-opacity duration-150"
+      className="absolute top-2 right-8 p-1 rounded-lg bg-pc-elevated/60 hover:bg-pc-elevated/80 border border-pc-border-strong text-pc-text-secondary hover:text-pc-text opacity-0 group-hover/tc-block:opacity-100 transition-opacity duration-150"
       title={wrap ? 'No wrap' : 'Word wrap'}
       aria-label="Toggle word wrap"
       type="button"
@@ -138,7 +138,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1 rounded-lg bg-zinc-700/60 hover:bg-zinc-600/80 border border-white/10 text-zinc-400 hover:text-zinc-200 opacity-0 group-hover/tc-block:opacity-100 transition-opacity duration-150"
+      className="absolute top-2 right-2 p-1 rounded-lg bg-pc-elevated/60 hover:bg-pc-elevated/80 border border-pc-border-strong text-pc-text-secondary hover:text-pc-text opacity-0 group-hover/tc-block:opacity-100 transition-opacity duration-150"
       title={copied ? 'Copied!' : 'Copy'}
       aria-label="Copy to clipboard"
       type="button"
@@ -266,7 +266,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
 
       {/* Result summary (always visible if result exists) */}
       {result && !open && (
-        <div className="mt-1 text-[11px] text-zinc-400 pl-2 truncate max-w-full">
+        <div className="mt-1 text-[11px] text-pc-text-secondary pl-2 truncate max-w-full">
           {truncateResult(result)}
         </div>
       )}
@@ -280,7 +280,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
               <div className="group/tc-block relative">
                 <HighlightedPre
                   text={inputStr}
-                  className="text-xs bg-[var(--pc-bg-input)]/60 border border-white/5 p-2.5 rounded-xl overflow-x-auto text-zinc-300 font-mono"
+                  className="text-xs bg-[var(--pc-bg-input)]/60 border border-pc-border p-2.5 rounded-xl overflow-x-auto text-pc-text font-mono"
                   wrap={wrap}
                 />
                 <WrapToggle wrap={wrap} onToggle={() => setWrap(!wrap)} />
@@ -299,7 +299,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
                       <div className="group/tc-block relative">
                         <HighlightedPre
                           text={imageData.remaining}
-                          className="text-xs bg-[var(--pc-bg-input)]/60 border border-white/5 p-2.5 rounded-xl overflow-x-auto text-zinc-300 font-mono mb-2"
+                          className="text-xs bg-[var(--pc-bg-input)]/60 border border-pc-border p-2.5 rounded-xl overflow-x-auto text-pc-text font-mono mb-2"
                           wrap={wrap}
                         />
                         <WrapToggle wrap={wrap} onToggle={() => setWrap(!wrap)} />
@@ -312,7 +312,7 @@ export function ToolCall({ name, input, result }: { name: string; input?: Record
                   <div className="group/tc-block relative">
                     <HighlightedPre
                       text={result}
-                      className="text-xs bg-[var(--pc-bg-input)]/60 border border-white/5 p-2.5 rounded-xl overflow-x-auto text-zinc-300 max-h-64 overflow-y-auto font-mono"
+                      className="text-xs bg-[var(--pc-bg-input)]/60 border border-pc-border p-2.5 rounded-xl overflow-x-auto text-pc-text max-h-64 overflow-y-auto font-mono"
                       wrap={wrap}
                     />
                     <WrapToggle wrap={wrap} onToggle={() => setWrap(!wrap)} />

@@ -24,17 +24,17 @@ export function TypingIndicator() {
 
   return (
     <div className="animate-fade-in flex items-start gap-3 px-4 py-3">
-      <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-zinc-900/60">
-        <Bot className="h-4 w-4 text-cyan-200" />
+      <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-2xl border border-pc-border-strong bg-pc-input/60">
+        <Bot className="h-4 w-4 text-pc-accent-light" />
       </div>
-      <div className="rounded-3xl border border-white/10 bg-zinc-900/55 px-4 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
+      <div className="rounded-3xl border border-pc-border-strong bg-pc-input/55 px-4 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
         <div className="flex items-center gap-1.5">
           <span className="bounce-dot h-2 w-2 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80" />
           <span className="bounce-dot h-2 w-2 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80" />
           <span className="bounce-dot h-2 w-2 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80" />
-          <span className="ml-2 text-xs text-zinc-400">{t('chat.thinking')}</span>
+          <span className="ml-2 text-xs text-pc-text-secondary">{t('chat.thinking')}</span>
           {elapsed >= 2 && (
-            <span className="text-[10px] text-zinc-500 tabular-nums ml-1">{formatElapsed(elapsed)}</span>
+            <span className="text-[10px] text-pc-text-muted tabular-nums ml-1">{formatElapsed(elapsed)}</span>
           )}
         </div>
       </div>

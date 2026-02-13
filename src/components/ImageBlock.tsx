@@ -27,7 +27,7 @@ function Lightbox({ src, alt, onClose }: ImageBlockProps & { onClose: () => void
       <button
         onClick={onClose}
         aria-label="Close preview"
-        className="absolute top-4 right-4 p-2 rounded-full bg-zinc-800/80 border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-700/80 transition-colors"
+        className="absolute top-4 right-4 p-2 rounded-full bg-pc-elevated/80 border border-pc-border-strong text-pc-text hover:text-white hover:bg-pc-elevated/80 transition-colors"
       >
         <X size={20} />
       </button>
@@ -51,7 +51,7 @@ export function ImageBlock({ src, alt }: ImageBlockProps) {
           type="button"
           onClick={() => setLightbox(true)}
           aria-label={`View ${alt || 'image'} full size`}
-          className="block rounded-xl border border-white/8 cursor-pointer hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+          className="block rounded-xl border border-pc-border cursor-pointer hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--pc-accent-dim)]"
         >
           <img
             src={src}

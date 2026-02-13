@@ -60,14 +60,14 @@ export function CodeBlock(props: HTMLAttributes<HTMLPreElement>) {
   return (
     <div className="group/code relative">
       {language && (
-        <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-800/80 border-b border-white/5 rounded-t-lg text-[11px] text-zinc-500 font-mono select-none">
+        <div className="flex items-center justify-between px-4 py-1.5 bg-pc-elevated/80 border-b border-pc-border rounded-t-lg text-[11px] text-pc-text-muted font-mono select-none">
           {formatLanguage(language)}
         </div>
       )}
       <pre {...props} className={`${props.className || ''} ${language ? '!rounded-t-none !mt-0' : ''}`} />
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 p-1.5 rounded-lg bg-zinc-700/60 hover:bg-zinc-600/80 border border-white/10 text-zinc-400 hover:text-zinc-200 opacity-0 group-hover/code:opacity-100 transition-opacity duration-150"
+        className="absolute top-2 right-2 p-1.5 rounded-lg bg-pc-elevated/60 hover:bg-pc-elevated/80 border border-pc-border-strong text-pc-text-secondary hover:text-pc-text opacity-0 group-hover/code:opacity-100 transition-opacity duration-150"
         title="Copy code"
         aria-label="Copy code to clipboard"
         type="button"

@@ -136,30 +136,30 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden relative" role="log" aria-label={t('chat.messages')} aria-live="polite">
         <div className="max-w-4xl mx-auto py-4 w-full">
           {messages.length === 0 && isLoadingHistory && (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500">
-              <Loader2 className="h-8 w-8 text-cyan-300/60 animate-spin mb-4" />
-              <div className="text-sm text-zinc-500">{t('chat.loadingHistory')}</div>
+            <div className="flex flex-col items-center justify-center h-[60vh] text-pc-text-muted">
+              <Loader2 className="h-8 w-8 text-pc-accent-light/60 animate-spin mb-4" />
+              <div className="text-sm text-pc-text-muted">{t('chat.loadingHistory')}</div>
             </div>
           )}
           {messages.length === 0 && !isLoadingHistory && (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500">
+            <div className="flex flex-col items-center justify-center h-[60vh] text-pc-text-muted">
               <div className="relative mb-6">
                 <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-cyan-400/10 via-indigo-500/10 to-violet-500/10 blur-2xl" />
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl border border-white/8 bg-zinc-800/40">
-                  <Bot className="h-8 w-8 text-cyan-200" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl border border-pc-border bg-pc-elevated/40">
+                  <Bot className="h-8 w-8 text-pc-accent-light" />
                 </div>
               </div>
-              <div className="text-lg text-zinc-200 font-semibold">{t('chat.welcome')}</div>
-              <div className="text-sm mt-1 text-zinc-500">{t('chat.welcomeSub')}</div>
+              <div className="text-lg text-pc-text font-semibold">{t('chat.welcome')}</div>
+              <div className="text-sm mt-1 text-pc-text-muted">{t('chat.welcomeSub')}</div>
             </div>
           )}
           {visibleMessages.map(({ msg, showSep }) => (
                 <div key={msg.id}>
                   {showSep && (
                     <div className="flex items-center gap-3 py-3 px-4 select-none" aria-label={formatDateSeparator(msg.timestamp, t)}>
-                      <div className="flex-1 h-px bg-white/8" />
-                      <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">{formatDateSeparator(msg.timestamp, t)}</span>
-                      <div className="flex-1 h-px bg-white/8" />
+                      <div className="flex-1 h-px bg-[var(--pc-hover-strong)]" />
+                      <span className="text-[11px] font-medium text-pc-text-muted uppercase tracking-wider">{formatDateSeparator(msg.timestamp, t)}</span>
+                      <div className="flex-1 h-px bg-[var(--pc-hover-strong)]" />
                     </div>
                   )}
                   <ChatMessageComponent message={msg} onRetry={!isGenerating ? handleSend : undefined} agentAvatarUrl={agentAvatarUrl} />
@@ -176,7 +176,7 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
             onClick={globalState === 'expand-all' ? collapseAll : expandAll}
             aria-label={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
             title={globalState === 'expand-all' ? t('chat.collapseTools') : t('chat.expandTools')}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-800/90 backdrop-blur-lg px-3 py-2 text-xs text-zinc-300 shadow-lg hover:bg-zinc-700/90 transition-all hover:shadow-violet-500/10"
+            className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-violet-500/10"
           >
             {globalState === 'expand-all' ? <ChevronsDownUp size={14} className="text-violet-300" /> : <ChevronsUpDown size={14} className="text-violet-300" />}
           </button>
@@ -185,9 +185,9 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
           <button
             onClick={() => scrollToBottom('smooth')}
             aria-label={t('chat.scrollToBottom')}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-800/90 backdrop-blur-lg px-3.5 py-2 text-xs text-zinc-300 shadow-lg hover:bg-zinc-700/90 transition-all hover:shadow-cyan-500/10"
+            className="flex items-center gap-1.5 rounded-full border border-pc-border-strong bg-pc-elevated/90 backdrop-blur-lg px-3.5 py-2 text-xs text-pc-text shadow-lg hover:bg-pc-elevated/90 transition-all hover:shadow-cyan-500/10"
           >
-            <ArrowDown size={14} className="text-cyan-300" />
+            <ArrowDown size={14} className="text-pc-accent-light" />
             <span className="hidden sm:inline">{t('chat.scrollToBottom')}</span>
           </button>
         )}
