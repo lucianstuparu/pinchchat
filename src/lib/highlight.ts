@@ -8,11 +8,14 @@ import type { LanguageFn } from 'highlight.js';
 
 // Languages commonly seen in AI assistant conversations
 import bash from 'highlight.js/lib/languages/bash';
+import c from 'highlight.js/lib/languages/c';
+import cpp from 'highlight.js/lib/languages/cpp';
 import css from 'highlight.js/lib/languages/css';
 import diff from 'highlight.js/lib/languages/diff';
 import dockerfile from 'highlight.js/lib/languages/dockerfile';
 import go from 'highlight.js/lib/languages/go';
 import ini from 'highlight.js/lib/languages/ini';
+import java from 'highlight.js/lib/languages/java';
 import javascript from 'highlight.js/lib/languages/javascript';
 import json from 'highlight.js/lib/languages/json';
 import markdown from 'highlight.js/lib/languages/markdown';
@@ -25,11 +28,14 @@ import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
 
 hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('c', c);
+hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('css', css);
 hljs.registerLanguage('diff', diff);
 hljs.registerLanguage('dockerfile', dockerfile);
 hljs.registerLanguage('go', go);
 hljs.registerLanguage('ini', ini);
+hljs.registerLanguage('java', java);
 hljs.registerLanguage('javascript', javascript);
 hljs.registerLanguage('json', json);
 hljs.registerLanguage('markdown', markdown);
@@ -43,6 +49,8 @@ hljs.registerLanguage('yaml', yaml);
 
 // Aliases for hljs direct usage (ToolCall.tsx)
 hljs.registerAliases(['sh', 'zsh'], { languageName: 'bash' });
+hljs.registerAliases(['h'], { languageName: 'c' });
+hljs.registerAliases(['cc', 'cxx', 'c++', 'hpp', 'hxx'], { languageName: 'cpp' });
 hljs.registerAliases(['js', 'jsx'], { languageName: 'javascript' });
 hljs.registerAliases(['ts', 'tsx'], { languageName: 'typescript' });
 hljs.registerAliases(['py'], { languageName: 'python' });
@@ -56,7 +64,7 @@ hljs.registerAliases(['rs'], { languageName: 'rust' });
  * rehype-highlight uses lowlight internally and accepts a `languages` record.
  */
 export const rehypeHighlightLanguages: Record<string, LanguageFn> = {
-  bash, css, diff, dockerfile, go, ini, javascript, json,
+  bash, c, cpp, css, diff, dockerfile, go, ini, java, javascript, json,
   markdown, python, rust, shell, sql, typescript, xml, yaml,
 };
 
@@ -67,6 +75,8 @@ export const rehypeHighlightOptions = {
   languages: rehypeHighlightLanguages,
   aliases: {
     bash: ['sh', 'zsh'],
+    c: ['h'],
+    cpp: ['cc', 'cxx', 'c++', 'hpp', 'hxx'],
     javascript: ['js', 'jsx'],
     typescript: ['ts', 'tsx'],
     python: ['py'],

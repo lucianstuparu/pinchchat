@@ -3,8 +3,8 @@ import hljs, { rehypeHighlightLanguages, rehypeHighlightOptions } from '../highl
 
 describe('highlight', () => {
   const expectedLanguages = [
-    'bash', 'css', 'diff', 'dockerfile', 'go', 'ini',
-    'javascript', 'json', 'markdown', 'python', 'rust',
+    'bash', 'c', 'cpp', 'css', 'diff', 'dockerfile', 'go', 'ini',
+    'java', 'javascript', 'json', 'markdown', 'python', 'rust',
     'shell', 'sql', 'typescript', 'xml', 'yaml',
   ];
 
@@ -17,7 +17,7 @@ describe('highlight', () => {
     });
 
     it('resolves common aliases', () => {
-      const aliases = ['sh', 'zsh', 'js', 'jsx', 'ts', 'tsx', 'py', 'html', 'yml', 'rs'];
+      const aliases = ['sh', 'zsh', 'h', 'cc', 'cxx', 'js', 'jsx', 'ts', 'tsx', 'py', 'html', 'yml', 'rs'];
       for (const alias of aliases) {
         const lang = hljs.getLanguage(alias);
         expect(lang, `alias "${alias}" should resolve`).toBeDefined();
