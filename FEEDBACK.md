@@ -545,7 +545,8 @@
 ## Item #51
 - **Date:** 2026-02-12
 - **Priority:** medium
-- **Status:** pending
+- **Status:** done
+- **Completed:** 2026-02-13 — commit `4dfaaff`
 - **Description:** Typing preview — live markdown render while typing
   - Show a preview pane below or beside the input with rendered markdown
   - Toggle on/off
