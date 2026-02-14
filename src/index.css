@@ -53,8 +53,6 @@
 }
 
 /* Chat textarea: no focus ring (container handles visual feedback) */
-.ht-textarea:focus-visible,
-.ht-textarea:focus,
 #chat-input:focus-visible,
 #chat-input:focus {
   outline: none;
@@ -201,77 +199,6 @@ html, body {
 .markdown-body th, .markdown-body td { border: 1px solid var(--pc-border); padding: 6px 12px; }
 .markdown-body th { background: var(--pc-accent-glow); }
 .markdown-body img { max-width: 100%; border-radius: 8px; }
-
-/* Highlighted textarea overlay */
-.ht-container {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.ht-backdrop,
-.ht-textarea {
-  /* Must share EXACTLY identical text layout — any difference causes cursor desync */
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-  word-spacing: inherit;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  overflow-x: hidden;
-  overflow-y: auto;
-  margin: 0;
-  box-sizing: border-box;
-  /* padding, border, border-radius all come from the shared className */
-}
-
-.ht-backdrop {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  color: var(--pc-text-primary);
-  background: transparent;
-}
-
-.ht-textarea {
-  position: relative;
-  width: 100%;
-  color: transparent;
-  caret-color: var(--pc-text-primary);
-  background: transparent !important;
-  resize: none;
-  z-index: 1;
-}
-
-/* Token colors — ONLY color allowed, nothing that changes text geometry */
-.ht-code-block {
-  color: #67e8f9; /* cyan-300 */
-}
-
-.ht-inline-code {
-  color: #67e8f9;
-}
-
-.ht-bold {
-  color: var(--pc-text-primary);
-}
-
-.ht-italic {
-  color: var(--pc-text-secondary);
-  /* No font-style: italic — italic glyphs have different widths, causes cursor desync */
-}
-
-.ht-heading {
-  color: #a78bfa; /* violet-400 */
-  /* No font-weight — bolder glyphs are wider, causes cursor desync */
-}
-
-.ht-link {
-  color: #67e8f9;
-}
 
 /* Accessibility: respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
