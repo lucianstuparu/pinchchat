@@ -108,7 +108,7 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
     if (sessionKey !== prevSessionKeyRef.current) {
       prevSessionKeyRef.current = sessionKey;
       prevMessageCountRef.current = messages.length;
-      setNewMessageCount(0);
+      setNewMessageCount(0); // eslint-disable-line react-hooks/set-state-in-effect -- intentional: reset on session switch
       isNearBottomRef.current = true;
       // Scroll to bottom on session switch
       requestAnimationFrame(() => scrollToBottom('instant'));
@@ -130,7 +130,7 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
       // History just loaded — scroll to bottom, don't show indicator
       scrollToBottom('instant');
       isNearBottomRef.current = true;
-      setNewMessageCount(0);
+      setNewMessageCount(0); // eslint-disable-line react-hooks/set-state-in-effect -- intentional: reset after history load
       return;
     }
 
