@@ -3,6 +3,7 @@ import { GatewayClient, type JsonPayload } from '../lib/gateway';
 import { genIdempotencyKey } from '../lib/utils';
 import { getStoredCredentials, storeCredentials, clearCredentials } from '../lib/credentials';
 import { isSystemEvent } from '../lib/systemEvent';
+import { getCachedMessages, setCachedMessages, mergeWithCache } from '../lib/messageCache';
 import type { ChatMessage, MessageBlock, ConnectionStatus, Session, AgentIdentity } from '../types';
 
 interface ChatPayloadMessage {
@@ -249,7 +250,19 @@ export function useGateway() {
             }
           }
         }
-        setMessages(merged);
+        // Merge with cached messages to preserve pre-compaction history
+        const cached = await getCachedMessages(sessionKey);
+        const { messages: finalMessages, wasCompacted } = mergeWithCache(merged, cached);
+
+        if (wasCompacted) {
+          // Store the full merged set so future loads keep the archive
+          setCachedMessages(sessionKey, finalMessages.filter(m => !m.isCompactionSeparator));
+        } else {
+          // No compaction — update cache with latest gateway messages
+          setCachedMessages(sessionKey, merged);
+        }
+
+        setMessages(finalMessages);
       }
     } catch {
       // Silently ignore history load failures

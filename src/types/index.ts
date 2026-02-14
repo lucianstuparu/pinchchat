@@ -14,6 +14,10 @@ export interface ChatMessage {
   streamStartedAt?: number;
   /** Total generation time in milliseconds (set when streaming ends) */
   generationTimeMs?: number;
+  /** True if this message was restored from local cache (pre-compaction) */
+  isArchived?: boolean;
+  /** True if this is a visual separator showing where compaction occurred */
+  isCompactionSeparator?: boolean;
 }
 
 export type MessageBlock =

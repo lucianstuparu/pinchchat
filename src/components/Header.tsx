@@ -17,9 +17,10 @@ interface Props {
   onToggleSound?: () => void;
   messages?: ChatMessage[];
   agentAvatarUrl?: string;
+  agentName?: string;
 }
 
-export function Header({ status, sessionKey, onToggleSidebar, activeSessionData, onLogout, soundEnabled, onToggleSound, messages, agentAvatarUrl }: Props) {
+export function Header({ status, sessionKey, onToggleSidebar, activeSessionData, onLogout, soundEnabled, onToggleSound, messages, agentAvatarUrl, agentName }: Props) {
   const t = useT();
   const sessionLabel = activeSessionData ? sessionDisplayName(activeSessionData) : (sessionKey.split(':').pop() || sessionKey);
 
@@ -41,7 +42,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
         <img src={agentAvatarUrl || '/logo.png'} alt="PinchChat" className="h-9 w-9 rounded-2xl object-cover" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src !== window.location.origin + '/logo.png') { img.src = '/logo.png'; } else { img.style.display = 'none'; } }} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-pc-text text-sm tracking-wide">{t('header.title')}</span>
+            <span className="font-semibold text-pc-text text-sm tracking-wide">{agentName || t('header.title')}</span>
             <Sparkles className="h-3.5 w-3.5 text-pc-accent-light/60" />
           </div>
           <span className="text-xs text-pc-text-muted truncate flex items-center gap-1.5">
