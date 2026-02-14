@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Send, Square, Paperclip, X, FileText, Eye, EyeOff } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
+import { useSendShortcut } from '../hooks/useSendShortcut';
 
 const ReactMarkdown = lazy(() => import('react-markdown'));
 const remarkGfm = import('remark-gfm').then(m => m.default);
@@ -87,6 +88,7 @@ function formatSize(bytes: number): string {
 
 export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey }: Props) {
   const t = useT();
+  const { sendOnEnter, toggle: toggleSendShortcut } = useSendShortcut();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -179,9 +181,20 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
+    if (e.key === 'Enter') {
+      if (sendOnEnter) {
+        // Enter sends, Shift+Enter for newline
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          handleSubmit();
+        }
+      } else {
+        // Ctrl+Enter (or Cmd+Enter on Mac) sends, Enter for newline
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          handleSubmit();
+        }
+      }
     }
   };
 
@@ -305,6 +318,14 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
               rows={1}
               className="flex-1 bg-transparent resize-none rounded-2xl border border-pc-border bg-pc-input/35 px-4 py-3 text-sm text-pc-text placeholder:text-pc-text-muted outline-none transition-all max-h-[200px]"
             />
+            {/* Send shortcut toggle */}
+            <button
+              onClick={toggleSendShortcut}
+              className="hidden sm:flex shrink-0 h-7 rounded-xl border border-pc-border bg-pc-elevated/30 px-2 items-center gap-1 text-[10px] text-pc-text-muted hover:text-pc-text-secondary hover:bg-[var(--pc-hover)] transition-colors"
+              title={`${t('settings.sendShortcut')}: ${sendOnEnter ? t('settings.sendEnter') : t('settings.sendCtrlEnter')}`}
+            >
+              <span>{sendOnEnter ? '↵' : (navigator.userAgent.includes('Mac') ? '⌘↵' : 'Ctrl↵')}</span>
+            </button>
             {isGenerating ? (
               <button
                 onClick={onAbort}

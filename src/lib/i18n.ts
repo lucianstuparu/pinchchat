@@ -137,6 +137,11 @@ const en = {
   'search.prev': 'Previous match',
   'search.next': 'Next match',
   'shortcuts.searchMessages': 'Search messages',
+
+  // Send shortcut setting
+  'settings.sendShortcut': 'Send with',
+  'settings.sendEnter': 'Enter',
+  'settings.sendCtrlEnter': 'Ctrl+Enter',
 } as const;
 
 const fr: Record<keyof typeof en, string> = {
@@ -255,6 +260,10 @@ const fr: Record<keyof typeof en, string> = {
   'search.prev': 'Résultat précédent',
   'search.next': 'Résultat suivant',
   'shortcuts.searchMessages': 'Rechercher dans les messages',
+
+  'settings.sendShortcut': 'Envoyer avec',
+  'settings.sendEnter': 'Entrée',
+  'settings.sendCtrlEnter': 'Ctrl+Entrée',
 };
 
 export type TranslationKey = keyof typeof en;

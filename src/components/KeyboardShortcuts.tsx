@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { X, Keyboard } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
+import { useSendShortcut } from '../hooks/useSendShortcut';
 
 interface Props {
   open: boolean;
@@ -37,6 +38,7 @@ const mod = isMac ? '⌘' : 'Ctrl';
 
 export function KeyboardShortcuts({ open, onClose }: Props) {
   const t = useT();
+  const { sendOnEnter } = useSendShortcut();
 
   useEffect(() => {
     if (!open) return;
@@ -79,11 +81,11 @@ export function KeyboardShortcuts({ open, onClose }: Props) {
           <div className="pb-3">
             <SectionTitle>{t('shortcuts.chatSection')}</SectionTitle>
             <ShortcutRow
-              keys={<Kbd>Enter</Kbd>}
+              keys={sendOnEnter ? <Kbd>Enter</Kbd> : <><Kbd>{mod}</Kbd><span className="text-pc-text-faint">+</span><Kbd>Enter</Kbd></>}
               label={t('shortcuts.send')}
             />
             <ShortcutRow
-              keys={<><Kbd>Shift</Kbd><span className="text-pc-text-faint">+</span><Kbd>Enter</Kbd></>}
+              keys={sendOnEnter ? <><Kbd>Shift</Kbd><span className="text-pc-text-faint">+</span><Kbd>Enter</Kbd></> : <Kbd>Enter</Kbd>}
               label={t('shortcuts.newline')}
             />
             <ShortcutRow
