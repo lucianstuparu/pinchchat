@@ -719,3 +719,63 @@
 - **Priority:** medium
 - **Status:** open
 - **Description:** Context compaction button — Add a button in the PinchChat UI to trigger OpenClaw's context summarize/compaction. When a session's token usage is high (e.g. near the limit), the user can click to compact the conversation history, summarizing older messages to free up context window space. OpenClaw should expose an API/tool for this. (Feedback from Bardak)
+
+## Item #64
+- **Date:** 2026-02-14
+- **Priority:** high
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** PWA not working — no install button appears on mobile or desktop. The app should be installable as a Progressive Web App. Check manifest.json, service worker registration, and install prompt handling. Test on both Chrome mobile and desktop.
+
+## Item #65
+- **Date:** 2026-02-14
+- **Priority:** medium
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** Replace the star icon (⭐) next to "PinchChat" and "Sessions" in the sidebar/navbar. It looks cheap. Replace with something better — PinchChat logo, lobster emoji (🦞), or whatever looks cool and fits the branding. Make it feel intentional, not placeholder.
+
+## Item #66
+- **Date:** 2026-02-14
+- **Priority:** high
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** Image display bug — when the assistant sends an image, it initially shows as an empty square container (wrong aspect ratio, no image visible). Clicking it opens the preview modal correctly and shows the image. After closing the preview, the image then renders correctly in the message bubble with the right aspect ratio. The image should render correctly on first load without requiring user interaction. Likely a lazy-loading or onload sizing issue.
+
+## Item #67 (DUPLICATE — see Item #63)
+- **Date:** 2026-02-14
+- **Note:** Already tracked as Item #63. Context compaction button.
+
+## Item #68
+- **Date:** 2026-02-14
+- **Priority:** medium
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** Colorize channel/source icons in the session list and chat — use each service's brand colors for visual identification. Discord = blurple (#5865F2), Telegram = blue (#26A5E4), Cron = amber/orange, TeamSpeak = blue (#2580C3), Signal = blue (#3A76F0), webchat = green, bardak-bot = custom, etc. Currently they're all the same color and hard to distinguish at a glance.
+
+## Item #69
+- **Date:** 2026-02-14
+- **Priority:** medium
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** Display the agent/assistant name somewhere in the UI (header, sidebar, or chat). The name is available in OpenClaw config at `ui.assistant.name` (e.g. "Marlbot"). Currently there's no indication of who the agent is — should be visible, especially for multi-agent setups. Could also show the avatar if `ui.assistant.avatar` is set. **Important:** these fields are optional and most users won't set them — always have a sensible fallback (e.g. "Assistant" + default robot icon) when `ui.assistant.name` / `ui.assistant.avatar` are absent.
+
+## Item #70
+- **Date:** 2026-02-14
+- **Priority:** medium
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** WebSocket connection indicator uses primary/accent color — this is problematic because when the theme accent is red, the "connected" dot looks like an error/disconnected state. Use fixed semantic colors instead: green (#22c55e) for connected, red for disconnected, amber for reconnecting. Never tie connection status indicator to the theme accent color.
+
+## Item #71
+- **Date:** 2026-02-14
+- **Priority:** low
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** The three-dot menu (⋯) at the bottom of the sidebar next to the version number feels useless. Remove it or replace with something actually useful (e.g. settings shortcut, theme picker, link to GitHub repo, etc.).
+
+## Item #72
+- **Date:** 2026-02-14
+- **Priority:** high
+- **Status:** open
+- **Source:** Josh (Bardak)
+- **Description:** After OpenClaw compaction, all previous messages disappear from the chat UI. This is a bad UX — the user loses their message history visually even though the conversation continues. Ideally PinchChat should keep a local cache/history of previous messages (IndexedDB or localStorage) so the user can still scroll back and see/copy-paste old messages even after compaction. The compaction boundary could be shown with a visual separator ("— context compacted —") but old messages should remain visible above it. This is critical for usability — users need to be able to reference what they said earlier.

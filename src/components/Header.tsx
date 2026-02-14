@@ -81,7 +81,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
         <span className="hidden sm:contents"><LanguageSelector /></span>
         {status === 'connected' ? (
           <div className="flex items-center gap-2 rounded-2xl border border-pc-border bg-pc-elevated/30 px-3 py-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--pc-accent)] shadow-[0_0_12px_var(--pc-accent-dim)]" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
             <span className="text-xs text-pc-text hidden sm:inline">{t('header.connected')}</span>
           </div>
         ) : status === 'connecting' ? (

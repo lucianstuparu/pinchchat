@@ -64,17 +64,18 @@ export function ImageBlock({ src, alt }: ImageBlockProps) {
           aria-label={`View ${alt || 'image'} full size`}
           className="block rounded-xl border border-pc-border cursor-pointer hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--pc-accent-dim)]"
         >
-          {loading && (
-            <div className="w-48 h-32 rounded-xl bg-pc-elevated/50 animate-pulse" />
-          )}
-          <img
-            src={src}
-            alt={alt || 'Image'}
-            className={`max-w-full max-h-80 rounded-xl${loading ? ' hidden' : ''}`}
-            loading="lazy"
-            onLoad={() => setLoading(false)}
-            onError={() => { setLoading(false); setError(true); }}
-          />
+          <div className="relative">
+            {loading && (
+              <div className="w-48 h-32 rounded-xl bg-pc-elevated/50 animate-pulse" />
+            )}
+            <img
+              src={src}
+              alt={alt || 'Image'}
+              className={`max-w-full max-h-80 rounded-xl transition-opacity duration-200${loading ? ' absolute top-0 left-0 opacity-0 pointer-events-none' : ' opacity-100'}`}
+              onLoad={() => setLoading(false)}
+              onError={() => { setLoading(false); setError(true); }}
+            />
+          </div>
         </button>
       </div>
       {lightbox && <Lightbox src={src} alt={alt} onClose={() => setLightbox(false)} />}

@@ -46,44 +46,63 @@ function SlackIcon({ size = 15, className = '' }: { size?: number; className?: s
  * Returns the appropriate icon for a session based on its channel or kind.
  * Detects cron sessions from the session key pattern.
  */
-export function SessionIcon({ session, isActive, isCurrentSession }: {
+export function SessionIcon({ session, isCurrentSession }: {
   session: Session;
-  isActive?: boolean;
+  isActive?: boolean; // kept for API compat, brand colors used instead
   isCurrentSession?: boolean;
 }) {
   const size = 15;
-  const baseClass = isCurrentSession ? 'text-pc-accent-light/70' : isActive ? 'text-violet-400/70' : '';
+  // Brand colors for each channel
+  const brandColor = (() => {
+    const isCron = session.key.includes(':cron:');
+    if (isCron) return 'text-amber-400/80';
+    const isSubAgent = session.key.includes(':spawn:') || session.key.includes(':sub:');
+    if (isSubAgent) return 'text-violet-400/80';
+    const ch = session.channel?.toLowerCase();
+    switch (ch) {
+      case 'discord': return 'text-[#5865F2]';
+      case 'telegram': return 'text-[#26A5E4]';
+      case 'signal': return 'text-[#3A76F0]';
+      case 'whatsapp': return 'text-[#25D366]';
+      case 'slack': return 'text-[#E01E5A]';
+      case 'webchat': return 'text-emerald-400/80';
+      case 'teamspeak': return 'text-[#2580C3]';
+      default: return 'text-pc-text-secondary';
+    }
+  })();
+
+  const colorClass = isCurrentSession ? 'text-pc-accent-light' : brandColor;
 
   // Detect cron sessions from key pattern
   const isCron = session.key.includes(':cron:');
   if (isCron) {
-    return <Clock size={size} className={baseClass} />;
+    return <Clock size={size} className={colorClass} />;
   }
 
   // Detect sub-agent / spawned sessions
   const isSubAgent = session.key.includes(':spawn:') || session.key.includes(':sub:');
   if (isSubAgent) {
-    return <Bot size={size} className={baseClass} />;
+    return <Bot size={size} className={colorClass} />;
   }
 
   const channel = session.channel?.toLowerCase();
 
   switch (channel) {
     case 'discord':
-      return <DiscordIcon size={size} className={baseClass} />;
+      return <DiscordIcon size={size} className={colorClass} />;
     case 'telegram':
-      return <TelegramIcon size={size} className={baseClass} />;
+      return <TelegramIcon size={size} className={colorClass} />;
     case 'signal':
-      return <SignalIcon size={size} className={baseClass} />;
+      return <SignalIcon size={size} className={colorClass} />;
     case 'whatsapp':
-      return <WhatsAppIcon size={size} className={baseClass} />;
+      return <WhatsAppIcon size={size} className={colorClass} />;
     case 'slack':
-      return <SlackIcon size={size} className={baseClass} />;
+      return <SlackIcon size={size} className={colorClass} />;
     case 'webchat':
-      return <Globe size={size} className={baseClass} />;
+      return <Globe size={size} className={colorClass} />;
     case 'teamspeak':
-      return <MessageSquare size={size} className={baseClass} />;
+      return <MessageSquare size={size} className={colorClass} />;
     default:
-      return <MessageSquare size={size} className={baseClass} />;
+      return <MessageSquare size={size} className={colorClass} />;
   }
 }

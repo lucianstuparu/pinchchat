@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Sparkles, Search, Pin, Trash2, Columns2, Clock, Bot, MessageSquare, Globe, Zap, ArrowUpCircle } from 'lucide-react';
+import { X, Search, Pin, Trash2, Columns2, Clock, Bot, MessageSquare, Globe, Zap, ArrowUpCircle, Download } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { SessionIcon } from './SessionIcon';
 import { sessionDisplayName } from '../lib/sessionName';
 import { relativeTime } from '../lib/relativeTime';
 import { useUpdateCheck } from '../hooks/useUpdateCheck';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 function VersionBadge() {
   const update = useUpdateCheck(__APP_VERSION__);
@@ -28,6 +29,34 @@ function VersionBadge() {
   }
   return (
     <span className="ml-1 text-[9px] text-pc-text-faint select-all" title={`PinchChat v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
+  );
+}
+
+function SidebarFooter() {
+  const pwa = usePwaInstall();
+  return (
+    <div className="px-4 py-3 border-t border-pc-border flex items-center justify-center gap-3">
+      {pwa.canInstall && (
+        <button
+          onClick={pwa.install}
+          className="inline-flex items-center gap-1 text-[10px] text-pc-accent-light hover:text-[var(--pc-accent)] transition-colors"
+          title="Install app"
+        >
+          <Download size={11} />
+          <span>Install</span>
+        </button>
+      )}
+      <a
+        href="https://github.com/MarlBurroW/pinchchat"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-pc-text-faint hover:text-pc-text-secondary transition-colors"
+        title="GitHub"
+      >
+        <Globe size={11} />
+      </a>
+      <VersionBadge />
+    </div>
   );
 }
 
@@ -258,8 +287,8 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, onSplit, 
           <div className="flex items-center gap-2">
             <div className="relative">
               <div className="absolute -inset-1.5 rounded-xl bg-gradient-to-r from-cyan-400/15 to-violet-500/15 blur-lg" />
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-pc-border bg-pc-elevated/50">
-                <Sparkles className="h-4 w-4 text-pc-accent-light" />
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl overflow-hidden">
+                <img src="/logo.png" alt="PinchChat" className="h-8 w-8 object-contain" />
               </div>
             </div>
             <span className="font-semibold text-sm text-pc-text tracking-wide">{t('sidebar.title')}</span>
@@ -511,12 +540,7 @@ export function Sidebar({ sessions, activeSession, onSwitch, onDelete, onSplit, 
           })}
         </div>
         {/* Footer with version */}
-        <div className="px-4 py-3 border-t border-pc-border flex items-center justify-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-300/60 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--pc-accent-dim)] shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-300/50 shadow-[0_0_10px_rgba(99,102,241,0.4)]" />
-          <VersionBadge />
-        </div>
+        <SidebarFooter />
         {/* Resize drag handle */}
         <div
           onMouseDown={startDrag}

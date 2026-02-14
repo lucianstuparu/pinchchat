@@ -1,8 +1,10 @@
 {
+  "id": "/",
   "name": "PinchChat",
   "short_name": "PinchChat",
   "description": "A sleek, dark-themed webchat UI for OpenClaw — monitor sessions, stream responses, and inspect tool calls in real-time.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#1e1e24",
   "theme_color": "#1e1e24",

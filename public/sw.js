@@ -1,5 +1,5 @@
 // PinchChat Service Worker — cache static assets for offline/instant load
-const CACHE_NAME = 'pinchchat-__SW_VERSION__';
+const CACHE_NAME = 'pinchchat-v1';
 
 // Cache static assets on install
 self.addEventListener('install', (event) => {
