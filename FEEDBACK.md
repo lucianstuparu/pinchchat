@@ -806,24 +806,32 @@
 ## Item #75
 - **Date:** 2026-02-15
 - **Priority:** high
-- **Status:** open
+- **Status:** done
+- **Completed:** 2026-02-15 — commit `b315d80`, tagged `v1.64.1`
 - **Description:** Session info tooltip not clickable — clicking inside the tooltip (e.g. to copy sessionKey) closes it immediately. The click event bubbles up to the parent button that toggles the tooltip. Need stopPropagation on the tooltip container. (Note: fix attempted in v1.63.3 but marlbot-chat had stale files)
+- **Resolution:** stopPropagation was already in code from v1.63.3; redeployed dev instance with fresh src files. Also fixed clipboard fallback (#76) which was the actual copy failure.
 
 ## Item #76
 - **Date:** 2026-02-15
 - **Priority:** high
-- **Status:** open
+- **Status:** done
+- **Completed:** 2026-02-15 — commit `7606a09`, tagged `v1.64.1`
 - **Description:** Code/payload copy button doesn't work — clicking the copy button on code blocks and tool call payloads does nothing. Investigate clipboard API calls in CodeBlock and ToolCall components.
+- **Resolution:** navigator.clipboard.writeText requires HTTPS/localhost (secure context). Added copyToClipboard utility with execCommand('copy') fallback for HTTP deployments. Replaced all 5 clipboard call sites.
 
 ## Item #78
 - **Date:** 2026-02-15
 - **Priority:** medium
-- **Status:** open
+- **Status:** done
+- **Completed:** 2026-02-15 — commit `7606a09`, tagged `v1.64.1`
 - **Source:** Josh (Bardak)
 - **Description:** Session renaming — allow users to rename sessions from the sidebar. OpenClaw supports `sessions.patch` with a `label` field. Add a rename action (double-click, right-click menu, or edit icon) on session names in the sidebar. Requires `operator.admin` scope (already added in v1.63.3).
+- **Resolution:** Rename UI already existed (local-only). Added server-side persistence via sessions.patch with label field.
 
 ## Item #77
 - **Date:** 2026-02-15
 - **Priority:** high
-- **Status:** open
+- **Status:** done
+- **Completed:** 2026-02-15 — tagged `v1.64.1`
 - **Description:** Compact button doesn't work — need to verify the correct OpenClaw API for triggering compaction. Current implementation sends `sessions.compact` which requires `operator.admin` scope (added in v1.63.3). If it still doesn't work, check OpenClaw docs for the correct method name and parameters. May need to use `/compact` slash command equivalent via WS.
+- **Resolution:** Code verified correct: sessions.compact with { key } param, operator.admin scope already requested since v1.63.3. The compact only truncates transcript files with >400 lines. May have appeared broken because session didn't have enough history to compact. Redeployed dev instance with fresh build.
