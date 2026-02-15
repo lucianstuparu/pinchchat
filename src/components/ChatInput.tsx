@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Send, Square, Paperclip, X, FileText, Eye, EyeOff } from 'lucide-react';
+import { Send, Square, Paperclip, X, FileText, Eye, EyeOff, Reply } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
 import { useSendShortcut } from '../hooks/useSendShortcut';
 import { SlashCommandMenu } from './SlashCommands';
@@ -18,12 +18,18 @@ interface FileAttachment {
   preview?: string; // data url thumbnail for images
 }
 
+export interface ReplyContext {
+  preview: string;
+}
+
 interface Props {
   onSend: (text: string, attachments?: Array<{ mimeType: string; fileName: string; content: string }>) => void;
   onAbort: () => void;
   isGenerating: boolean;
   disabled: boolean;
   sessionKey?: string;
+  replyTo?: ReplyContext | null;
+  onCancelReply?: () => void;
 }
 
 const MAX_BASE64_CHARS = 300 * 1024; // ~225KB real, well under 512KB WS limit (JSON overhead + base64 bloat)
@@ -88,7 +94,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey }: Props) {
+export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey, replyTo, onCancelReply }: Props) {
   const t = useT();
   const { sendOnEnter, toggle: toggleSendShortcut } = useSendShortcut();
   const [text, setText] = useState('');
@@ -176,10 +182,17 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
       fileName: f.file.name,
       content: f.base64,
     })) : undefined;
-    onSend(trimmed || ' ', attachments);
+    // Prepend quote if replying
+    let finalText = trimmed || ' ';
+    if (replyTo?.preview) {
+      const quoteLine = replyTo.preview.split('\n')[0].slice(0, 80);
+      finalText = `> ${quoteLine}\n\n${finalText}`;
+    }
+    onSend(finalText, attachments);
     setText('');
     setFiles([]);
     setShowSlash(false);
+    onCancelReply?.();
     // Clear draft for this session after sending
     if (sessionKey) draftsRef.current.delete(sessionKey);
   };
@@ -252,6 +265,20 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey 
             onSelect={(cmd) => { setText(cmd); setShowSlash(shouldShowSlashMenu(cmd)); textareaRef.current?.focus(); }}
             onClose={() => setShowSlash(false)}
           />
+          {/* Reply context banner */}
+          {replyTo && (
+            <div className="flex items-center gap-2 mb-2 px-1 py-2 rounded-xl border-l-2 border-[var(--pc-accent)] bg-[rgba(var(--pc-accent-rgb),0.06)]">
+              <Reply size={14} className="shrink-0 text-pc-accent-light ml-2" />
+              <span className="text-xs text-pc-text-secondary truncate flex-1">{replyTo.preview || '…'}</span>
+              <button
+                onClick={onCancelReply}
+                className="shrink-0 h-5 w-5 rounded-md flex items-center justify-center text-pc-text-muted hover:text-pc-text-secondary transition-colors mr-1"
+                aria-label="Cancel reply"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
           {/* File previews */}
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 px-1">

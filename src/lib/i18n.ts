@@ -168,6 +168,8 @@ const en = {
   // Bookmarks
   'message.bookmark': 'Bookmark message',
   'message.removeBookmark': 'Remove bookmark',
+  'message.reply': 'Reply',
+  'chat.replyingTo': 'Replying to',
   'chat.bookmarks': 'Bookmarks',
   'chat.export': 'Export conversation',
   'chat.contextCompacted': 'Context compacted — older messages cached locally',
@@ -326,6 +328,8 @@ const fr: Record<keyof typeof en, string> = {
 
   'message.bookmark': 'Marquer le message',
   'message.removeBookmark': 'Retirer le marque-page',
+  'message.reply': 'Répondre',
+  'chat.replyingTo': 'En réponse à',
   'chat.bookmarks': 'Marque-pages',
   'chat.export': 'Exporter la conversation',
   'chat.contextCompacted': 'Contexte compacté — anciens messages en cache local',
@@ -484,6 +488,8 @@ const es: Record<keyof typeof en, string> = {
 
   'message.bookmark': 'Marcar mensaje',
   'message.removeBookmark': 'Quitar marcador',
+  'message.reply': 'Responder',
+  'chat.replyingTo': 'Respondiendo a',
   'chat.bookmarks': 'Marcadores',
   'chat.export': 'Exportar conversación',
   'chat.contextCompacted': 'Contexto compactado — mensajes anteriores en caché local',
@@ -643,6 +649,8 @@ const de: Record<keyof typeof en, string> = {
   'settings.sendCtrlEnter': 'Strg+Enter',
 
   'message.bookmark': 'Nachricht markieren',
+  'message.reply': 'Antworten',
+  'chat.replyingTo': 'Antwort auf',
   'message.removeBookmark': 'Lesezeichen entfernen',
   'chat.bookmarks': 'Lesezeichen',
   'chat.export': 'Unterhaltung exportieren',
@@ -801,6 +809,8 @@ const ja: Record<keyof typeof en, string> = {
   'settings.sendCtrlEnter': 'Ctrl+Enter',
 
   'message.bookmark': 'メッセージをブックマーク',
+  'message.reply': '返信',
+  'chat.replyingTo': '返信先',
   'message.removeBookmark': 'ブックマークを削除',
   'chat.bookmarks': 'ブックマーク',
   'chat.export': '会話をエクスポート',
@@ -959,6 +969,8 @@ const pt: Record<keyof typeof en, string> = {
   'settings.sendCtrlEnter': 'Ctrl+Enter',
 
   'message.bookmark': 'Marcar mensagem',
+  'message.reply': 'Responder',
+  'chat.replyingTo': 'Respondendo a',
   'message.removeBookmark': 'Remover marcador',
   'chat.bookmarks': 'Marcadores',
   'chat.export': 'Exportar conversa',
@@ -1117,6 +1129,8 @@ const zh: Record<keyof typeof en, string> = {
   'settings.sendCtrlEnter': 'Ctrl+Enter',
 
   'message.bookmark': '收藏消息',
+  'message.reply': '回复',
+  'chat.replyingTo': '回复',
   'message.removeBookmark': '取消收藏',
   'chat.bookmarks': '收藏',
   'chat.export': '导出会话',
@@ -1275,6 +1289,8 @@ const it: Record<keyof typeof en, string> = {
   'settings.sendCtrlEnter': 'Ctrl+Invio',
 
   'message.bookmark': 'Aggiungi ai segnalibri',
+  'message.reply': 'Rispondi',
+  'chat.replyingTo': 'In risposta a',
   'message.removeBookmark': 'Rimuovi segnalibro',
   'chat.bookmarks': 'Segnalibri',
   'chat.export': 'Esporta conversazione',
