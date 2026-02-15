@@ -501,13 +501,58 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
 
       {/* Bubble */}
       <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-        <div className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full min-w-[8rem] overflow-hidden ${
+        <div className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full overflow-hidden ${
           isUser
             ? (isLight
                 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-text border border-[rgba(var(--pc-accent-rgb),0.3)]'
                 : 'bg-[rgba(var(--pc-accent-rgb),0.08)] text-pc-text border border-[rgba(var(--pc-accent-rgb),0.2)]')
             : 'bg-pc-elevated/40 text-pc-text border border-pc-border shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
         }`}>
+          {/* User-visible text */}
+          {!isUser ? (
+            <CollapsibleContent content={message.content || ''} isStreaming={message.isStreaming}>
+              {message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
+                <div className="markdown-body">
+                  <LazyMarkdown components={markdownComponents}>
+                    {autoFormatText(message.content)}
+                  </LazyMarkdown>
+                </div>
+              )}
+            </CollapsibleContent>
+          ) : (
+            message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
+              <div className="markdown-body">
+                <LazyMarkdown components={markdownComponents}>
+                  {autoFormatText(message.content)}
+                </LazyMarkdown>
+              </div>
+            )
+          )}
+
+          {/* Inline images */}
+          {renderImageBlocks(message.blocks)}
+
+          {/* Streaming indicator */}
+          {message.isStreaming && (() => {
+            const hasVisibleContent = message.content?.trim();
+            if (!hasVisibleContent) {
+              return <ThinkingIndicator />;
+            }
+            return (
+              <div className="flex gap-1 mt-2">
+                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
+              </div>
+            );
+          })()}
+
+          {/* Tool calls & thinking (inline) */}
+          {!isUser && <InternalsSummary blocks={message.blocks} />}
+
+          {/* Raw JSON viewer */}
+          {showRawJson && <RawJsonPanel message={rawMessage} />}
+
           {/* Action buttons — bottom-right toolbar, inside the bubble */}
           <div className={`flex flex-nowrap gap-0.5 justify-end mt-1.5 -mb-1 opacity-0 group-hover:opacity-100 transition-all`}>
             {!isUser && !message.isStreaming && getPlainText(message).trim() && (
@@ -553,51 +598,6 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
             <MetadataViewer metadata={message.metadata} />
             <RawJsonToggle isOpen={showRawJson} onToggle={() => setShowRawJson(o => !o)} />
           </div>
-          {/* Retry button moved into the action toolbar below */}
-          {/* User-visible text */}
-          {!isUser ? (
-            <CollapsibleContent content={message.content || ''} isStreaming={message.isStreaming}>
-              {message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
-                <div className="markdown-body">
-                  <LazyMarkdown components={markdownComponents}>
-                    {autoFormatText(message.content)}
-                  </LazyMarkdown>
-                </div>
-              )}
-            </CollapsibleContent>
-          ) : (
-            message.blocks.length > 0 ? renderTextBlocks(message.blocks) : (
-              <div className="markdown-body">
-                <LazyMarkdown components={markdownComponents}>
-                  {autoFormatText(message.content)}
-                </LazyMarkdown>
-              </div>
-            )
-          )}
-
-          {/* Inline images */}
-          {renderImageBlocks(message.blocks)}
-
-          {/* Streaming indicator */}
-          {message.isStreaming && (() => {
-            const hasVisibleContent = message.content?.trim();
-            if (!hasVisibleContent) {
-              return <ThinkingIndicator />;
-            }
-            return (
-              <div className="flex gap-1 mt-2">
-                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
-                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
-                <span className="bounce-dot w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-300/80 to-violet-400/80 inline-block" />
-              </div>
-            );
-          })()}
-
-          {/* Tool calls & thinking (inline) */}
-          {!isUser && <InternalsSummary blocks={message.blocks} />}
-
-          {/* Raw JSON viewer */}
-          {showRawJson && <RawJsonPanel message={rawMessage} />}
         </div>
         {(message.timestamp || wasWebhookMessage || isBookmarked) && (
           <div className={`mt-1 flex items-center gap-1.5 text-[11px] text-pc-text-muted ${isUser ? 'justify-end pr-2' : 'pl-2'}`}>
