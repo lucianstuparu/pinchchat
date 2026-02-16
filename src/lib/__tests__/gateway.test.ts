@@ -96,6 +96,9 @@ describe('GatewayClient', () => {
     // Server sends challenge
     ws._receive({ type: 'event', event: 'connect.challenge' });
 
+    // handleChallenge is async — flush microtasks
+    await vi.advanceTimersByTimeAsync(0);
+
     // Client should have sent a connect request
     expect(ws.sent.length).toBe(1);
     const req = JSON.parse(ws.sent[0]!);
@@ -165,6 +168,7 @@ describe('GatewayClient', () => {
     // Complete the challenge first
     const ws = MockWebSocket.instances[0]!;
     ws._receive({ type: 'event', event: 'connect.challenge' });
+    await vi.advanceTimersByTimeAsync(0);
     const connectReq = JSON.parse(ws.sent[0]!);
     ws._receive({ type: 'res', id: connectReq.id, ok: true, payload: {} });
     await vi.advanceTimersByTimeAsync(0);
@@ -184,6 +188,7 @@ describe('GatewayClient', () => {
 
     const ws = MockWebSocket.instances[0]!;
     ws._receive({ type: 'event', event: 'connect.challenge' });
+    await vi.advanceTimersByTimeAsync(0);
     const connectReq = JSON.parse(ws.sent[0]!);
     ws._receive({ type: 'res', id: connectReq.id, ok: true, payload: {} });
     await vi.advanceTimersByTimeAsync(0);
@@ -207,6 +212,7 @@ describe('GatewayClient', () => {
 
     const ws = MockWebSocket.instances[0]!;
     ws._receive({ type: 'event', event: 'connect.challenge' });
+    await vi.advanceTimersByTimeAsync(0);
     const connectReq = JSON.parse(ws.sent[0]!);
     ws._receive({ type: 'res', id: connectReq.id, ok: true, payload: {} });
     await vi.advanceTimersByTimeAsync(0);
@@ -270,5 +276,47 @@ describe('GatewayClient', () => {
     gw.connect();
     const ws = MockWebSocket.instances[0]!;
     expect(ws.url).toBe('ws://new:5678');
+  });
+
+  it('extracts nonce from challenge payload', async () => {
+    const gw = new GatewayClient('ws://test:1234', 'tok');
+    gw.connect();
+    await vi.advanceTimersByTimeAsync(1);
+
+    const ws = MockWebSocket.instances[0]!;
+    // Server sends challenge with nonce
+    ws._receive({ type: 'event', event: 'connect.challenge', payload: { nonce: 'test-nonce-123' } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const req = JSON.parse(ws.sent[0]!);
+    expect(req.method).toBe('connect');
+    // Device object won't be set (no identity), but the connect should still work
+    expect(req.params.auth.token).toBe('tok');
+
+    // Clean up
+    gw.disconnect();
+  });
+
+  it('emits pairing status on NOT_PAIRED error', async () => {
+    const gw = new GatewayClient('ws://test:1234', 'tok');
+    const statuses: string[] = [];
+    gw.onStatus(s => statuses.push(s));
+
+    gw.connect();
+    await vi.advanceTimersByTimeAsync(1);
+
+    const ws = MockWebSocket.instances[0]!;
+    ws._receive({ type: 'event', event: 'connect.challenge' });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const req = JSON.parse(ws.sent[0]!);
+    // Server rejects with NOT_PAIRED
+    ws._receive({ type: 'res', id: req.id, ok: false, payload: { code: 'NOT_PAIRED', message: 'Device not paired' } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(statuses).toContain('pairing');
+
+    // Clean up
+    gw.disconnect();
   });
 });

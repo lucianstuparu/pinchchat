@@ -53,7 +53,7 @@ export interface AgentIdentity {
   agentId?: string;
 }
 
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'pairing';
 
 export interface GatewayState {
   status: ConnectionStatus;

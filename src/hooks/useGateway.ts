@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { GatewayClient, type JsonPayload } from '../lib/gateway';
 import { genIdempotencyKey } from '../lib/utils';
 import { getStoredCredentials, storeCredentials, clearCredentials } from '../lib/credentials';
+import { getOrCreateDeviceIdentity } from '../lib/deviceIdentity';
 import { isSystemEvent } from '../lib/systemEvent';
 import { getCachedMessages, setCachedMessages, mergeWithCache } from '../lib/messageCache';
 import type { ChatMessage, MessageBlock, ConnectionStatus, Session, AgentIdentity } from '../types';
@@ -271,7 +272,7 @@ export function useGateway() {
     }
   }, []);
 
-  const setupClient = useCallback((wsUrl: string, token: string) => {
+  const setupClient = useCallback(async (wsUrl: string, token: string) => {
     // Tear down existing client
     if (clientRef.current) {
       clientRef.current.disconnect();
@@ -279,6 +280,14 @@ export function useGateway() {
 
     const client = new GatewayClient(wsUrl, token);
     clientRef.current = client;
+
+    // Load device identity for signed connect handshake
+    try {
+      const identity = await getOrCreateDeviceIdentity();
+      client.setDeviceIdentity(identity);
+    } catch (err) {
+      console.warn('[PinchChat] Failed to load device identity, connecting without it:', err);
+    }
 
     client.onStatus((s) => {
       setStatus(s);
@@ -291,6 +300,11 @@ export function useGateway() {
         loadSessions();
         loadAgentIdentity();
         loadHistory(activeSessionRef.current);
+      } else if (s === 'pairing') {
+        setAuthenticated(true);
+        setConnectError(null);
+        setIsConnecting(false);
+        isConnectingRef.current = false;
       } else if (s === 'disconnected' && !client.isConnected) {
         // If we never connected successfully, this is an auth/connection error
         if (isConnectingRef.current) {

@@ -1,4 +1,6 @@
 import { genId } from './utils';
+import type { DeviceIdentity } from './deviceIdentity';
+import { buildDeviceAuthPayload, signPayload } from './deviceIdentity';
 
 /** Debug logger — enable with localStorage.setItem('pinchchat:debug', '1') */
 const isDebug = () => {
@@ -24,18 +26,22 @@ interface GatewayMessage {
   error?: string;
 }
 
+export type GatewayStatus = 'disconnected' | 'connecting' | 'connected' | 'pairing';
+
 export class GatewayClient {
   private ws: WebSocket | null = null;
   private pendingRequests = new Map<string, { resolve: (v: JsonPayload) => void; reject: (e: unknown) => void }>();
   private eventHandlers: GatewayEventHandler[] = [];
-  private _onStatus: (s: 'disconnected' | 'connecting' | 'connected') => void = () => {};
+  private _onStatus: (s: GatewayStatus) => void = () => {};
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private connected = false;
   private autoReconnect = true;
+  private connectNonce: string | null = null;
 
   private wsUrl: string;
   private authToken: string;
+  private deviceIdentity: DeviceIdentity | null = null;
 
   constructor(wsUrl?: string, authToken?: string) {
     this.wsUrl = wsUrl || `ws://${window.location.hostname}:18789`;
@@ -48,7 +54,12 @@ export class GatewayClient {
     this.authToken = authToken;
   }
 
-  onStatus(fn: (s: 'disconnected' | 'connecting' | 'connected') => void) {
+  /** Set the device identity for signed connect handshakes. */
+  setDeviceIdentity(identity: DeviceIdentity) {
+    this.deviceIdentity = identity;
+  }
+
+  onStatus(fn: (s: GatewayStatus) => void) {
     this._onStatus = fn;
   }
 
@@ -60,6 +71,7 @@ export class GatewayClient {
   connect() {
     if (this.ws) return;
     this.autoReconnect = true;
+    this.connectNonce = null;
     this._onStatus('connecting');
     this.ws = new WebSocket(this.wsUrl);
 
@@ -72,6 +84,9 @@ export class GatewayClient {
 
       if (msg.type === 'event') {
         if (msg.event === 'connect.challenge') {
+          // Extract nonce from challenge payload if present
+          const payload = msg.payload as Record<string, unknown> | undefined;
+          this.connectNonce = (payload && typeof payload.nonce === 'string') ? payload.nonce : null;
           this.handleChallenge();
         } else {
           for (const h of this.eventHandlers) h(msg.event ?? '', msg.payload ?? {});
@@ -99,30 +114,68 @@ export class GatewayClient {
     this.ws.onerror = (e) => { log('WS error', e); };
   }
 
-  private handleChallenge() {
+  private async handleChallenge() {
     const id = genId('connect');
-    this.request(id, 'connect', {
-      minProtocol: 3,
-      maxProtocol: 3,
-      client: { id: 'webchat', version: __APP_VERSION__, platform: 'web', mode: 'webchat' },
-      role: 'operator',
-      scopes: ['operator.read', 'operator.write', 'operator.admin'],
-      caps: [],
-      commands: [],
-      permissions: {},
-      auth: { token: this.authToken },
-      locale: (typeof navigator !== 'undefined' ? navigator.language : undefined) || 'en',
-      userAgent: `pinchchat/${__APP_VERSION__}`,
-    }).then((res) => {
+    const role = 'operator';
+    const scopes = ['operator.read', 'operator.write', 'operator.admin'];
+    const signedAtMs = Date.now();
+    const nonce = this.connectNonce ?? undefined;
+
+    // Build device object if we have an identity
+    let device: Record<string, unknown> | undefined;
+    if (this.deviceIdentity) {
+      const payload = buildDeviceAuthPayload({
+        deviceId: this.deviceIdentity.id,
+        clientId: 'webchat',
+        clientMode: 'webchat',
+        role,
+        scopes,
+        signedAtMs,
+        token: this.authToken || null,
+        nonce,
+      });
+      const signature = await signPayload(this.deviceIdentity.keyPair.privateKey, payload);
+      device = {
+        id: this.deviceIdentity.id,
+        publicKey: this.deviceIdentity.publicKeyRaw,
+        signature,
+        signedAt: signedAtMs,
+        nonce,
+      };
+    }
+
+    try {
+      const res = await this.request(id, 'connect', {
+        minProtocol: 3,
+        maxProtocol: 3,
+        client: { id: 'webchat', version: __APP_VERSION__, platform: 'web', mode: 'webchat' },
+        role,
+        scopes,
+        caps: [],
+        commands: [],
+        permissions: {},
+        auth: { token: this.authToken },
+        device,
+        locale: (typeof navigator !== 'undefined' ? navigator.language : undefined) || 'en',
+        userAgent: `pinchchat/${__APP_VERSION__}`,
+      });
       log('connected!', res);
       this.connected = true;
       this.reconnectAttempts = 0;
       this._onStatus('connected');
-    }).catch((err) => {
+    } catch (err) {
       log('connect failed:', err);
+      // Check if this is a NOT_PAIRED error
+      const errObj = err as Record<string, unknown> | undefined;
+      if (errObj && (errObj.code === 'NOT_PAIRED' || (typeof errObj.message === 'string' && errObj.message.includes('NOT_PAIRED')))) {
+        log('device not paired — awaiting approval');
+        this._onStatus('pairing');
+        // Keep connection open and auto-reconnect; gateway may close us
+        return;
+      }
       this.autoReconnect = false;
       this.disconnect();
-    });
+    }
   }
 
   private scheduleReconnect() {

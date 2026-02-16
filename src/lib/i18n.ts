@@ -87,6 +87,7 @@ const en = {
   // Connection banner
   'connection.reconnecting': 'Connection lost — reconnecting…',
   'connection.reconnected': 'Reconnected!',
+  'connection.pairing': 'Device pairing pending — run `openclaw devices approve` on your gateway',
 
   // Message actions
   'message.copy': 'Copy message',
@@ -257,6 +258,7 @@ const fr: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': 'Connexion perdue — reconnexion…',
   'connection.reconnected': 'Reconnecté !',
+  'connection.pairing': 'Appairage en attente — exécutez `openclaw devices approve` sur votre gateway',
 
   'message.copy': 'Copier le message',
   'message.copied': 'Copié !',
@@ -418,6 +420,7 @@ const es: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': 'Conexión perdida — reconectando…',
   'connection.reconnected': '¡Reconectado!',
+  'connection.pairing': 'Emparejamiento pendiente — ejecute `openclaw devices approve` en su gateway',
 
   'message.copy': 'Copiar mensaje',
   'message.copied': '¡Copiado!',
@@ -581,6 +584,7 @@ const de: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': 'Verbindung verloren — wird wiederhergestellt…',
   'connection.reconnected': 'Wieder verbunden!',
+  'connection.pairing': 'Gerätekopplung ausstehend — führen Sie `openclaw devices approve` auf Ihrem Gateway aus',
 
   'message.copy': 'Nachricht kopieren',
   'message.copied': 'Kopiert!',
@@ -742,6 +746,7 @@ const ja: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': '接続が切断されました — 再接続中…',
   'connection.reconnected': '再接続しました！',
+  'connection.pairing': 'デバイスペアリング保留中 — ゲートウェイで `openclaw devices approve` を実行してください',
 
   'message.copy': 'メッセージをコピー',
   'message.copied': 'コピーしました！',
@@ -903,6 +908,7 @@ const pt: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': 'Conexão perdida — reconectando…',
   'connection.reconnected': 'Reconectado!',
+  'connection.pairing': 'Emparelhamento pendente — execute `openclaw devices approve` no seu gateway',
 
   'message.copy': 'Copiar mensagem',
   'message.copied': 'Copiado!',
@@ -1064,6 +1070,7 @@ const zh: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': '连接中断 — 正在重连…',
   'connection.reconnected': '已重新连接！',
+  'connection.pairing': '设备配对待处理 — 在网关上运行 `openclaw devices approve`',
 
   'message.copy': '复制消息',
   'message.copied': '已复制！',
@@ -1225,6 +1232,7 @@ const it: Record<keyof typeof en, string> = {
 
   'connection.reconnecting': 'Connessione persa — riconnessione…',
   'connection.reconnected': 'Riconnesso!',
+  'connection.pairing': 'Accoppiamento dispositivo in attesa — esegui `openclaw devices approve` sul tuo gateway',
 
   'message.copy': 'Copia messaggio',
   'message.copied': 'Copiato!',
