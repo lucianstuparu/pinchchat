@@ -47,7 +47,7 @@ describe('storeCredentials', () => {
     storeCredentials('wss://gw', 'tok');
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       'pinchchat_credentials',
-      JSON.stringify({ url: 'wss://gw', token: 'tok' }),
+      JSON.stringify({ url: 'wss://gw', token: 'tok', authMode: 'token' }),
     );
   });
 });

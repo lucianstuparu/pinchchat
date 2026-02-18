@@ -1,6 +1,7 @@
 import { genId } from './utils';
 import type { DeviceIdentity } from './deviceIdentity';
 import { buildDeviceAuthPayload, signPayload } from './deviceIdentity';
+import type { AuthMode } from './credentials';
 
 /** Debug logger — enable with localStorage.setItem('pinchchat:debug', '1') */
 const isDebug = () => {
@@ -41,17 +42,20 @@ export class GatewayClient {
 
   private wsUrl: string;
   private authToken: string;
+  private authMode: AuthMode = 'token';
   private deviceIdentity: DeviceIdentity | null = null;
 
-  constructor(wsUrl?: string, authToken?: string) {
+  constructor(wsUrl?: string, authToken?: string, authMode?: AuthMode) {
     this.wsUrl = wsUrl || `ws://${window.location.hostname}:18789`;
     this.authToken = authToken || '';
+    this.authMode = authMode || 'token';
   }
 
   /** Update credentials (e.g. after login). Does not reconnect automatically. */
-  setCredentials(wsUrl: string, authToken: string) {
+  setCredentials(wsUrl: string, authToken: string, authMode?: AuthMode) {
     this.wsUrl = wsUrl;
     this.authToken = authToken;
+    if (authMode) this.authMode = authMode;
   }
 
   /** Set the device identity for signed connect handshakes. */
@@ -154,7 +158,7 @@ export class GatewayClient {
         caps: [],
         commands: [],
         permissions: {},
-        auth: { token: this.authToken },
+        auth: this.authMode === 'password' ? { password: this.authToken } : { token: this.authToken },
         device,
         locale: (typeof navigator !== 'undefined' ? navigator.language : undefined) || 'en',
         userAgent: `pinchchat/${__APP_VERSION__}`,

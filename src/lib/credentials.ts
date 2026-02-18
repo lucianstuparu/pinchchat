@@ -1,6 +1,15 @@
 const STORAGE_KEY = 'pinchchat_credentials';
 
-export function getStoredCredentials(): { url: string; token: string } | null {
+export type AuthMode = 'token' | 'password';
+
+export interface StoredCredentials {
+  url: string;
+  token: string;
+  /** Auth mode — defaults to 'token' for backward compatibility */
+  authMode?: AuthMode;
+}
+
+export function getStoredCredentials(): StoredCredentials | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -12,8 +21,8 @@ export function getStoredCredentials(): { url: string; token: string } | null {
   return null;
 }
 
-export function storeCredentials(url: string, token: string) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, token }));
+export function storeCredentials(url: string, token: string, authMode: AuthMode = 'token') {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, token, authMode }));
 }
 
 export function clearCredentials() {

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Sparkles, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2, Key, Lock } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
-import { getStoredCredentials } from '../lib/credentials';
+import { getStoredCredentials, type AuthMode } from '../lib/credentials';
 
 interface Props {
-  onConnect: (url: string, token: string) => void;
+  onConnect: (url: string, secret: string, authMode: AuthMode) => void;
   error?: string | null;
   isConnecting?: boolean;
 }
@@ -31,11 +31,17 @@ function getInitialToken(): string {
   return stored?.token ?? '';
 }
 
+function getInitialAuthMode(): AuthMode {
+  const stored = getStoredCredentials();
+  return stored?.authMode ?? 'token';
+}
+
 export function LoginScreen({ onConnect, error, isConnecting }: Props) {
   const t = useT();
   const [url, setUrl] = useState(getInitialUrl);
   const [token, setToken] = useState(getInitialToken);
   const [showToken, setShowToken] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>(getInitialAuthMode);
 
   const urlTrimmed = url.trim();
   const isValidWsUrl = /^wss?:\/\/.+/.test(urlTrimmed);
@@ -44,7 +50,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlTrimmed || !token.trim() || !isValidWsUrl) return;
-    onConnect(urlTrimmed, token.trim());
+    onConnect(urlTrimmed, token.trim(), authMode);
   };
 
   return (
@@ -83,9 +89,39 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
             )}
           </div>
 
+          {/* Auth mode toggle */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAuthMode('token')}
+              disabled={isConnecting}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                authMode === 'token'
+                  ? 'border-[var(--pc-accent-dim)] bg-[var(--pc-accent-dim)]/10 text-pc-text'
+                  : 'border-pc-border bg-pc-elevated/30 text-pc-text-muted hover:bg-pc-elevated/50'
+              }`}
+            >
+              <Key size={14} />
+              {t('login.authToken')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('password')}
+              disabled={isConnecting}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                authMode === 'password'
+                  ? 'border-[var(--pc-accent-dim)] bg-[var(--pc-accent-dim)]/10 text-pc-text'
+                  : 'border-pc-border bg-pc-elevated/30 text-pc-text-muted hover:bg-pc-elevated/50'
+              }`}
+            >
+              <Lock size={14} />
+              {t('login.authPassword')}
+            </button>
+          </div>
+
           <div className="space-y-2">
             <label htmlFor="gateway-token" className="block text-xs font-medium text-pc-text-secondary uppercase tracking-wider">
-              {t('login.token')}
+              {authMode === 'password' ? t('login.password') : t('login.token')}
             </label>
             <div className="relative">
               <input
@@ -93,7 +129,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
                 type={showToken ? 'text' : 'password'}
                 value={token}
                 onChange={e => setToken(e.target.value)}
-                placeholder={t('login.tokenPlaceholder')}
+                placeholder={authMode === 'password' ? t('login.passwordPlaceholder') : t('login.tokenPlaceholder')}
                 className="w-full rounded-xl border border-pc-border bg-pc-elevated/50 px-4 py-3 pr-12 text-sm text-pc-text placeholder:text-pc-text-faint outline-none focus:border-[var(--pc-accent-dim)] focus:ring-1 focus:ring-[var(--pc-accent-glow)] transition-all"
                 autoComplete="current-password"
                 disabled={isConnecting}

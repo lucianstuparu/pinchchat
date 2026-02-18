@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GatewayClient, type JsonPayload } from '../lib/gateway';
 import { genIdempotencyKey } from '../lib/utils';
-import { getStoredCredentials, storeCredentials, clearCredentials } from '../lib/credentials';
+import { getStoredCredentials, storeCredentials, clearCredentials, type AuthMode } from '../lib/credentials';
 import { getOrCreateDeviceIdentity } from '../lib/deviceIdentity';
 import { isSystemEvent } from '../lib/systemEvent';
 import { getCachedMessages, setCachedMessages, mergeWithCache } from '../lib/messageCache';
@@ -272,13 +272,13 @@ export function useGateway() {
     }
   }, []);
 
-  const setupClient = useCallback(async (wsUrl: string, token: string) => {
+  const setupClient = useCallback(async (wsUrl: string, token: string, authMode: AuthMode = 'token') => {
     // Tear down existing client
     if (clientRef.current) {
       clientRef.current.disconnect();
     }
 
-    const client = new GatewayClient(wsUrl, token);
+    const client = new GatewayClient(wsUrl, token, authMode);
     clientRef.current = client;
 
     // Load device identity for signed connect handshake
@@ -296,7 +296,7 @@ export function useGateway() {
         setConnectError(null);
         setIsConnecting(false);
         isConnectingRef.current = false;
-        storeCredentials(wsUrl, token);
+        storeCredentials(wsUrl, token, authMode);
         loadSessions();
         loadAgentIdentity();
         loadHistory(activeSessionRef.current);
@@ -445,7 +445,7 @@ export function useGateway() {
     const stored = getStoredCredentials();
     if (stored) {
       // Init on mount — setupClient sets state as part of establishing the connection
-      setupClient(stored.url, stored.token);
+      setupClient(stored.url, stored.token, stored.authMode || 'token');
     } else {
       setAuthenticated(false);
     }
@@ -503,8 +503,8 @@ export function useGateway() {
     loadHistory(key);
   }, [loadHistory]);
 
-  const login = useCallback((url: string, token: string) => {
-    setupClient(url, token);
+  const login = useCallback((url: string, token: string, authMode: AuthMode = 'token') => {
+    setupClient(url, token, authMode);
   }, [setupClient]);
 
   const deleteSession = useCallback(async (key: string) => {
