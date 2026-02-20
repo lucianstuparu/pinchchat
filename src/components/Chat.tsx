@@ -9,7 +9,7 @@ import { useT } from '../hooks/useLocale';
 import { getLocale, type TranslationKey } from '../lib/i18n';
 import { useToolCollapse } from '../hooks/useToolCollapse';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { exportAsMarkdown, downloadFile } from '../lib/exportConversation';
+import { messagesToMarkdown, downloadFile } from '../lib/exportChat';
 
 interface Props {
   messages: ChatMessage[];
@@ -215,7 +215,7 @@ export function Chat({ messages, isGenerating, isLoadingHistory, status, session
 
   const handleExport = useCallback(() => {
     const label = sessionKey?.replace(/^agent:[^:]+:/, '') || 'conversation';
-    const md = exportAsMarkdown(messages, label);
+    const md = messagesToMarkdown(messages, label);
     const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
     downloadFile(md, `${safeLabel}-${new Date().toISOString().slice(0, 10)}.md`);
   }, [messages, sessionKey]);
