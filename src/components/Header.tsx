@@ -62,7 +62,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
       </button>
       <div className="flex items-center gap-3 flex-1 min-w-0 relative" ref={sessionInfoRef}>
         <img src={agentAvatarUrl || '/logo.png'} alt="PinchChat" className="h-9 w-9 rounded-2xl object-cover" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src !== window.location.origin + '/logo.png') { img.src = '/logo.png'; } else { img.style.display = 'none'; } }} />
-        <button className="min-w-0 text-left group" onClick={() => setShowSessionInfo(v => !v)} title={t('header.sessionInfo')}>
+        <button className="min-w-0 text-left group" onClick={() => setShowSessionInfo(v => !v)} title={t('header.sessionInfo')} aria-label={t('header.sessionInfo')}>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-pc-text text-sm tracking-wide">{agentName || t('header.title')}</span>
             <Sparkles className="h-3.5 w-3.5 text-pc-accent-light/60" />
@@ -169,6 +169,7 @@ function CopyField({ value }: { value: string }) {
       className="ml-auto p-0.5 rounded hover:bg-[var(--pc-hover)] text-pc-text-faint hover:text-pc-text-secondary transition-colors"
       onClick={() => { copyToClipboard(value).then((ok) => { if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); } }); }}
       title="Copy"
+      aria-label="Copy to clipboard"
     >
       {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
     </button>
@@ -206,7 +207,7 @@ const SessionInfoPopover = forwardRef<HTMLDivElement, { session: Session; sessio
     >
       <div className="p-3 border-b border-pc-border flex items-center justify-between">
         <span className="text-xs font-semibold text-pc-text">{t('header.sessionInfo')}</span>
-        <button onClick={onClose} className="text-pc-text-faint hover:text-pc-text text-xs">✕</button>
+        <button onClick={onClose} className="text-pc-text-faint hover:text-pc-text text-xs" aria-label="Close">✕</button>
       </div>
       <div className="p-3 space-y-2">
         {rows.map(({ label, value, copyable }) => (
@@ -241,6 +242,7 @@ function CompactButton({ sessionKey, onCompact }: { sessionKey: string; onCompac
       disabled={compacting}
       className="inline-flex items-center gap-1 text-[10px] text-pc-text-muted hover:text-pc-text shrink-0 px-1.5 py-0.5 rounded hover:bg-[var(--pc-hover)] transition-colors disabled:opacity-50"
       title={t('header.compact')}
+      aria-label={t('header.compact')}
     >
       <Minimize2 className={`h-3 w-3 ${compacting ? 'animate-pulse' : ''}`} />
       <span className="hidden sm:inline">{compacting ? t('header.compacting') : t('header.compact')}</span>

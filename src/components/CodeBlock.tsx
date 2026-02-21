@@ -111,6 +111,7 @@ export function CodeBlock(props: HTMLAttributes<HTMLPreElement>) {
               onClick={toggleWrap}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-pc-border/40 transition-colors text-pc-text-muted hover:text-pc-text-secondary"
               title={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+              aria-label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
               type="button"
             >
               {wordWrap ? <AlignLeft className="h-3 w-3" /> : <WrapText className="h-3 w-3" />}
@@ -120,6 +121,7 @@ export function CodeBlock(props: HTMLAttributes<HTMLPreElement>) {
                 onClick={toggleLineNumbers}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-pc-border/40 transition-colors text-pc-text-muted hover:text-pc-text-secondary"
                 title={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
+                aria-label={showLineNumbers ? 'Hide line numbers' : 'Show line numbers'}
                 type="button"
               >
                 <Hash className="h-3 w-3" />
@@ -155,6 +157,7 @@ export function CodeBlock(props: HTMLAttributes<HTMLPreElement>) {
         <button
           onClick={() => setIsCollapsed(prev => !prev)}
           className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[11px] text-pc-text-muted hover:text-pc-text-secondary bg-pc-elevated/40 hover:bg-pc-elevated/60 border-t border-pc-border transition-colors rounded-b-lg"
+          aria-label={isCollapsed ? `Show all ${lines.length} lines` : 'Collapse code'}
           type="button"
         >
           {isCollapsed ? (

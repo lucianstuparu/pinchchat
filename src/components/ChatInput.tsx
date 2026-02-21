@@ -296,6 +296,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey,
                   <button
                     onClick={() => removeFile(f.id)}
                     className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-pc-elevated border border-pc-border-strong flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                    aria-label={`Remove ${f.file.name}`}
                   >
                     <X size={10} className="text-pc-text" />
                   </button>
@@ -360,6 +361,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey,
               onClick={toggleSendShortcut}
               className="hidden sm:flex shrink-0 h-7 rounded-xl border border-pc-border bg-pc-elevated/30 px-2 items-center gap-1 text-[10px] text-pc-text-muted hover:text-pc-text-secondary hover:bg-[var(--pc-hover)] transition-colors"
               title={`${t('settings.sendShortcut')}: ${sendOnEnter ? t('settings.sendEnter') : t('settings.sendCtrlEnter')}`}
+              aria-label={`${t('settings.sendShortcut')}: ${sendOnEnter ? t('settings.sendEnter') : t('settings.sendCtrlEnter')}`}
             >
               <span>{sendOnEnter ? '↵' : (navigator.userAgent.includes('Mac') ? '⌘↵' : 'Ctrl↵')}</span>
             </button>
@@ -367,6 +369,7 @@ export function ChatInput({ onSend, onAbort, isGenerating, disabled, sessionKey,
               <button
                 onClick={onAbort}
                 className="shrink-0 h-11 px-4 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+                aria-label={t('chat.stop')}
               >
                 <Square size={16} />
                 <span className="text-sm hidden sm:inline">{t('chat.stop')}</span>
