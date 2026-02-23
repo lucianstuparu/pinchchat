@@ -2,33 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GatewayClient, JsonPayload } from '../lib/gateway';
 import type { ChatMessage, MessageBlock } from '../types';
 import { isSystemEvent } from '../lib/systemEvent';
-
-interface ChatPayloadMessage {
-  content?: string | Array<{ type: string; text?: string; thinking?: string }>;
-}
-
-function extractText(message: ChatPayloadMessage | undefined): string {
-  if (!message) return '';
-  const content = message.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((b) => b.type === 'text' && typeof b.text === 'string')
-      .map((b) => b.text as string)
-      .join('\n');
-  }
-  return '';
-}
-
-function extractThinking(message: ChatPayloadMessage | undefined): string {
-  if (!message) return '';
-  const content = message.content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter((b) => b.type === 'thinking')
-    .map((b) => b.thinking || b.text || '')
-    .join('\n');
-}
+import { extractText, extractThinking } from '../lib/messageExtract';
+import type { ChatPayloadMessage } from '../lib/messageExtract';
 
 /**
  * Hook to manage a secondary session for split view.

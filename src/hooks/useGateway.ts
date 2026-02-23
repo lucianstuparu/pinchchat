@@ -5,34 +5,8 @@ import { getStoredCredentials, storeCredentials, clearCredentials, type AuthMode
 import { getOrCreateDeviceIdentity } from '../lib/deviceIdentity';
 import { isSystemEvent } from '../lib/systemEvent';
 import { getCachedMessages, setCachedMessages, mergeWithCache } from '../lib/messageCache';
+import { extractText, extractThinking, type ChatPayloadMessage } from '../lib/messageExtract';
 import type { ChatMessage, MessageBlock, ConnectionStatus, Session, AgentIdentity } from '../types';
-
-interface ChatPayloadMessage {
-  content?: string | Array<{ type: string; text?: string; thinking?: string }>;
-}
-
-function extractText(message: ChatPayloadMessage | undefined): string {
-  if (!message) return '';
-  const content = message.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((b) => b.type === 'text' && typeof b.text === 'string')
-      .map((b) => b.text as string)
-      .join('\n');
-  }
-  return '';
-}
-
-function extractThinking(message: ChatPayloadMessage | undefined): string {
-  if (!message) return '';
-  const content = message.content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter((b) => b.type === 'thinking')
-    .map((b) => b.thinking || b.text || '')
-    .join('\n');
-}
 
 export function useGateway() {
   const clientRef = useRef<GatewayClient | null>(null);
