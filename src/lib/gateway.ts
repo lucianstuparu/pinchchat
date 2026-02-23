@@ -44,11 +44,13 @@ export class GatewayClient {
   private authToken: string;
   private authMode: AuthMode = 'token';
   private deviceIdentity: DeviceIdentity | null = null;
+  private clientId: string;
 
-  constructor(wsUrl?: string, authToken?: string, authMode?: AuthMode) {
+  constructor(wsUrl?: string, authToken?: string, authMode?: AuthMode, clientId?: string) {
     this.wsUrl = wsUrl || `ws://${window.location.hostname}:18789`;
     this.authToken = authToken || '';
     this.authMode = authMode || 'token';
+    this.clientId = clientId || import.meta.env.VITE_CLIENT_ID || 'webchat';
   }
 
   /** Update credentials (e.g. after login). Does not reconnect automatically. */
@@ -130,7 +132,7 @@ export class GatewayClient {
     if (this.deviceIdentity) {
       const payload = buildDeviceAuthPayload({
         deviceId: this.deviceIdentity.id,
-        clientId: 'webchat',
+        clientId: this.clientId,
         clientMode: 'webchat',
         role,
         scopes,
@@ -152,7 +154,7 @@ export class GatewayClient {
       const res = await this.request(id, 'connect', {
         minProtocol: 3,
         maxProtocol: 3,
-        client: { id: 'webchat', version: __APP_VERSION__, platform: 'web', mode: 'webchat' },
+        client: { id: this.clientId, version: __APP_VERSION__, platform: 'web', mode: 'webchat' },
         role,
         scopes,
         caps: [],

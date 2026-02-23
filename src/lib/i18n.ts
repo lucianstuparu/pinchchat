@@ -24,6 +24,9 @@ const en = {
   'login.hideToken': 'Hide token',
   'login.storedLocally': 'Credentials are stored locally in your browser',
   'login.wsHint': 'URL must start with ws:// or wss://',
+  'login.advanced': 'Advanced',
+  'login.clientId': 'Client ID',
+  'login.clientIdHint': 'Sent in the WebSocket connect frame. Default: webchat',
 
   // Header
   'header.title': 'PinchChat',
@@ -205,6 +208,9 @@ const fr: Record<keyof typeof en, string> = {
   'login.hideToken': 'Masquer le token',
   'login.storedLocally': 'Les identifiants sont stockés localement dans votre navigateur',
   'login.wsHint': 'L\'URL doit commencer par ws:// ou wss://',
+  'login.advanced': 'Avancé',
+  'login.clientId': 'ID client',
+  'login.clientIdHint': 'Envoyé dans la trame de connexion WebSocket. Par défaut : webchat',
 
   'header.title': 'PinchChat',
   'header.connected': 'Connecté',
@@ -371,6 +377,9 @@ const es: Record<keyof typeof en, string> = {
   'login.hideToken': 'Ocultar token',
   'login.storedLocally': 'Las credenciales se guardan localmente en tu navegador',
   'login.wsHint': 'La URL debe empezar con ws:// o wss://',
+  'login.advanced': 'Avanzado',
+  'login.clientId': 'ID de cliente',
+  'login.clientIdHint': 'Enviado en la trama de conexión WebSocket. Por defecto: webchat',
 
   'header.title': 'PinchChat',
   'header.connected': 'Conectado',
@@ -539,6 +548,9 @@ const de: Record<keyof typeof en, string> = {
   'login.hideToken': 'Token verbergen',
   'login.storedLocally': 'Zugangsdaten werden lokal in deinem Browser gespeichert',
   'login.wsHint': 'URL muss mit ws:// oder wss:// beginnen',
+  'login.advanced': 'Erweitert',
+  'login.clientId': 'Client-ID',
+  'login.clientIdHint': 'Wird im WebSocket-Connect-Frame gesendet. Standard: webchat',
 
   'header.title': 'PinchChat',
   'header.connected': 'Verbunden',
@@ -705,6 +717,9 @@ const ja: Record<keyof typeof en, string> = {
   'login.hideToken': 'トークンを非表示',
   'login.storedLocally': '認証情報はブラウザにローカル保存されます',
   'login.wsHint': 'URLはws://またはwss://で始まる必要があります',
+  'login.advanced': '詳細設定',
+  'login.clientId': 'クライアントID',
+  'login.clientIdHint': 'WebSocket接続フレームで送信されます。デフォルト: webchat',
 
   'header.title': 'PinchChat',
   'header.connected': '接続済み',
@@ -871,6 +886,9 @@ const pt: Record<keyof typeof en, string> = {
   'login.hideToken': 'Ocultar token',
   'login.storedLocally': 'As credenciais são armazenadas localmente no navegador',
   'login.wsHint': 'A URL deve começar com ws:// ou wss://',
+  'login.advanced': 'Avançado',
+  'login.clientId': 'ID do cliente',
+  'login.clientIdHint': 'Enviado no frame de conexão WebSocket. Padrão: webchat',
 
   'header.title': 'PinchChat',
   'header.connected': 'Conectado',
@@ -1037,6 +1055,9 @@ const zh: Record<keyof typeof en, string> = {
   'login.hideToken': '隐藏令牌',
   'login.storedLocally': '凭据仅存储在浏览器本地',
   'login.wsHint': '地址必须以 ws:// 或 wss:// 开头',
+  'login.advanced': '高级',
+  'login.clientId': '客户端 ID',
+  'login.clientIdHint': '在 WebSocket 连接帧中发送。默认值：webchat',
 
   'header.title': 'PinchChat',
   'header.connected': '已连接',
@@ -1203,6 +1224,9 @@ const it: Record<keyof typeof en, string> = {
   'login.hideToken': 'Nascondi token',
   'login.storedLocally': 'Le credenziali vengono salvate localmente nel browser',
   'login.wsHint': 'L\'URL deve iniziare con ws:// o wss://',
+  'login.advanced': 'Avanzate',
+  'login.clientId': 'ID client',
+  'login.clientIdHint': 'Inviato nel frame di connessione WebSocket. Predefinito: webchat',
 
   'header.title': 'PinchChat',
   'header.connected': 'Connesso',

@@ -272,13 +272,13 @@ export function useGateway() {
     }
   }, []);
 
-  const setupClient = useCallback(async (wsUrl: string, token: string, authMode: AuthMode = 'token') => {
+  const setupClient = useCallback(async (wsUrl: string, token: string, authMode: AuthMode = 'token', clientId?: string) => {
     // Tear down existing client
     if (clientRef.current) {
       clientRef.current.disconnect();
     }
 
-    const client = new GatewayClient(wsUrl, token, authMode);
+    const client = new GatewayClient(wsUrl, token, authMode, clientId);
     clientRef.current = client;
 
     // Load device identity for signed connect handshake
@@ -296,7 +296,7 @@ export function useGateway() {
         setConnectError(null);
         setIsConnecting(false);
         isConnectingRef.current = false;
-        storeCredentials(wsUrl, token, authMode);
+        storeCredentials(wsUrl, token, authMode, clientId);
         loadSessions();
         loadAgentIdentity();
         loadHistory(activeSessionRef.current);
@@ -445,7 +445,7 @@ export function useGateway() {
     const stored = getStoredCredentials();
     if (stored) {
       // Init on mount — setupClient sets state as part of establishing the connection
-      setupClient(stored.url, stored.token, stored.authMode || 'token');
+      setupClient(stored.url, stored.token, stored.authMode || 'token', stored.clientId);
     } else {
       setAuthenticated(false);
     }
@@ -503,8 +503,8 @@ export function useGateway() {
     loadHistory(key);
   }, [loadHistory]);
 
-  const login = useCallback((url: string, token: string, authMode: AuthMode = 'token') => {
-    setupClient(url, token, authMode);
+  const login = useCallback((url: string, token: string, authMode: AuthMode = 'token', clientId?: string) => {
+    setupClient(url, token, authMode, clientId);
   }, [setupClient]);
 
   const deleteSession = useCallback(async (key: string) => {

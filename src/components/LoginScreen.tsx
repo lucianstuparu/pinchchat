@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Sparkles, Eye, EyeOff, Loader2, Key, Lock } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2, Key, Lock, ChevronDown } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
 import { getStoredCredentials, type AuthMode } from '../lib/credentials';
 
 interface Props {
-  onConnect: (url: string, secret: string, authMode: AuthMode) => void;
+  onConnect: (url: string, secret: string, authMode: AuthMode, clientId?: string) => void;
   error?: string | null;
   isConnecting?: boolean;
 }
@@ -36,12 +36,19 @@ function getInitialAuthMode(): AuthMode {
   return stored?.authMode ?? 'token';
 }
 
+function getInitialClientId(): string {
+  const stored = getStoredCredentials();
+  return stored?.clientId ?? '';
+}
+
 export function LoginScreen({ onConnect, error, isConnecting }: Props) {
   const t = useT();
   const [url, setUrl] = useState(getInitialUrl);
   const [token, setToken] = useState(getInitialToken);
   const [showToken, setShowToken] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>(getInitialAuthMode);
+  const [clientId, setClientId] = useState(getInitialClientId);
+  const [showAdvanced, setShowAdvanced] = useState(() => getInitialClientId() !== '');
 
   const urlTrimmed = url.trim();
   const isValidWsUrl = /^wss?:\/\/.+/.test(urlTrimmed);
@@ -50,7 +57,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlTrimmed || !token.trim() || !isValidWsUrl) return;
-    onConnect(urlTrimmed, token.trim(), authMode);
+    onConnect(urlTrimmed, token.trim(), authMode, clientId.trim() || undefined);
   };
 
   return (
@@ -144,6 +151,37 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
                 {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+
+          {/* Advanced settings */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1.5 text-xs text-pc-text-muted hover:text-pc-text transition-colors"
+            >
+              <ChevronDown size={14} className={`transition-transform ${showAdvanced ? 'rotate-0' : '-rotate-90'}`} />
+              {t('login.advanced')}
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 space-y-2">
+                <label htmlFor="client-id" className="block text-xs font-medium text-pc-text-secondary uppercase tracking-wider">
+                  {t('login.clientId')}
+                </label>
+                <input
+                  id="client-id"
+                  type="text"
+                  value={clientId}
+                  onChange={e => setClientId(e.target.value)}
+                  placeholder="webchat"
+                  className="w-full rounded-xl border border-pc-border bg-pc-elevated/50 px-4 py-3 text-sm text-pc-text placeholder:text-pc-text-faint outline-none focus:border-[var(--pc-accent-dim)] focus:ring-1 focus:ring-[var(--pc-accent-glow)] transition-all"
+                  disabled={isConnecting}
+                />
+                <p className="text-xs text-pc-text-faint pl-1">
+                  {t('login.clientIdHint')}
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (
