@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { ChevronRight, ChevronDown, Check, Copy, WrapText, AlignLeft } from 'lucide-react';
-import hljs from '../lib/highlight';
 import { copyToClipboard } from '../lib/clipboard';
 import { useT } from '../hooks/useLocale';
 import { useTheme } from '../hooks/useTheme';
@@ -124,11 +123,16 @@ function isStructured(text: string): boolean {
   return termHits / lines.length > 0.3;
 }
 
-/** Highlight code using highlight.js, returns HTML string or null */
+// Lazy-loaded highlight.js instance (keeps hljs out of the main bundle)
+let _hljs: typeof import('highlight.js/lib/core').default | null = null;
+const _hljsPromise = import('../lib/highlight').then(m => { _hljs = m.default; return m.default; });
+
+/** Highlight code using highlight.js, returns HTML string or null.
+ *  Returns null until hljs is loaded (callers should re-render after load). */
 function highlightCode(text: string): string | null {
-  if (!text || !isStructured(text)) return null;
+  if (!text || !isStructured(text) || !_hljs) return null;
   try {
-    const result = hljs.highlightAuto(text);
+    const result = _hljs.highlightAuto(text);
     return result.value;
   } catch {
     return null;
@@ -178,7 +182,11 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export function HighlightedPre({ text, className, wrap }: { text: string; className: string; wrap?: boolean }) {
-  const highlighted = useMemo(() => highlightCode(text), [text]);
+  const [hljsReady, setHljsReady] = useState(!!_hljs);
+  useEffect(() => {
+    if (!_hljs) { _hljsPromise.then(() => setHljsReady(true)); }
+  }, []);
+  const highlighted = useMemo(() => highlightCode(text), [text, hljsReady]); // eslint-disable-line react-hooks/exhaustive-deps
   const wrapClass = wrap ? 'whitespace-pre-wrap break-words overflow-x-hidden' : '';
 
   if (highlighted) {
