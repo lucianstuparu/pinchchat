@@ -13,7 +13,7 @@ export function useGateway() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSession, setActiveSession] = useState('agent:main:main');
+  const [activeSession, setActiveSession] = useState('agent:gateway-lucian:main');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null); // null = checking
@@ -496,7 +496,7 @@ export function useGateway() {
     setSessions(prev => prev.filter(s => s.key !== key));
     // If we deleted the active session, switch to main
     if (activeSessionRef.current === key) {
-      const mainKey = 'agent:main:main';
+      const mainKey = 'agent:gateway-lucian:main';
       setActiveSession(mainKey);
       activeSessionRef.current = mainKey;
       setMessages([]);
