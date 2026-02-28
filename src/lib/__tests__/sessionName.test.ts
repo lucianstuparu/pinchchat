@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sessionDisplayName } from '../sessionName';
+import { sessionDisplayName, extractAgentIdFromKey, formatAgentId } from '../sessionName';
 import type { Session } from '../../types';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
@@ -57,5 +57,41 @@ describe('sessionDisplayName', () => {
       key: 'agent:bot:mycustomkey',
     } as Partial<Session>));
     expect(name).toBe('mycustomkey');
+  });
+});
+
+describe('extractAgentIdFromKey', () => {
+  it('extracts agent id from a standard key', () => {
+    expect(extractAgentIdFromKey('agent:my-bot:abc123')).toBe('my-bot');
+  });
+
+  it('returns undefined for keys without agent prefix', () => {
+    expect(extractAgentIdFromKey('some-random-key')).toBeUndefined();
+  });
+
+  it('handles UUIDs as agent ids', () => {
+    expect(extractAgentIdFromKey('agent:a1b2c3d4-e5f6-7890-abcd-ef1234567890:session')).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+  });
+});
+
+describe('formatAgentId', () => {
+  it('formats a kebab-case id', () => {
+    expect(formatAgentId('my-cool-bot')).toBe('My Cool Bot');
+  });
+
+  it('formats a snake_case id', () => {
+    expect(formatAgentId('my_cool_bot')).toBe('My Cool Bot');
+  });
+
+  it('formats mixed separators', () => {
+    expect(formatAgentId('my-cool_bot')).toBe('My Cool Bot');
+  });
+
+  it('returns undefined for UUIDs', () => {
+    expect(formatAgentId('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBeUndefined();
+  });
+
+  it('formats a single word', () => {
+    expect(formatAgentId('main')).toBe('Main');
   });
 });
