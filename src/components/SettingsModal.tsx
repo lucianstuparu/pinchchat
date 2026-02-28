@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { X, Settings, Sun, Moon, Monitor, Laptop, Check, Volume2, VolumeOff } from 'lucide-react';
+import { X, Settings, Sun, Moon, Monitor, Laptop, Check, Volume2, VolumeOff, Leaf } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useSendShortcut } from '../hooks/useSendShortcut';
 import { useT, useLocale } from '../hooks/useLocale';
@@ -12,6 +12,7 @@ const themeOptions: { value: ThemeName; icon: typeof Sun; labelKey: TranslationK
   { value: 'dark', icon: Moon, labelKey: 'theme.dark' },
   { value: 'light', icon: Sun, labelKey: 'theme.light' },
   { value: 'oled', icon: Monitor, labelKey: 'theme.oled' },
+  { value: 'sand', icon: Leaf, labelKey: 'theme.sand' },
 ];
 
 const accentOptions: { value: AccentColor; color: string }[] = [
@@ -21,6 +22,7 @@ const accentOptions: { value: AccentColor; color: string }[] = [
   { value: 'amber', color: '#f59e0b' },
   { value: 'rose', color: '#f43f5e' },
   { value: 'blue', color: '#3b82f6' },
+  { value: 'teal', color: '#00a884' },
 ];
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);

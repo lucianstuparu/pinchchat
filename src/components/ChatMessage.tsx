@@ -451,7 +451,7 @@ function SystemEventMessage({ message }: { message: ChatMessageType }) {
 export const ChatMessageComponent = memo(function ChatMessageComponent({ message: rawMessage, onRetry, onReply, agentAvatarUrl, isFirstInGroup = true, isBookmarked = false, onToggleBookmark }: { message: ChatMessageType; onRetry?: (text: string) => void; onReply?: (preview: string) => void; agentAvatarUrl?: string; isFirstInGroup?: boolean; isBookmarked?: boolean; onToggleBookmark?: () => void }) {
   useLocale(); // re-render on locale change
   const { resolvedTheme } = useTheme();
-  const isLight = resolvedTheme === 'light';
+  const isLight = resolvedTheme === 'light' || resolvedTheme === 'sand';
   const [showRawJson, setShowRawJson] = useState(false);
 
   // Strip webhook/hook scaffolding and webchat envelope from user messages before rendering

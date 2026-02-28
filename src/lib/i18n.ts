@@ -155,6 +155,7 @@ const en = {
   'theme.dark': 'Dark',
   'theme.light': 'Light',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   // Message search
   'search.placeholder': 'Search messages…',
@@ -327,6 +328,7 @@ const fr: Record<keyof typeof en, string> = {
   'theme.dark': 'Sombre',
   'theme.light': 'Clair',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'Rechercher dans les messages…',
   'search.noResults': '0 résultat',
@@ -496,6 +498,7 @@ const es: Record<keyof typeof en, string> = {
   'theme.dark': 'Oscuro',
   'theme.light': 'Claro',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'Buscar en mensajes…',
   'search.noResults': '0 resultados',
@@ -667,6 +670,7 @@ const de: Record<keyof typeof en, string> = {
   'theme.dark': 'Dunkel',
   'theme.light': 'Hell',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'In Nachrichten suchen…',
   'search.noResults': '0 Ergebnisse',
@@ -836,6 +840,7 @@ const ja: Record<keyof typeof en, string> = {
   'theme.dark': 'ダーク',
   'theme.light': 'ライト',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'メッセージを検索…',
   'search.noResults': '0件',
@@ -1005,6 +1010,7 @@ const pt: Record<keyof typeof en, string> = {
   'theme.dark': 'Escuro',
   'theme.light': 'Claro',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'Pesquisar mensagens…',
   'search.noResults': '0 resultados',
@@ -1174,6 +1180,7 @@ const zh: Record<keyof typeof en, string> = {
   'theme.dark': '深色',
   'theme.light': '浅色',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': '搜索消息…',
   'search.noResults': '无结果',
@@ -1343,6 +1350,7 @@ const it: Record<keyof typeof en, string> = {
   'theme.dark': 'Scuro',
   'theme.light': 'Chiaro',
   'theme.oled': 'OLED',
+  'theme.sand': 'Sand',
 
   'search.placeholder': 'Cerca nei messaggi…',
   'search.noResults': '0 risultati',

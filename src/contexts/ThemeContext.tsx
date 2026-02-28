@@ -10,7 +10,10 @@ interface StoredTheme {
   accent: AccentColor;
 }
 
-type ConcreteTheme = 'dark' | 'light' | 'oled';
+type ConcreteTheme = 'dark' | 'light' | 'oled' | 'sand';
+
+const DEFAULT_GRADIENT = 'radial-gradient(ellipse at top, rgba(255,255,255,0.02), transparent 50%), radial-gradient(ellipse at bottom right, rgba(99,102,241,0.04), transparent 50%)';
+
 const themes: Record<ConcreteTheme, Record<string, string>> = {
   dark: {
     '--pc-bg-base': '#1e1e24',
@@ -31,6 +34,7 @@ const themes: Record<ConcreteTheme, Record<string, string>> = {
     '--pc-hover': 'rgba(255,255,255,0.05)',
     '--pc-hover-strong': 'rgba(255,255,255,0.08)',
     '--pc-separator': 'rgba(255,255,255,0.05)',
+    '--pc-bg-gradient': DEFAULT_GRADIENT,
   },
   light: {
     '--pc-bg-base': '#f4f4f5',
@@ -51,6 +55,7 @@ const themes: Record<ConcreteTheme, Record<string, string>> = {
     '--pc-hover': 'rgba(0,0,0,0.05)',
     '--pc-hover-strong': 'rgba(0,0,0,0.08)',
     '--pc-separator': 'rgba(0,0,0,0.08)',
+    '--pc-bg-gradient': DEFAULT_GRADIENT,
   },
   oled: {
     '--pc-bg-base': '#000000',
@@ -71,6 +76,28 @@ const themes: Record<ConcreteTheme, Record<string, string>> = {
     '--pc-hover': 'rgba(255,255,255,0.04)',
     '--pc-hover-strong': 'rgba(255,255,255,0.06)',
     '--pc-separator': 'rgba(255,255,255,0.04)',
+    '--pc-bg-gradient': DEFAULT_GRADIENT,
+  },
+  sand: {
+    '--pc-bg-base': '#efeae2',
+    '--pc-bg-surface': '#ffffff',
+    '--pc-bg-elevated': '#ffffff',
+    '--pc-bg-input': '#f0f2f5',
+    '--pc-bg-sidebar': 'rgba(255,255,255,0.97)',
+    '--pc-bg-code': '#f0f2f5',
+    '--pc-border': 'rgba(0,0,0,0.10)',
+    '--pc-border-strong': 'rgba(0,0,0,0.15)',
+    '--pc-text-primary': '#111b21',
+    '--pc-text-secondary': '#3b4a54',
+    '--pc-text-muted': '#667781',
+    '--pc-text-faint': '#aebac1',
+    '--pc-scrollbar-thumb': '#aebac1',
+    '--pc-scrollbar-track': '#efeae2',
+    '--pc-scrollbar-thumb-hover': '#667781',
+    '--pc-hover': 'rgba(0,0,0,0.04)',
+    '--pc-hover-strong': 'rgba(0,0,0,0.07)',
+    '--pc-separator': 'rgba(0,0,0,0.06)',
+    '--pc-bg-gradient': 'none',
   },
 };
 
@@ -117,6 +144,13 @@ const accents: Record<AccentColor, Record<string, string>> = {
     '--pc-accent-glow': 'rgba(59,130,246,0.1)',
     '--pc-accent-rgb': '59,130,246',
   },
+  teal: {
+    '--pc-accent': '#00a884',
+    '--pc-accent-light': '#25d366',
+    '--pc-accent-dim': 'rgba(0,168,132,0.3)',
+    '--pc-accent-glow': 'rgba(0,168,132,0.1)',
+    '--pc-accent-rgb': '0,168,132',
+  },
 };
 
 function applyVars(vars: Record<string, string>) {
@@ -127,7 +161,7 @@ function applyVars(vars: Record<string, string>) {
 }
 
 /** Resolve 'system' to the actual theme based on OS preference. */
-function resolveTheme(name: ThemeName): 'dark' | 'light' | 'oled' {
+function resolveTheme(name: ThemeName): ConcreteTheme {
   if (name === 'system') {
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }

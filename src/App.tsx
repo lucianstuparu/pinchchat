@@ -165,7 +165,7 @@ export default function App() {
 
   return (
     <ToolCollapseProvider>
-    <div className="h-dvh flex overflow-x-hidden bg-[var(--pc-bg-base)] text-pc-text bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.02),transparent_50%),radial_gradient(ellipse_at_bottom_right,rgba(99,102,241,0.04),transparent_50%)]" role="application" aria-label="PinchChat">
+    <div className="h-dvh flex overflow-x-hidden bg-[var(--pc-bg-base)] text-pc-text" style={{ backgroundImage: 'var(--pc-bg-gradient)' }} role="application" aria-label="PinchChat">
       <a href="#chat-input" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-pc-accent focus:text-white focus:text-sm focus:font-medium">{t('app.skipToChat')}</a>
       <Sidebar
         sessions={sessions}
