@@ -421,10 +421,10 @@ export function useGateway() {
       // Init on mount — setupClient sets state as part of establishing the connection
       setupClient(stored.url, stored.token, stored.authMode || 'token', stored.clientId);
     } else if (window.location.protocol === 'https:') {
-      // When served over HTTPS, authentication is handled at the infrastructure
-      // level (e.g. Cloudflare Access) before the user reaches this app.
-      // Skip the login screen and auto-connect to the gateway WebSocket
-      // on the same host. The gateway token is baked in at build time.
+      // HTTPS implies a reverse-proxy deployment with authentication handled
+      // upstream (e.g. an identity-aware proxy, SSO gate, or similar).
+      // Auto-connect to the gateway WebSocket on the same host, using an
+      // optional build-time token (VITE_GATEWAY_TOKEN) for the gateway handshake.
       const wsUrl = `wss://${window.location.hostname}/ws`;
       const autoToken = import.meta.env.VITE_GATEWAY_TOKEN || '';
       setupClient(wsUrl, autoToken, 'token');
