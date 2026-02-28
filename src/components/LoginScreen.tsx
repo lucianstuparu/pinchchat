@@ -15,13 +15,9 @@ function getInitialUrl(): string {
   if (import.meta.env.VITE_GATEWAY_WS_URL) return import.meta.env.VITE_GATEWAY_WS_URL;
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
-  // When served over HTTPS, assume gateway is on a sibling subdomain (e.g. marlbot-gw.example.com)
+  // When served over HTTPS, use same host with /ws path (reverse proxy handles routing)
   if (protocol === 'wss') {
-    const parts = host.split('.');
-    if (parts.length >= 2) {
-      parts[0] = parts[0] + '-gw';
-      return `${protocol}://${parts.join('.')}`;
-    }
+    return `${protocol}://${host}/ws`;
   }
   return `${protocol}://${host}:18789`;
 }
