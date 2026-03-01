@@ -1,14 +1,10 @@
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Square, Paperclip, X, FileText, Eye, EyeOff, Reply } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
 import { useSendShortcut } from '../hooks/useSendShortcut';
 import { SlashCommandMenu } from './SlashCommands';
 import { shouldShowSlashMenu } from '../lib/slashUtils';
-
-const ReactMarkdown = lazy(() => import('react-markdown'));
-const remarkGfm = import('remark-gfm').then(m => m.default);
-let _remarkGfm: typeof import('remark-gfm').default | null = null;
-remarkGfm.then(p => { _remarkGfm = p; });
+import { LazyMarkdown } from './LazyMarkdown';
 
 interface FileAttachment {
   id: string;
@@ -320,9 +316,7 @@ export function ChatInput({ onSend, onNewSession, onAbort, isGenerating, disable
           {/* Markdown preview */}
           {showPreview && text.trim() && (
             <div className="mb-3 px-1 max-h-[200px] overflow-y-auto rounded-2xl border border-pc-border bg-pc-elevated/30 p-3 text-sm text-pc-text prose prose-invert prose-sm max-w-none [&_pre]:bg-pc-elevated [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-cyan-300 [&_a]:text-cyan-400">
-              <Suspense fallback={<span className="text-pc-text-muted text-xs">Loading…</span>}>
-                <ReactMarkdown remarkPlugins={_remarkGfm ? [_remarkGfm] : []}>{text}</ReactMarkdown>
-              </Suspense>
+              <LazyMarkdown>{text}</LazyMarkdown>
             </div>
           )}
 
