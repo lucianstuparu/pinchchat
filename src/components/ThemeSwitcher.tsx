@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Palette, Sun, Moon, Monitor, Laptop, Check } from 'lucide-react';
+import { Palette, Sun, Moon, Monitor, Laptop, Check, Leaf } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import type { ThemeName, AccentColor } from '../contexts/ThemeContextDef';
 import { useT } from '../hooks/useLocale';
@@ -12,6 +12,7 @@ const themeOptions: { value: ThemeName; icon: typeof Sun; labelKey: TranslationK
   { value: 'dark', icon: Moon, labelKey: 'theme.dark' },
   { value: 'light', icon: Sun, labelKey: 'theme.light' },
   { value: 'oled', icon: Monitor, labelKey: 'theme.oled' },
+  { value: 'sand', icon: Leaf, labelKey: 'theme.sand' },
 ];
 
 const accentOptions: { value: AccentColor; color: string }[] = [
@@ -21,6 +22,7 @@ const accentOptions: { value: AccentColor; color: string }[] = [
   { value: 'amber', color: '#f59e0b' },
   { value: 'rose', color: '#f43f5e' },
   { value: 'blue', color: '#3b82f6' },
+  { value: 'teal', color: '#00a884' },
 ];
 
 export function ThemeSwitcher() {
