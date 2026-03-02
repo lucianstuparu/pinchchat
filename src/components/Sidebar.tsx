@@ -41,6 +41,7 @@ function SidebarFooter() {
           onClick={pwa.install}
           className="inline-flex items-center gap-1 text-[10px] text-pc-accent-light hover:text-[var(--pc-accent)] transition-colors"
           title="Install app"
+          aria-label="Install app"
         >
           <Download size={11} />
           <span>Install</span>
@@ -52,6 +53,7 @@ function SidebarFooter() {
         rel="noopener noreferrer"
         className="text-pc-text-faint hover:text-pc-text-secondary transition-colors"
         title="GitHub"
+        aria-label="GitHub repository"
       >
         <Globe size={11} />
       </a>
