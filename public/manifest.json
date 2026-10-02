@@ -1,15 +1,22 @@
 {
-  "id": "/",
-  "name": "PinchChat",
-  "short_name": "PinchChat",
-  "description": "A sleek, dark-themed webchat UI for OpenClaw — monitor sessions, stream responses, and inspect tool calls in real-time.",
-  "start_url": "/",
+  "id": "/openclaw",
+  "name": "OpenClaw",
+  "short_name": "OpenClaw",
+  "description": "Private messenger for your OpenClaw assistant. Share links, photos and files straight into the conversation.",
+  "start_url": "/?ui=mobile",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#1e1e24",
-  "theme_color": "#1e1e24",
-  "orientation": "any",
-  "categories": ["developer", "productivity", "utilities"],
+  "display_override": [
+    "standalone"
+  ],
+  "background_color": "#efeae2",
+  "theme_color": "#00a884",
+  "orientation": "portrait",
+  "categories": [
+    "productivity",
+    "social",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/favicon-16.png",
@@ -37,5 +44,26 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "image/*",
+            "application/pdf",
+            "text/*",
+            "audio/*"
+          ]
+        }
+      ]
+    }
+  }
 }

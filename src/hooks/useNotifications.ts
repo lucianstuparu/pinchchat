@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { playNotificationSound } from '../lib/notificationSound';
 
-const APP_NAME = 'PinchChat';
+const APP_NAME = import.meta.env.VITE_APP_NAME || 'PinchChat';
 let baseTitle = APP_NAME;
 
 /** Update the base title (e.g. with active session name). Called by App. */
