@@ -3,10 +3,10 @@ import { GatewayClient, type JsonPayload } from '../lib/gateway';
 import { genIdempotencyKey } from '../lib/utils';
 import { getStoredCredentials, storeCredentials, clearCredentials, type AuthMode } from '../lib/credentials';
 import { getOrCreateDeviceIdentity } from '../lib/deviceIdentity';
-import { isSystemEvent } from '../lib/systemEvent';
 import { getCachedMessages, setCachedMessages, mergeWithCache } from '../lib/messageCache';
 import { extractAgentIdFromKey } from '../lib/sessionName';
 import { extractText, extractThinking, type ChatPayloadMessage } from '../lib/messageExtract';
+import { parseHistoryMessages } from '../lib/historyParser';
 import type { ChatMessage, MessageBlock, ConnectionStatus, Session, AgentIdentity } from '../types';
 
 export function useGateway() {
@@ -14,9 +14,11 @@ export function useGateway() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSession, setActiveSession] = useState('agent:gateway-lucian:main');
+  const [activeSession, setActiveSession] = useState(import.meta.env.VITE_AGENT_SESSION || 'agent:main:main');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSessionsLoaded, setIsSessionsLoaded] = useState(false);
+  const [agents, setAgents] = useState<string[]>([]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null); // null = checking
   const [connectError, setConnectError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -89,7 +91,7 @@ export function useGateway() {
 
   const loadAgentIdentity = useCallback(async () => {
     try {
-      const res = await clientRef.current?.send('agent.identity.get', {});
+      const res = await clientRef.current?.send('agent.identity.get', { sessionKey: activeSessionRef.current });
       if (res) {
         setAgentIdentity({
           name: res.name as string | undefined,
@@ -103,20 +105,37 @@ export function useGateway() {
     }
   }, []);
 
+  const loadAgents = useCallback(async () => {
+    try {
+      const res = await clientRef.current?.send('agents.list', {});
+      const agentList = res?.agents as Array<Record<string, unknown>> | undefined;
+      if (agentList) {
+        const ids = agentList.map(a => (a.id || a.agentId) as string).filter(Boolean).sort();
+        setAgents(ids);
+      }
+    } catch (err) {
+      console.warn('[loadAgents] agents.list not supported, agent picker will be unavailable', err);
+    }
+  }, []);
+
   const loadSessions = useCallback(async () => {
     try {
       const res = await clientRef.current?.send('sessions.list', {});
       const sessionList = res?.sessions as Array<Record<string, unknown>> | undefined;
       if (sessionList) {
+        const agentPrefix = import.meta.env.VITE_AGENT_PREFIX;
+        const filteredSessionList = agentPrefix
+          ? sessionList.filter((s) => ((s.key || s.sessionKey) as string).startsWith(agentPrefix))
+          : sessionList;
         const deleted = getDeletedSessions();
         // Reconcile: remove blacklisted keys for sessions that no longer exist on the gateway
         // (they were successfully deleted, so no need to keep hiding them)
-        const activeKeys = new Set(sessionList.map((s) => (s.key || s.sessionKey) as string));
+        const activeKeys = new Set(filteredSessionList.map((s) => (s.key || s.sessionKey) as string));
         const reconciled = new Set([...deleted].filter((k) => activeKeys.has(k)));
         if (reconciled.size !== deleted.size) {
           localStorage.setItem('pinchchat-deleted-sessions', JSON.stringify([...reconciled]));
         }
-        setSessions(sessionList.filter((s) => !deleted.has((s.key || s.sessionKey) as string)).map((s) => ({
+        setSessions(filteredSessionList.filter((s) => !deleted.has((s.key || s.sessionKey) as string)).map((s) => ({
           key: (s.key || s.sessionKey) as string,
           label: (s.label || s.key || s.sessionKey) as string,
           messageCount: s.messageCount as number | undefined,
@@ -134,6 +153,8 @@ export function useGateway() {
       }
     } catch {
       // Silently ignore session list failures (e.g. disconnected)
+    } finally {
+      setIsSessionsLoaded(true);
     }
   }, [getDeletedSessions]);
 
@@ -143,80 +164,7 @@ export function useGateway() {
       const res = await clientRef.current?.send('chat.history', { sessionKey, limit: 100 });
       const rawMsgs = res?.messages as Array<Record<string, unknown>> | undefined;
       if (rawMsgs) {
-        /* eslint-disable @typescript-eslint/no-explicit-any -- raw gateway history messages have dynamic shape */
-        const msgs: ChatMessage[] = rawMsgs.map((m: Record<string, any>, i: number) => {
-          const blocks: MessageBlock[] = [];
-          if (m.content) {
-            if (Array.isArray(m.content)) {
-              for (const block of m.content) {
-                if (block.type === 'text') blocks.push({ type: 'text', text: block.text });
-                else if (block.type === 'thinking') blocks.push({ type: 'thinking', text: block.thinking || block.text || '' });
-                else if (block.type === 'image') {
-                  const src = block.source || {};
-                  blocks.push({ type: 'image', mediaType: src.media_type || block.media_type || 'image/png', data: src.data || block.data, url: block.url || src.url });
-                }
-                else if (block.type === 'image_url') {
-                  blocks.push({ type: 'image', mediaType: 'image/png', url: block.image_url?.url || block.url });
-                }
-                else if (block.type === 'tool_use') blocks.push({ type: 'tool_use', name: block.name, input: block.input, id: block.id });
-                else if (block.type === 'tool_result') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.tool_use_id });
-                else if (block.type === 'toolCall') blocks.push({ type: 'tool_use', name: block.name, input: block.arguments || block.input, id: block.id });
-                else if (block.type === 'toolResult') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.toolCallId || block.tool_use_id, name: block.name });
-              }
-            } else if (typeof m.content === 'string') {
-              blocks.push({ type: 'text', text: m.content });
-            }
-          }
-          const role: 'user' | 'assistant' = m.role === 'user' ? 'user' : 'assistant';
-
-          if (m.role === 'toolResult') {
-            const toolBlocks: MessageBlock[] = blocks.map(b => {
-              if (b.type === 'text') {
-                return { type: 'tool_result' as const, content: b.text, toolUseId: m.toolCallId };
-              }
-              return b;
-            });
-            return {
-              id: m.id || `hist-${i}`,
-              role: 'assistant' as const,
-              content: '',
-              timestamp: m.timestamp || Date.now(),
-              blocks: toolBlocks,
-              isToolResult: true,
-            };
-          }
-
-          const textContent = blocks.filter((b): b is Extract<MessageBlock, { type: 'text' }> => b.type === 'text').map(b => b.text).join('');
-          // Capture raw metadata (exclude heavy fields already parsed)
-          const metadata: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(m)) {
-            if (['content', 'blocks'].includes(k)) continue;
-            metadata[k] = v;
-          }
-          return {
-            id: m.id || `hist-${i}`,
-            role,
-            content: textContent,
-            timestamp: m.timestamp || Date.now(),
-            blocks,
-            metadata,
-            isSystemEvent: role === 'user' && isSystemEvent(textContent),
-          };
-        });
-        const merged: ChatMessage[] = [];
-        for (const msg of msgs) {
-          const isToolResult = 'isToolResult' in msg && (msg as ChatMessage & { isToolResult?: boolean }).isToolResult;
-          if (isToolResult && merged.length > 0 && merged[merged.length - 1].role === 'assistant') {
-            merged[merged.length - 1] = {
-              ...merged[merged.length - 1],
-              blocks: [...merged[merged.length - 1].blocks, ...msg.blocks],
-            };
-          } else if (isToolResult) {
-            // skip orphan tool results
-          } else {
-            merged.push(msg);
-          }
-        }
+        const merged = parseHistoryMessages(rawMsgs as Array<Record<string, any>>); // eslint-disable-line @typescript-eslint/no-explicit-any
         // Apply stored generation time to the last assistant message if available
         const genKey = sessionKey + ':latest';
         const genTime = generationTimesRef.current.get(genKey);
@@ -267,15 +215,38 @@ export function useGateway() {
       console.warn('[PinchChat] Failed to load device identity, connecting without it:', err);
     }
 
+    client.onConnectError((gatewayMsg) => {
+      let userFacingError: string;
+      if (gatewayMsg.includes('missing scope')) {
+        // Extract the missing scope name if present, e.g. "missing scope: operator.read"
+        const scopeMatch = gatewayMsg.match(/missing scope:\s*(\S+)/);
+        const scopeName = scopeMatch ? scopeMatch[1] : 'operator.*';
+        userFacingError =
+          `Token is missing the required scope: ${scopeName}. ` +
+          'Please make sure your OpenClaw token has operator-level permissions. ' +
+          'Check the scopes assigned to this token in your OpenClaw configuration.';
+      } else if (gatewayMsg.includes('UNAUTHORIZED') || gatewayMsg.includes('invalid token') || gatewayMsg.includes('Unauthorized')) {
+        userFacingError = 'Invalid token — please check your credentials.';
+      } else {
+        userFacingError = `Connection rejected: ${gatewayMsg}`;
+      }
+      setConnectError(userFacingError);
+      setIsConnecting(false);
+      isConnectingRef.current = false;
+      setAuthenticated(false);
+    });
+
     client.onStatus((s) => {
       setStatus(s);
       if (s === 'connected') {
+        setIsGenerating(false);
         setAuthenticated(true);
         setConnectError(null);
         setIsConnecting(false);
         isConnectingRef.current = false;
         storeCredentials(wsUrl, token, authMode, clientId);
         loadSessions();
+        loadAgents();
         loadAgentIdentity();
         loadHistory(activeSessionRef.current);
       } else if (s === 'pairing') {
@@ -284,7 +255,7 @@ export function useGateway() {
         setIsConnecting(false);
         isConnectingRef.current = false;
       } else if (s === 'disconnected' && !client.isConnected) {
-        // If we never connected successfully, this is an auth/connection error
+        // If we never connected successfully and no specific error was set, show a generic message
         if (isConnectingRef.current) {
           setConnectError('Connection failed — check URL and token');
           setIsConnecting(false);
@@ -413,7 +384,7 @@ export function useGateway() {
     isConnectingRef.current = true;
     setConnectError(null);
     client.connect();
-  }, [handleAgentEvent, loadHistory, loadSessions, loadAgentIdentity]);
+  }, [handleAgentEvent, loadHistory, loadSessions, loadAgents, loadAgentIdentity]);
 
   // On mount: try stored credentials
   const initRef = useRef(false);
@@ -424,14 +395,6 @@ export function useGateway() {
     if (stored) {
       // Init on mount — setupClient sets state as part of establishing the connection
       setupClient(stored.url, stored.token, stored.authMode || 'token', stored.clientId);
-    } else if (window.location.protocol === 'https:') {
-      // HTTPS implies a reverse-proxy deployment with authentication handled
-      // upstream (e.g. an identity-aware proxy, SSO gate, or similar).
-      // Auto-connect to the gateway WebSocket on the same host, using an
-      // optional build-time token (VITE_GATEWAY_TOKEN) for the gateway handshake.
-      const wsUrl = `wss://${window.location.hostname}/ws`;
-      const autoToken = import.meta.env.VITE_GATEWAY_TOKEN || '';
-      setupClient(wsUrl, autoToken, 'token');
     } else {
       setAuthenticated(false);
     }
@@ -492,24 +455,16 @@ export function useGateway() {
     loadHistory(key);
   }, [loadHistory]);
 
-  const createNewSession = useCallback(async () => {
+  const createSessionWithConfig = useCallback(async (agentId: string, channel: string) => {
     const client = clientRef.current;
     if (!client) return;
 
-    const currentKey = activeSessionRef.current;
-    const currentSession = sessionsRef.current.find((s) => s.key === currentKey);
-    const targetAgentId = currentSession?.agentId || extractAgentIdFromKey(currentKey) || 'main';
-    const targetChannel = currentSession?.channel || 'webchat';
-    const expectedPrefix = `agent:${targetAgentId}:`;
-
+    const expectedPrefix = `agent:${agentId}:`;
     const fallbackKey = `${expectedPrefix}webchat-${Date.now()}`;
     let nextKey = fallbackKey;
 
     try {
-      const res = await client.send('sessions.create', {
-        channel: targetChannel,
-        agentId: targetAgentId,
-      }) as JsonPayload | undefined;
+      const res = await client.send('sessions.create', { channel, agentId }) as JsonPayload | undefined;
       const fromRoot = (typeof res?.key === 'string' && res.key)
         || (typeof res?.sessionKey === 'string' && res.sessionKey)
         || null;
@@ -523,16 +478,31 @@ export function useGateway() {
         nextKey = returnedKey;
       }
     } catch (err) {
-      console.warn('[createNewSession] sessions.create not supported, using fallback key', err);
+      console.warn('[createSession] sessions.create not supported, using fallback key', err);
     }
 
     switchSession(nextKey);
     try {
       await loadSessions();
     } catch (err) {
-      console.warn('[createNewSession] failed to refresh session list', err);
+      console.warn('[createSession] failed to refresh session list', err);
     }
   }, [switchSession, loadSessions]);
+
+  const createNewSession = useCallback(async () => {
+    const currentKey = activeSessionRef.current;
+    const currentSession = sessionsRef.current.find((s) => s.key === currentKey);
+    const targetAgentId = currentSession?.agentId || extractAgentIdFromKey(currentKey) || 'main';
+    const targetChannel = currentSession?.channel || 'webchat';
+    await createSessionWithConfig(targetAgentId, targetChannel);
+  }, [createSessionWithConfig]);
+
+  const createSessionForAgent = useCallback(async (agentId: string) => {
+    const currentKey = activeSessionRef.current;
+    const currentSession = sessionsRef.current.find((s) => s.key === currentKey);
+    const targetChannel = currentSession?.channel || 'webchat';
+    await createSessionWithConfig(agentId, targetChannel);
+  }, [createSessionWithConfig]);
 
   const login = useCallback((url: string, token: string, authMode: AuthMode = 'token', clientId?: string) => {
     setupClient(url, token, authMode, clientId);
@@ -542,15 +512,17 @@ export function useGateway() {
     try {
       await clientRef.current?.send('sessions.delete', { key, deleteTranscript: true });
     } catch {
-      // Ignore delete failures — blacklist will hide it anyway
+      // If the gateway rejects the delete, don't blacklist — the session still exists
+      // and hiding it would make it permanently invisible until localStorage is cleared.
+      return;
     }
-    // Persist to blacklist so it stays hidden after refresh
+    // Only blacklist and hide if the delete actually succeeded
     addDeletedSession(key);
     // Remove from local state
     setSessions(prev => prev.filter(s => s.key !== key));
-    // If we deleted the active session, switch to main
+    // If we deleted the active session, switch back to the configured default session
     if (activeSessionRef.current === key) {
-      const mainKey = 'agent:gateway-lucian:main';
+      const mainKey = import.meta.env.VITE_AGENT_SESSION || 'agent:main:main';
       setActiveSession(mainKey);
       activeSessionRef.current = mainKey;
       setMessages([]);
@@ -594,8 +566,9 @@ export function useGateway() {
   }, []);
 
   return {
-    status, messages, sessions: enrichedSessions, activeSession, isGenerating, isLoadingHistory,
-    sendMessage, abort, switchSession, createNewSession, loadSessions, deleteSession,
+    status, messages, sessions: enrichedSessions, agents, activeSession, isGenerating, isLoadingHistory,
+    isSessionsLoaded,
+    sendMessage, abort, switchSession, createNewSession, createSessionForAgent, loadSessions, deleteSession,
     authenticated, login, logout, connectError, isConnecting, agentIdentity,
     getClient, addEventListener,
   };

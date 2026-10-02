@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GatewayClient, JsonPayload } from '../lib/gateway';
 import type { ChatMessage, MessageBlock } from '../types';
-import { isSystemEvent } from '../lib/systemEvent';
+import { parseHistoryMessages } from '../lib/historyParser';
 import { extractText, extractThinking } from '../lib/messageExtract';
 import type { ChatPayloadMessage } from '../lib/messageExtract';
 
@@ -28,56 +28,7 @@ export function useSecondarySession(
       const res = await getClient()?.send('chat.history', { sessionKey: key, limit: 100 });
       const rawMsgs = res?.messages as Array<Record<string, unknown>> | undefined;
       if (!rawMsgs) return;
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      const msgs: ChatMessage[] = rawMsgs.map((m: Record<string, any>, i: number) => {
-        const blocks: MessageBlock[] = [];
-        if (m.content) {
-          if (Array.isArray(m.content)) {
-            for (const block of m.content) {
-              if (block.type === 'text') blocks.push({ type: 'text', text: block.text });
-              else if (block.type === 'thinking') blocks.push({ type: 'thinking', text: block.thinking || block.text || '' });
-              else if (block.type === 'image') {
-                const src = block.source || {};
-                blocks.push({ type: 'image', mediaType: src.media_type || block.media_type || 'image/png', data: src.data || block.data, url: block.url || src.url });
-              }
-              else if (block.type === 'image_url') {
-                blocks.push({ type: 'image', mediaType: 'image/png', url: block.image_url?.url || block.url });
-              }
-              else if (block.type === 'tool_use') blocks.push({ type: 'tool_use', name: block.name, input: block.input, id: block.id });
-              else if (block.type === 'tool_result') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.tool_use_id });
-              else if (block.type === 'toolCall') blocks.push({ type: 'tool_use', name: block.name, input: block.arguments || block.input, id: block.id });
-              else if (block.type === 'toolResult') blocks.push({ type: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content, null, 2), toolUseId: block.toolCallId || block.tool_use_id, name: block.name });
-            }
-          } else if (typeof m.content === 'string') {
-            blocks.push({ type: 'text', text: m.content });
-          }
-        }
-        const role: 'user' | 'assistant' = m.role === 'user' ? 'user' : 'assistant';
-        if (m.role === 'toolResult') {
-          const toolBlocks: MessageBlock[] = blocks.map(b => {
-            if (b.type === 'text') return { type: 'tool_result' as const, content: b.text, toolUseId: m.toolCallId };
-            return b;
-          });
-          return { id: m.id || `hist-${i}`, role: 'assistant' as const, content: '', timestamp: m.timestamp || Date.now(), blocks: toolBlocks, isToolResult: true };
-        }
-        const textContent = blocks.filter((b): b is Extract<MessageBlock, { type: 'text' }> => b.type === 'text').map(b => b.text).join('');
-        const metadata: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(m)) {
-          if (['content', 'blocks'].includes(k)) continue;
-          metadata[k] = v;
-        }
-        return { id: m.id || `hist-${i}`, role, content: textContent, timestamp: m.timestamp || Date.now(), blocks, metadata, isSystemEvent: role === 'user' && isSystemEvent(textContent) };
-      });
-      /* eslint-enable @typescript-eslint/no-explicit-any */
-      const merged: ChatMessage[] = [];
-      for (const msg of msgs) {
-        const isToolResult = 'isToolResult' in msg && (msg as ChatMessage & { isToolResult?: boolean }).isToolResult;
-        if (isToolResult && merged.length > 0 && merged[merged.length - 1].role === 'assistant') {
-          merged[merged.length - 1] = { ...merged[merged.length - 1], blocks: [...merged[merged.length - 1].blocks, ...msg.blocks] };
-        } else if (!isToolResult) {
-          merged.push(msg);
-        }
-      }
+      const merged = parseHistoryMessages(rawMsgs as Array<Record<string, any>>); // eslint-disable-line @typescript-eslint/no-explicit-any
       setMessages(merged);
     } catch {
       // ignore

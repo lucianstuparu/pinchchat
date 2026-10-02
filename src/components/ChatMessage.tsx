@@ -15,6 +15,7 @@ import { Bot, User, Wrench, Copy, Check, CheckCheck, RefreshCw, Zap, Info, Webho
 import { t, getLocale } from '../lib/i18n';
 import { useLocale } from '../hooks/useLocale';
 import { stripWebhookScaffolding, hasWebhookScaffolding, hasWebchatEnvelope, stripWebchatEnvelope } from '../lib/systemEvent';
+import { autoFormatText } from '../lib/autoFormat';
 // ChevronDown, ChevronRight, Wrench still used by InternalOnlyMessage
 
 /** Avatar image with fallback to Bot icon on load error */
@@ -72,102 +73,6 @@ function Timestamp({ ts, className }: { ts: number; className?: string }) {
   );
 }
 
-/** Guess a language hint from content patterns */
-function guessLanguage(lines: string[]): string {
-  const joined = lines.join('\n');
-  if (/^import .+ from ['"]/.test(joined) || /^export (function|const|default|class|interface|type) /.test(joined) || /React\./.test(joined) || /<\w+[\s/>]/.test(joined) && /className=/.test(joined)) return 'tsx';
-  if (/^(import|export|const|let|var|function|class|interface|type) /.test(joined) || /=>\s*{/.test(joined) || /: (string|number|boolean|any)\b/.test(joined)) return 'typescript';
-  if (/^(use |fn |let mut |pub |impl |struct |enum |mod |crate::)/.test(joined) || /-> (Self|Result|Option|Vec|String|bool|i32|u32)/.test(joined)) return 'rust';
-  if (/^(def |class |import |from .+ import |if __name__)/.test(joined) || /self\.\w+/.test(joined) && !/this\./.test(joined)) return 'python';
-  if (/^\s*(server|location|upstream|proxy_pass|listen \d)/.test(joined)) return 'nginx';
-  if (/^\[.*\]\s*$/.test(lines[0] || '') && /=/.test(joined)) return 'ini';
-  if (/^(apiVersion|kind|metadata|spec):/.test(joined)) return 'yaml';
-  if (/^\{/.test(joined.trim()) && /\}$/.test(joined.trim())) return 'json';
-  if (/^#!\/(bin|usr)/.test(joined) || /^\s*(if \[|then|fi|echo |export |source )/.test(joined)) return 'bash';
-  if (/^(<!DOCTYPE|<html|<div|<head|<body)/.test(joined)) return 'html';
-  if (/^\.\w+\s*\{|^@(media|keyframes|import)/.test(joined)) return 'css';
-  if (/^(SELECT|INSERT|CREATE|ALTER|DROP|UPDATE) /i.test(joined)) return 'sql';
-  return '';
-}
-
-/** Detect if a block of lines looks like code */
-function looksLikeCode(lines: string[]): boolean {
-  if (lines.length < 2) return false;
-  // If text contains markdown formatting, it's probably prose, not code
-  const joined = lines.join('\n');
-  if (/\*\*[^*]+\*\*/.test(joined) || /^#{1,6}\s/m.test(joined) || /^\s*[-*+]\s/m.test(joined)) return false;
-  let codeSignals = 0;
-  const patterns = [
-    /^(import|export|const|let|var|function|class|interface|type|enum|struct|fn|pub|use|def|from|module|package|namespace)\s/,
-    /[{};]\s*$/,
-    /^\s*(if|else|for|while|return|match|switch|case|break|continue)\b/,
-    /^\s*(\/\/|\/\*)/,
-    /^\s*#\s*(?:include|define|ifdef|ifndef|endif|pragma|import)\b/,
-    /[├└│┬─]──/,
-    /^\s+\w+\(.*\)/,
-    /^\s*<\/?[A-Z]\w*/,
-    /=>\s*[{(]/,
-    /\.\w+\(.*\)\s*[;,]?\s*$/,
-  ];
-  for (const line of lines) {
-    for (const pat of patterns) {
-      if (pat.test(line)) { codeSignals++; break; }
-    }
-  }
-  return codeSignals / lines.length > 0.3;
-}
-
-/** Auto-wrap unformatted code/terminal output in fenced code blocks */
-function autoFormatText(text: string): string {
-  // Already has code fences — leave as-is
-  if (text.includes('```')) return text;
-
-  const lines = text.split('\n');
-
-  // If most of the text looks like code, wrap the whole thing
-  const nonEmptyLines = lines.filter(l => l.trim());
-  if (nonEmptyLines.length >= 3 && looksLikeCode(nonEmptyLines)) {
-    const lang = guessLanguage(nonEmptyLines);
-    return '```' + lang + '\n' + text + '\n```';
-  }
-
-  // Otherwise, detect contiguous code blocks within prose
-  const result: string[] = [];
-  let codeBuffer: string[] = [];
-
-  const flushCode = () => {
-    if (codeBuffer.length >= 3 && looksLikeCode(codeBuffer)) {
-      const lang = guessLanguage(codeBuffer);
-      result.push('```' + lang);
-      result.push(...codeBuffer);
-      result.push('```');
-    } else {
-      result.push(...codeBuffer);
-    }
-    codeBuffer = [];
-  };
-
-  const isCodeLine = (line: string): boolean => {
-    return /^[\s]+(import|export|const|let|var|function|return|if|else|for)/.test(line)
-      || /[{};]\s*$/.test(line)
-      || /^\s*\/\//.test(line)
-      || /[├└│┬─]──/.test(line)
-      || /^\s+\w+\(.*\)/.test(line);
-  };
-
-  for (const line of lines) {
-    if (isCodeLine(line) || (codeBuffer.length > 0 && (line.trim() === '' || /^\s{2,}/.test(line)))) {
-      codeBuffer.push(line);
-    } else {
-      flushCode();
-      result.push(line);
-    }
-  }
-  flushCode();
-
-  return result.join('\n');
-}
-
 function getTextBlocks(blocks: MessageBlock[]): MessageBlock[] {
   return blocks.filter(b => b.type === 'text' && b.text.trim());
 }
@@ -217,6 +122,7 @@ function CollapsibleContent({ content, isStreaming, children }: { content: strin
           <button
             onClick={() => setExpanded(false)}
             className="mt-2 flex items-center gap-1 text-xs text-pc-accent-light hover:text-pc-accent transition-colors"
+            aria-label={t('message.showLess')}
           >
             <ChevronDown size={12} className="rotate-180" />
             <span>{t('message.showLess')}</span>
@@ -235,6 +141,7 @@ function CollapsibleContent({ content, isStreaming, children }: { content: strin
       <button
         onClick={() => setExpanded(true)}
         className="relative mt-1 flex items-center gap-1 text-xs text-pc-accent-light hover:text-pc-accent transition-colors"
+        aria-label={t('message.showMore')}
       >
         <ChevronDown size={12} />
         <span>{t('message.showMore')}</span>
@@ -408,6 +315,12 @@ function RawJsonPanel({ message }: { message: ChatMessageType }) {
   );
 }
 
+interface SelectionActionState {
+  text: string;
+  top: number;
+  left: number;
+}
+
 /** Extract plain text from message blocks for clipboard copy */
 function getPlainText(message: ChatMessageType): string {
   if (message.blocks.length > 0) {
@@ -448,11 +361,14 @@ function SystemEventMessage({ message }: { message: ChatMessageType }) {
   );
 }
 
-export const ChatMessageComponent = memo(function ChatMessageComponent({ message: rawMessage, onRetry, onReply, agentAvatarUrl, isFirstInGroup = true, isBookmarked = false, onToggleBookmark }: { message: ChatMessageType; onRetry?: (text: string) => void; onReply?: (preview: string) => void; agentAvatarUrl?: string; isFirstInGroup?: boolean; isBookmarked?: boolean; onToggleBookmark?: () => void }) {
+export const ChatMessageComponent = memo(function ChatMessageComponent({ message: rawMessage, onRetry, onReply, onUseSelection, agentAvatarUrl, isFirstInGroup = true, isBookmarked = false, onToggleBookmark }: { message: ChatMessageType; onRetry?: (text: string) => void; onReply?: (preview: string) => void; onUseSelection?: (text: string) => void; agentAvatarUrl?: string; isFirstInGroup?: boolean; isBookmarked?: boolean; onToggleBookmark?: () => void }) {
   useLocale(); // re-render on locale change
   const { resolvedTheme } = useTheme();
   const isLight = resolvedTheme === 'light' || resolvedTheme === 'sand';
   const [showRawJson, setShowRawJson] = useState(false);
+  const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const selectionButtonRef = useRef<HTMLButtonElement>(null);
 
   // Strip webhook/hook scaffolding and webchat envelope from user messages before rendering
   const message = useMemo(() => {
@@ -497,6 +413,69 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
 
   const isUser = message.role === 'user';
 
+  const clearSelectionAction = useCallback(() => {
+    setSelectionAction(null);
+  }, []);
+
+  const updateSelectionAction = useCallback(() => {
+    if (isUser || message.isStreaming || !onUseSelection) {
+      setSelectionAction(null);
+      return;
+    }
+
+    const selection = window.getSelection();
+    const bubble = bubbleRef.current;
+    if (!selection || !bubble || selection.rangeCount === 0 || selection.isCollapsed) {
+      setSelectionAction(null);
+      return;
+    }
+
+    const text = selection.toString().trim();
+    if (!text || text.length > 1500) {
+      setSelectionAction(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    if (!bubble.contains(common.nodeType === Node.TEXT_NODE ? common.parentNode : common)) {
+      setSelectionAction(null);
+      return;
+    }
+
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) {
+      setSelectionAction(null);
+      return;
+    }
+
+    setSelectionAction({
+      text,
+      top: Math.max(12, rect.top - 40),
+      left: rect.left + (rect.width / 2),
+    });
+  }, [isUser, message.isStreaming, onUseSelection]);
+
+  useEffect(() => {
+    if (!onUseSelection || isUser) return;
+
+    const handleSelectionChange = () => {
+      requestAnimationFrame(updateSelectionAction);
+    };
+    const handlePointerDown = (e: MouseEvent) => {
+      if (selectionButtonRef.current?.contains(e.target as Node)) return;
+      if (bubbleRef.current?.contains(e.target as Node)) return;
+      clearSelectionAction();
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [clearSelectionAction, isUser, onUseSelection, updateSelectionAction]);
+
   // System events render as subtle inline notifications
   if (message.isSystemEvent) {
     return <SystemEventMessage message={rawMessage} />;
@@ -527,13 +506,18 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
 
       {/* Bubble */}
       <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-        <div className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full overflow-hidden ${
+        <div
+          ref={bubbleRef}
+          onMouseUp={updateSelectionAction}
+          onKeyUp={updateSelectionAction}
+          className={`group relative inline-block text-left rounded-3xl px-4 py-3 text-sm leading-relaxed max-w-full overflow-hidden ${
           isUser
             ? (isLight
                 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-text border border-[rgba(var(--pc-accent-rgb),0.3)]'
                 : 'bg-[rgba(var(--pc-accent-rgb),0.08)] text-pc-text border border-[rgba(var(--pc-accent-rgb),0.2)]')
             : 'bg-pc-elevated/40 text-pc-text border border-pc-border shadow-[0_0_0_1px_rgba(255,255,255,0.03)]'
-        }`}>
+        }`}
+        >
           {/* User-visible text */}
           {!isUser ? (
             <CollapsibleContent content={message.content || ''} isStreaming={message.isStreaming}>
@@ -625,6 +609,30 @@ export const ChatMessageComponent = memo(function ChatMessageComponent({ message
             <RawJsonToggle isOpen={showRawJson} onToggle={() => setShowRawJson(o => !o)} />
           </div>
         </div>
+        {!isUser && selectionAction && onUseSelection && createPortal(
+          <button
+            ref={selectionButtonRef}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onUseSelection(selectionAction.text);
+              window.getSelection()?.removeAllRanges();
+              clearSelectionAction();
+            }}
+            className="fixed z-[9999] -translate-x-1/2 inline-flex items-center gap-2 rounded-2xl border border-white/8 bg-[rgba(26,26,29,0.96)] px-3.5 py-2 text-[13px] font-medium text-white shadow-[0_12px_28px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all hover:bg-[rgba(36,36,40,0.98)]"
+            style={{ top: selectionAction.top, left: selectionAction.left }}
+            aria-label={t('message.askInChat')}
+            title={t('message.askInChat')}
+          >
+            <span className="text-base leading-none text-white/90">❞</span>
+            <span>{t('message.askInChat')}</span>
+          </button>,
+          document.body
+        )}
         {(message.timestamp || wasWebhookMessage || isBookmarked) && (
           <div className={`mt-1 flex items-center gap-1.5 text-[11px] text-pc-text-muted ${isUser ? 'justify-end pr-2' : 'pl-2'}`}>
             {isBookmarked && (
