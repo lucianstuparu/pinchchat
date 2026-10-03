@@ -46,19 +46,24 @@ function isCliImportedStep(msg: ChatMessage): boolean {
 
 /**
  * History stores a claude-cli turn twice: the imported step messages and one combined reply that
- * repeats their text. Keep the combined reply and drop the steps of any turn that has one. A turn
- * runs from one user message to the next; turns without a combined reply are left as they are.
+ * repeats their text. Keep the combined reply and drop the steps of any turn that has one. The
+ * combined reply itself can carry the imported mark too (resumed sessions), so it is never dropped.
+ * A turn runs from one real user message to the next (system events do not end it); turns without
+ * a combined reply are left as they are.
  */
 export function collapseCliTurns(messages: ChatMessage[]): ChatMessage[] {
   const out: ChatMessage[] = [];
   let turn: ChatMessage[] = [];
   const flush = () => {
     const combined = turn.some(isCliCombinedReply);
-    for (const m of turn) if (!(combined && isCliImportedStep(m))) out.push(m);
+    for (const m of turn) {
+      if (combined && isCliImportedStep(m) && !isCliCombinedReply(m)) continue;
+      out.push(m);
+    }
     turn = [];
   };
   for (const m of messages) {
-    if (m.role === 'user') { flush(); out.push(m); } else turn.push(m);
+    if (m.role === 'user' && !m.isSystemEvent) { flush(); out.push(m); } else turn.push(m);
   }
   flush();
   return out;

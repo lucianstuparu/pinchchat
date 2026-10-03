@@ -57,4 +57,16 @@ describe('claude-cli turn collapsing', () => {
     const out = collapseCliTurns([user('u1'), step('s1', 'a'), combined('c1', 'a'), user('u2'), step('s2', 'b')]);
     expect(out.map(m => m.id)).toEqual(['u1', 'c1', 'u2', 's2']);
   });
+
+  it('keeps a combined reply that is itself marked imported (resumed sessions)', () => {
+    const importedCombined = msg({ id: 'c1', blocks: [{ type: 'text', text: '7:24 AM' }], metadata: { api: 'cli', __openclaw: { importedFrom: 'claude-cli' } } });
+    const out = collapseCliTurns([user('u1'), tool('t1'), importedCombined]);
+    expect(out.map(m => m.id)).toEqual(['u1', 'c1']);
+  });
+
+  it('does not end a turn at a system event', () => {
+    const sys = msg({ id: 'sys', role: 'user', isSystemEvent: true, blocks: [{ type: 'text', text: 'System: connected' }] });
+    const out = collapseCliTurns([user('u1'), step('s1', 'a'), sys, step('s2', 'b'), combined('c1', 'a\n\nb')]);
+    expect(out.map(m => m.id)).toEqual(['u1', 'sys', 'c1']);
+  });
 });
