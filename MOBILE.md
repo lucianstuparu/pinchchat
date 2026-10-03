@@ -15,10 +15,12 @@ Upstream PinchChat stays fully available behind the menu's **Advanced** entry.
   warm browns, terracotta accent), set as CSS variables on the messenger root —
   including Tailwind's `--color-pc-*` tokens, which resolve at `:root` and would
   otherwise ignore an override on a descendant. The full UI keeps the user's theme.
+- **Avatars**: OpenClaw logo and a person icon on the first message of each run.
 - **Reply to a message**: swipe a bubble right, or long-press (right-click on
   desktop) → Reply / Copy. The reply is sent with the quoted text as a Markdown
   blockquote, so the agent sees what it answers; a quoted reply's own quote is
-  not nested.
+  not nested. Bubbles set `touch-action: pan-y`; without it Chrome on Android
+  claims the sideways drag and the swipe never reaches the handler.
 - **Android Share Target** (`public/manifest.json` `share_target`,
   `public/sw.js` share block, `src/share/`): text, URLs, images, PDFs, audio
   shared from other apps open in the composer, **never auto-sent**, so a note

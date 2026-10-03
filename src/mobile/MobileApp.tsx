@@ -235,21 +235,23 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
         {shown.map((msg, i) => {
           const prev = shown[i - 1];
           const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
+          const firstOfRun = newDay || prev.role !== msg.role;
           return (
-            <div key={msg.id}>
+            <div key={msg.id} className={firstOfRun && i > 0 ? 'pt-1.5' : undefined}>
               {newDay && (
                 <div className="flex justify-center py-2">
                   <span className="rounded-lg bg-pc-surface px-3 py-1 text-[12px] text-pc-text-muted shadow-sm">{dayLabel(msg.timestamp)}</span>
                 </div>
               )}
-              <MessageBubble msg={msg} onRetry={retry} onReply={onReply} />
+              <MessageBubble msg={msg} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} />
             </div>
           );
         })}
 
-        {outbox.map(item => (
+        {outbox.map((item, i) => (
           <MessageBubble
             key={item.id}
+            showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
             msg={{ id: item.id, role: 'user', content: item.text, timestamp: item.queuedAt, blocks: [{ type: 'text', text: item.text || `📎 ${item.attachments.length} attachment(s)` }], sendStatus: 'sending' }}
           />
         ))}

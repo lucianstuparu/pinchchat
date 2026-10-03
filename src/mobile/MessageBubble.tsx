@@ -1,5 +1,5 @@
 import { memo, useRef, useState } from 'react';
-import { AlertCircle, Check, Clock, Copy, FileText, Reply } from 'lucide-react';
+import { AlertCircle, Check, Clock, Copy, FileText, Reply, User } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
@@ -26,13 +26,26 @@ interface Props {
   onRetry?: (msg: ChatMessage) => void;
   /** Enables swipe-right and long-press → Reply (WhatsApp-style). */
   onReply?: (msg: ChatMessage) => void;
+  /** First message of a run shows the sender's avatar; the rest keep its space. */
+  showAvatar?: boolean;
+}
+
+function Avatar({ mine, visible }: { mine: boolean; visible: boolean }) {
+  if (!visible) return <span className="w-7 shrink-0" aria-hidden />;
+  return mine ? (
+    <span className="mt-0.5 h-7 w-7 shrink-0 self-start rounded-full bg-pc-accent text-white flex items-center justify-center shadow-sm" aria-label="You">
+      <User size={16} />
+    </span>
+  ) : (
+    <img src="/logo-192.png" alt="OpenClaw" className="mt-0.5 h-7 w-7 shrink-0 self-start rounded-full shadow-sm" />
+  );
 }
 
 const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply }: Props) {
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true }: Props) {
   const mine = msg.role === 'user';
   const text = visibleText(msg);
   const images = msg.blocks.filter(b => b.type === 'image') as Array<{ type: 'image'; mediaType: string; data?: string; url?: string }>;
@@ -86,10 +99,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   };
 
   return (
-    <div className={`relative flex px-3 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {!mine && <Avatar mine={false} visible={showAvatar} />}
       {dx > 0 && (
         <span
-          className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
+          className="absolute left-2 z-[1] top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
           style={{ opacity: dx / SWIPE_TRIGGER }}
           aria-hidden
         >
@@ -102,8 +116,10 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
         onContextMenu={canReply ? e => { e.preventDefault(); setMenu(true); } : undefined}
-        style={dx ? { transform: `translateX(${dx}px)` } : undefined}
-        className={`relative max-w-[85%] rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${dx ? '' : 'transition-transform'} ${
+        // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
+        // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
+        style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${dx}px)` } : {}) }}
+        className={`relative max-w-[80%] rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${dx ? '' : 'transition-transform'} ${
           canReply ? 'select-none [-webkit-touch-callout:none]' : ''
         } ${
           mine
@@ -160,6 +176,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           </div>
         )}
       </div>
+      {mine && <Avatar mine visible={showAvatar} />}
       {menu && <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />}
     </div>
   );
