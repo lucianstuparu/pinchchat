@@ -12,7 +12,7 @@ import { LoginScreen } from '../components/LoginScreen';
 import { getStoredCredentials } from '../lib/credentials';
 import type { ChatMessage } from '../types';
 import { MessageBubble } from './MessageBubble';
-import { isShownInMessenger, visibleText } from './messageView';
+import { collapseCliTurns, isShownInMessenger, visibleText } from './messageView';
 import { Composer, type ComposerPrefill } from './Composer';
 import { QuestionCard } from './QuestionCard';
 import { useQuestions } from './useQuestions';
@@ -155,7 +155,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   }, [messages, notify]);
 
   // ---- Scrolling -----------------------------------------------------------
-  const shown = useMemo(() => messages.filter(isShownInMessenger), [messages]);
+  const shown = useMemo(() => collapseCliTurns(messages).filter(isShownInMessenger), [messages]);
 
   const scrollToBottom = useCallback((smooth = true) => {
     const el = scrollRef.current;

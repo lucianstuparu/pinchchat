@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isShownInMessenger, visibleText } from '../messageView';
+import { collapseCliTurns, isShownInMessenger, visibleText } from '../messageView';
 import type { ChatMessage } from '../../types';
 
 const msg = (over: Partial<ChatMessage>): ChatMessage => ({
@@ -34,5 +34,27 @@ describe('messenger visibility', () => {
   it('shows only the text blocks of a mixed turn', () => {
     const m = msg({ blocks: [{ type: 'thinking', text: 'plan' }, { type: 'tool_use', name: 'x', input: {} }, { type: 'text', text: 'done' }] });
     expect(visibleText(m)).toBe('done');
+  });
+});
+
+describe('claude-cli turn collapsing', () => {
+  const step = (id: string, text: string) => msg({ id, blocks: [{ type: 'text', text }], metadata: { __openclaw: { importedFrom: 'claude-cli' } } });
+  const tool = (id: string) => msg({ id, blocks: [{ type: 'tool_use', name: 'Bash', input: {} }], metadata: { __openclaw: { importedFrom: 'claude-cli' } } });
+  const combined = (id: string, text: string) => msg({ id, blocks: [{ type: 'text', text }], metadata: { api: 'cli', idempotencyKey: 'cli-assistant:x' } });
+  const user = (id: string) => msg({ id, role: 'user', blocks: [{ type: 'text', text: 'q' }] });
+
+  it('keeps only the combined reply of a turn that has one', () => {
+    const out = collapseCliTurns([user('u1'), step('s1', 'Routing.'), tool('t1'), step('s2', 'done'), combined('c1', 'Routing.\n\ndone')]);
+    expect(out.map(m => m.id)).toEqual(['u1', 'c1']);
+  });
+
+  it('leaves turns without a combined reply untouched (still running, or other backends)', () => {
+    const out = collapseCliTurns([user('u1'), step('s1', 'a'), user('u2'), msg({ id: 'p', blocks: [{ type: 'text', text: 'b' }] })]);
+    expect(out.map(m => m.id)).toEqual(['u1', 's1', 'u2', 'p']);
+  });
+
+  it('collapses each turn independently', () => {
+    const out = collapseCliTurns([user('u1'), step('s1', 'a'), combined('c1', 'a'), user('u2'), step('s2', 'b')]);
+    expect(out.map(m => m.id)).toEqual(['u1', 'c1', 'u2', 's2']);
   });
 });
