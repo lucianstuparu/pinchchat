@@ -1,0 +1,8 @@
+{
+  "name": "pinchchat-mock-gateway",
+  "private": true,
+  "type": "module",
+  "description": "Local mock of the OpenClaw gateway protocol for headless UI testing of the openclaw-pwa branch",
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": { "ws": "^8.22.0" }
+}
