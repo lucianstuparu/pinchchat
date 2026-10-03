@@ -12,11 +12,12 @@ import { LoginScreen } from '../components/LoginScreen';
 import { getStoredCredentials } from '../lib/credentials';
 import type { ChatMessage } from '../types';
 import { MessageBubble } from './MessageBubble';
-import { collapseCliTurns, isShownInMessenger, visibleText } from './messageView';
+import { collapseCliTurns, isShownInMessenger, visibleText, withoutLeadingQuote } from './messageView';
 import { Composer, type ComposerPrefill } from './Composer';
 import { QuestionCard } from './QuestionCard';
 import { useQuestions } from './useQuestions';
 import { switchUiMode } from './uiMode';
+import { WARM_VARS, useWarmChrome } from './warmTheme';
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 
@@ -59,7 +60,11 @@ function dayLabel(ts: number): string {
 
 export default function MobileApp() {
   const gw = useGateway();
+  useWarmChrome();
+  return <div style={WARM_VARS} className="bg-pc-base text-pc-text">{mobileScreen(gw)}</div>;
+}
 
+function mobileScreen(gw: ReturnType<typeof useGateway>) {
   if (gw.authenticated === null) {
     return <div className="h-dvh flex items-center justify-center bg-pc-base text-pc-text-muted text-sm">Connecting…</div>;
   }
@@ -82,6 +87,10 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [outbox, setOutbox] = useState<OutboxItem[]>(loadOutbox);
   const [atBottom, setAtBottom] = useState(true);
+  const [replyTo, setReplyTo] = useState<{ text: string; mine: boolean } | null>(null);
+  const onReply = useCallback((msg: ChatMessage) => {
+    setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || '📷 Photo', mine: msg.role === 'user' });
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentAttachments = useRef(new Map<string, OutgoingAttachment[]>());
   const flushing = useRef(false);
@@ -233,7 +242,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
                   <span className="rounded-lg bg-pc-surface px-3 py-1 text-[12px] text-pc-text-muted shadow-sm">{dayLabel(msg.timestamp)}</span>
                 </div>
               )}
-              <MessageBubble msg={msg} onRetry={retry} />
+              <MessageBubble msg={msg} onRetry={retry} onReply={onReply} />
             </div>
           );
         })}
@@ -254,7 +263,15 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
         </button>
       )}
 
-      <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} />
+      <Composer
+        key={prefill?.nonce ?? 0}
+        onSend={send}
+        prefill={prefill}
+        hint={hint}
+        onHintDismiss={() => setHint(null)}
+        replyTo={replyTo}
+        onReplyCancel={() => setReplyTo(null)}
+      />
     </div>
   );
 }

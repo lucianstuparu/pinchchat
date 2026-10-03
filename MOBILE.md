@@ -7,9 +7,18 @@ Upstream PinchChat stays fully available behind the menu's **Advanced** entry.
 ## What it adds
 
 - **Messenger UI** (`src/mobile/`): one conversation, bubbles (mine right,
-  OpenClaw left), timestamps, date separators, typing indicator, sent ticks,
-  system light/dark via the existing theme system. Tool calls, thinking blocks,
-  heartbeats and system events are hidden — they remain in the full UI.
+  OpenClaw left), timestamps, date separators, typing indicator, sent ticks.
+  Tool calls, thinking blocks, heartbeats and system events are hidden — they
+  remain in the full UI. A claude-cli turn is shown once (the gateway's combined
+  reply), not as its imported steps plus the combined copy (`collapseCliTurns`).
+- **Warm theme** (`src/mobile/warmTheme.ts`): its own light palette (parchment,
+  warm browns, terracotta accent), set as CSS variables on the messenger root —
+  including Tailwind's `--color-pc-*` tokens, which resolve at `:root` and would
+  otherwise ignore an override on a descendant. The full UI keeps the user's theme.
+- **Reply to a message**: swipe a bubble right, or long-press (right-click on
+  desktop) → Reply / Copy. The reply is sent with the quoted text as a Markdown
+  blockquote, so the agent sees what it answers; a quoted reply's own quote is
+  not nested.
 - **Android Share Target** (`public/manifest.json` `share_target`,
   `public/sw.js` share block, `src/share/`): text, URLs, images, PDFs, audio
   shared from other apps open in the composer, **never auto-sent**, so a note

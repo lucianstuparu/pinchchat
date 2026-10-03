@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { AlertCircle, Check, Clock, FileText } from 'lucide-react';
+import { memo, useRef, useState } from 'react';
+import { AlertCircle, Check, Clock, Copy, FileText, Reply } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
@@ -24,18 +24,88 @@ const MD_CLASSES =
 interface Props {
   msg: ChatMessage;
   onRetry?: (msg: ChatMessage) => void;
+  /** Enables swipe-right and long-press → Reply (WhatsApp-style). */
+  onReply?: (msg: ChatMessage) => void;
 }
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props) {
+const SWIPE_MAX = 72;
+const SWIPE_TRIGGER = 56;
+const LONG_PRESS_MS = 450;
+
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply }: Props) {
   const mine = msg.role === 'user';
   const text = visibleText(msg);
   const images = msg.blocks.filter(b => b.type === 'image') as Array<{ type: 'image'; mediaType: string; data?: string; url?: string }>;
   const typing = msg.isStreaming && !text;
+  const canReply = !!onReply && !msg.isStreaming && (text.length > 0 || images.length > 0);
+
+  const [dx, setDx] = useState(0);
+  const [menu, setMenu] = useState(false);
+  const touch = useRef<{ x: number; y: number; horizontal: boolean | null; timer: number | null; armed: boolean } | null>(null);
+
+  const clearTimer = () => {
+    if (touch.current?.timer) window.clearTimeout(touch.current.timer);
+    if (touch.current) touch.current.timer = null;
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (!canReply) return;
+    const t = e.touches[0];
+    touch.current = {
+      x: t.clientX, y: t.clientY, horizontal: null, armed: false,
+      timer: window.setTimeout(() => { setMenu(true); navigator.vibrate?.(10); }, LONG_PRESS_MS),
+    };
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const s = touch.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const mx = t.clientX - s.x;
+    const my = t.clientY - s.y;
+    if (Math.abs(mx) > 8 || Math.abs(my) > 8) clearTimer();
+    if (s.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) s.horizontal = Math.abs(mx) > Math.abs(my) && mx > 0;
+    if (!s.horizontal) return;
+    const next = Math.max(0, Math.min(SWIPE_MAX, mx));
+    if (next >= SWIPE_TRIGGER && !s.armed) { s.armed = true; navigator.vibrate?.(10); }
+    if (next < SWIPE_TRIGGER) s.armed = false;
+    setDx(next);
+  };
+
+  const onTouchEnd = () => {
+    const s = touch.current;
+    clearTimer();
+    touch.current = null;
+    if (s?.armed) onReply?.(msg);
+    setDx(0);
+  };
+
+  const copy = () => {
+    setMenu(false);
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+  };
 
   return (
-    <div className={`flex px-3 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`relative flex px-3 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {dx > 0 && (
+        <span
+          className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
+          style={{ opacity: dx / SWIPE_TRIGGER }}
+          aria-hidden
+        >
+          <Reply size={16} />
+        </span>
+      )}
       <div
-        className={`relative max-w-[85%] rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        onContextMenu={canReply ? e => { e.preventDefault(); setMenu(true); } : undefined}
+        style={dx ? { transform: `translateX(${dx}px)` } : undefined}
+        className={`relative max-w-[85%] rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${dx ? '' : 'transition-transform'} ${
+          canReply ? 'select-none [-webkit-touch-callout:none]' : ''
+        } ${
           mine
             ? 'rounded-tr-md bg-[rgba(var(--pc-accent-rgb),0.18)] text-pc-text'
             : 'rounded-tl-md bg-pc-surface text-pc-text'
@@ -73,7 +143,24 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
             </button>
           )}
         </div>
+
+        {menu && (
+          <div
+            role="menu"
+            className={`absolute top-full z-20 mt-1 w-36 rounded-xl border border-pc-border bg-pc-elevated shadow-lg py-1 text-[15px] ${mine ? 'right-0' : 'left-0'}`}
+          >
+            <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenu(false); onReply?.(msg); }}>
+              <Reply size={16} /> Reply
+            </button>
+            {text && (
+              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={copy}>
+                <Copy size={16} /> Copy
+              </button>
+            )}
+          </div>
+        )}
       </div>
+      {menu && <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />}
     </div>
   );
 });

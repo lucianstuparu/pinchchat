@@ -68,3 +68,20 @@ export function collapseCliTurns(messages: ChatMessage[]): ChatMessage[] {
   flush();
   return out;
 }
+
+/** Markdown blockquote of the message being replied to, prepended to the reply (WhatsApp-style). */
+export function quoteForReply(text: string, max = 300): string {
+  const flat = text.trim();
+  const cut = flat.length > max ? flat.slice(0, max).trimEnd() + '…' : flat;
+  return cut.split('\n').map(line => (line.trim() ? `> ${line}` : '>')).join('\n');
+}
+
+/** A reply's own text without the quote it carries, so quoting it does not nest quotes. */
+export function withoutLeadingQuote(text: string): string {
+  const lines = text.split('\n');
+  let i = 0;
+  while (i < lines.length && /^\s*>/.test(lines[i])) i++;
+  if (i === 0) return text;
+  while (i < lines.length && !lines[i].trim()) i++;
+  return i < lines.length ? lines.slice(i).join('\n') : text;
+}

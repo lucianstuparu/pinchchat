@@ -9,8 +9,8 @@
   "display_override": [
     "standalone"
   ],
-  "background_color": "#efeae2",
-  "theme_color": "#00a884",
+  "background_color": "#f4ebdf",
+  "theme_color": "#fdf7ef",
   "orientation": "portrait",
   "categories": [
     "productivity",

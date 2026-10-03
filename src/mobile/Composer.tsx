@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, SendHorizontal } from 'lucide-react';
 import { AttachmentChip } from './MessageBubble';
+import { quoteForReply } from './messageView';
 import { encodeAttachment, AttachmentTooLargeError, type OutgoingAttachment } from './attachments';
 
 export interface ComposerPrefill {
@@ -20,11 +21,14 @@ interface Props {
   /** Shown above the field, e.g. "Shared from another app — add a note" */
   hint?: string | null;
   onHintDismiss?: () => void;
+  /** Message being replied to; its quote is prepended on send. */
+  replyTo?: { text: string; mine: boolean } | null;
+  onReplyCancel?: () => void;
 }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
-export function Composer({ onSend, prefill, hint, onHintDismiss }: Props) {
+export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel }: Props) {
   const [text, setText] = useState(() => (prefill?.text ? prefill.text + '\n' : ''));
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +45,11 @@ export function Composer({ onSend, prefill, hint, onHintDismiss }: Props) {
     ta.setSelectionRange(ta.value.length, ta.value.length);
   }, [prefill]);
 
+  // Choosing Reply opens the keyboard, like WhatsApp
+  useEffect(() => {
+    if (replyTo) taRef.current?.focus();
+  }, [replyTo]);
+
   // Auto-grow up to ~6 lines
   useEffect(() => {
     const ta = taRef.current;
@@ -53,11 +62,13 @@ export function Composer({ onSend, prefill, hint, onHintDismiss }: Props) {
 
   const send = () => {
     if (!canSend) return;
-    onSend(text.trim(), attachments);
+    const body = text.trim();
+    onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${body}` : body, attachments);
     setText('');
     setAttachments([]);
     setError(null);
     onHintDismiss?.();
+    onReplyCancel?.();
   };
 
   const addFiles = async (files: FileList | null) => {
@@ -83,6 +94,15 @@ export function Composer({ onSend, prefill, hint, onHintDismiss }: Props) {
         <div className="mx-1 mb-1.5 flex items-center justify-between rounded-lg bg-[rgba(var(--pc-accent-rgb),0.12)] px-3 py-1.5 text-xs text-pc-text">
           <span>{hint}</span>
           <button type="button" onClick={onHintDismiss} className="text-pc-text-muted" aria-label="Dismiss">×</button>
+        </div>
+      )}
+      {replyTo && (
+        <div className="mx-1 mb-1.5 flex items-start gap-2 rounded-xl border-l-4 border-pc-accent bg-pc-surface px-3 py-1.5 shadow-sm">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-pc-accent">{replyTo.mine ? 'You' : 'OpenClaw'}</p>
+            <p className="line-clamp-2 text-[13px] text-pc-text-muted break-words">{replyTo.text || '📷 Photo'}</p>
+          </div>
+          <button type="button" onClick={onReplyCancel} className="h-6 w-6 shrink-0 rounded-full text-pc-text-muted hover:bg-[var(--pc-hover-strong)]" aria-label="Cancel reply">×</button>
         </div>
       )}
       {attachments.length > 0 && (

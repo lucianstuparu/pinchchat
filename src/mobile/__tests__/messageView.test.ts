@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collapseCliTurns, isShownInMessenger, visibleText } from '../messageView';
+import { collapseCliTurns, isShownInMessenger, quoteForReply, visibleText, withoutLeadingQuote } from '../messageView';
 import type { ChatMessage } from '../../types';
 
 const msg = (over: Partial<ChatMessage>): ChatMessage => ({
@@ -68,5 +68,27 @@ describe('claude-cli turn collapsing', () => {
     const sys = msg({ id: 'sys', role: 'user', isSystemEvent: true, blocks: [{ type: 'text', text: 'System: connected' }] });
     const out = collapseCliTurns([user('u1'), step('s1', 'a'), sys, step('s2', 'b'), combined('c1', 'a\n\nb')]);
     expect(out.map(m => m.id)).toEqual(['u1', 'sys', 'c1']);
+  });
+});
+
+describe('reply quoting', () => {
+  it('quotes every line as a Markdown blockquote', () => {
+    expect(quoteForReply('first\n\nsecond')).toBe('> first\n>\n> second');
+  });
+
+  it('shortens long messages', () => {
+    const q = quoteForReply('x'.repeat(500), 10);
+    expect(q).toBe('> ' + 'x'.repeat(10) + '…');
+  });
+});
+
+describe('nested replies', () => {
+  it('drops the quote a reply carries', () => {
+    expect(withoutLeadingQuote('> earlier\n> more\n\nmy answer')).toBe('my answer');
+  });
+
+  it('leaves unquoted text and quote-only text alone', () => {
+    expect(withoutLeadingQuote('plain\n> later quote')).toBe('plain\n> later quote');
+    expect(withoutLeadingQuote('> only a quote')).toBe('> only a quote');
   });
 });
