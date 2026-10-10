@@ -1,19 +1,35 @@
 // PinchChat Service Worker — cache static assets for offline/instant load
-const CACHE_NAME = 'pinchchat-v1';
+// App files: one cache per build. scripts/stamp-sw.mjs replaces the
+// placeholder after `vite build` with a hash of the built index.html, so each
+// deploy gets a fresh cache and old ones are deleted on activate.
+const CACHE_NAME = 'pinchchat-__BUILD_VERSION__';
+// Pending Share Sheet payloads live in their own, stable cache so a deploy
+// never deletes a share that has not been opened yet.
+const SHARE_CACHE = 'pinchchat-share-inbox';
 
 // Cache static assets on install
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Clean old caches on activate
+// Clean old caches on activate. Older builds kept pending shares inside the
+// app cache: move any /share-inbox/ entries to SHARE_CACHE before deleting.
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const shares = await caches.open(SHARE_CACHE);
+    for (const name of await caches.keys()) {
+      if (name === CACHE_NAME || name === SHARE_CACHE) continue;
+      const old = await caches.open(name);
+      for (const req of await old.keys()) {
+        if (new URL(req.url).pathname.startsWith('/share-inbox/')) {
+          const res = await old.match(req);
+          if (res) await shares.put(req, res);
+        }
+      }
+      await caches.delete(name);
+    }
+    await self.clients.claim();
+  })());
 });
 
 // Stale-while-revalidate for static assets, network-first for API/WS
@@ -66,8 +82,8 @@ self.addEventListener('fetch', (event) => {
 //
 // Android's Share Sheet POSTs multipart data to /share (manifest share_target).
 // Store it in Cache Storage and redirect to /?ui=mobile&share=<id>; the app
-// (src/share/shareInbox.ts) prefills the composer from it. Stored inside
-// CACHE_NAME so the activate handler above never deletes a pending share.
+// (src/share/shareInbox.ts, which searches every cache) prefills the composer
+// from it. Stored in SHARE_CACHE, which the activate handler never deletes.
 // Handled entirely here, so it works offline and before any login.
 // ---------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
@@ -78,7 +94,7 @@ self.addEventListener('fetch', (event) => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     try {
       const form = await event.request.formData();
-      const cache = await caches.open(CACHE_NAME);
+      const cache = await caches.open(SHARE_CACHE);
       const files = form.getAll('files').filter((f) => f && typeof f === 'object' && 'size' in f);
       const meta = {
         id,

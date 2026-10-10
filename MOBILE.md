@@ -45,7 +45,8 @@ Keep this list current — it is what makes `git merge upstream/main` tractable.
 |---|---|---|
 | `src/main.tsx` | 3 lines: import + `getUiMode() === 'mobile' ? <MobileApp/> : <App/>` | entry switch |
 | `public/manifest.json` | name, colours, `start_url: /?ui=mobile`, `share_target` | install as "OpenClaw", receive shares |
-| `public/sw.js` | appended "Share target" block; existing code untouched | store shared content, works offline |
+| `public/sw.js` | appended "Share target" block; cache name per build (`pinchchat-__BUILD_VERSION__`) plus a stable `pinchchat-share-inbox` cache, old shares migrated on activate | store shared content, works offline; deploys clear old app caches |
+| `package.json`, `scripts/stamp-sw.mjs` | `build` runs `stamp-sw.mjs` after `vite build` (hash of dist/index.html into dist/sw.js) | per-build cache name without a manual bump |
 | `src/hooks/useNotifications.ts` | `APP_NAME` from `VITE_APP_NAME` | tab title |
 | `src/hooks/useGateway.ts` | deleted-active-session fallback uses `VITE_AGENT_SESSION` | never silently fall back to `agent:main:main` |
 | `src/contexts/ThemeContext*.ts(x)`, `SettingsModal.tsx`, `ThemeSwitcher.tsx`, `i18n.ts` | Sand theme + Teal accent | WhatsApp-like palette (fork commit predating this branch) |
