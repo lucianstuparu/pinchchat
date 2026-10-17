@@ -15,6 +15,9 @@ Upstream PinchChat stays fully available behind the menu's **Advanced** entry.
   warm browns, terracotta accent), set as CSS variables on the messenger root —
   including Tailwind's `--color-pc-*` tokens, which resolve at `:root` and would
   otherwise ignore an override on a descendant. The full UI keeps the user's theme.
+- **Push notifications** (`src/mobile/pushNotifications.ts`, `public/sw.js` push block): ⋮ menu →
+  "Turn on notifications" subscribes this phone with oc-push (same origin `/push/*`, CT 105).
+  Agents, digests and health alerts then arrive while the app is closed; tapping opens the app.
 - **Avatars**: OpenClaw logo and a person icon on the first message of each run.
 - **Reply to a message**: swipe a bubble right, or long-press (right-click on
   desktop) → Reply / Copy. The reply is sent with the quoted text as a Markdown

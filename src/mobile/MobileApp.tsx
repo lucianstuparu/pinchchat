@@ -18,6 +18,7 @@ import { QuestionCard } from './QuestionCard';
 import { useQuestions } from './useQuestions';
 import { switchUiMode } from './uiMode';
 import { WARM_VARS, useWarmChrome } from './warmTheme';
+import { disablePush, enablePush, getPushState, type PushState } from './pushNotifications';
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 
@@ -91,6 +92,18 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const onReply = useCallback((msg: ChatMessage) => {
     setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || '📷 Photo', mine: msg.role === 'user' });
   }, []);
+  const [pushState, setPushState] = useState<PushState | 'busy'>('off');
+  useEffect(() => { void getPushState().then(setPushState).catch(() => setPushState('unsupported')); }, []);
+  const togglePush = useCallback(async () => {
+    const from = pushState;
+    setPushState('busy');
+    try {
+      setPushState(from === 'on' ? await disablePush() : await enablePush());
+    } catch (e) {
+      setPushState(from);
+      setHint(e instanceof Error ? e.message : 'Could not change notifications.');
+    }
+  }, [pushState]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentAttachments = useRef(new Map<string, OutgoingAttachment[]>());
   const flushing = useRef(false);
@@ -217,6 +230,19 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-10 z-20 w-56 rounded-xl border border-pc-border bg-pc-elevated shadow-lg py-1 text-[15px]">
                 <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenuOpen(false); void createNewSession(); }}>New conversation</button>
+                {pushState !== 'unsupported' && (
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)] disabled:opacity-60"
+                    disabled={pushState === 'blocked' || pushState === 'busy'}
+                    onClick={() => void togglePush()}
+                  >
+                    {pushState === 'on' ? 'Notifications: on — turn off'
+                      : pushState === 'blocked' ? 'Notifications blocked in Chrome settings'
+                      : pushState === 'busy' ? 'Notifications…'
+                      : 'Turn on notifications'}
+                  </button>
+                )}
                 <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => switchUiMode('full')}>Advanced (full PinchChat)</button>
                 <button type="button" className="w-full text-left px-4 py-2.5 text-red-500 hover:bg-[var(--pc-hover)]" onClick={() => { setMenuOpen(false); logout(); }}>Log out</button>
               </div>
