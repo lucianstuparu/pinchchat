@@ -21,7 +21,7 @@ import { WARM_VARS, useWarmChrome } from './warmTheme';
 import { disablePush, enablePush, getPushState, type PushState } from './pushNotifications';
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { AGENTS, INBOX, agentForSession, loadAgent, saveAgent, type MessengerAgent } from './agents';
+import { loadAgentId, messengerAgents, saveAgentId, type MessengerAgent } from './agents';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
 
@@ -84,9 +84,11 @@ function mobileScreen(gw: ReturnType<typeof useGateway>) {
 
 function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const { status, messages, isGenerating, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener, switchSession } = gw;
-  const agent = agentForSession(activeSession);
+  const agents = useMemo(() => messengerAgents(gw.agents), [gw.agents]);
+  const INBOX = agents[0];
+  const agent = agents.find(a => a.session === activeSession) ?? INBOX;
   const chooseAgent = useCallback((next: MessengerAgent) => {
-    saveAgent(next);
+    saveAgentId(next.id);
     if (next.session !== activeSession) switchSession(next.session);
   }, [activeSession, switchSession]);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -123,11 +125,12 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const restored = useRef(false);
   const sharedOnLoad = useRef(pendingShareId() !== null); // read before the share import clears it
   useEffect(() => {
-    if (status !== 'connected' || restored.current) return;
+    // Wait for the agent list: it says whose gateway this is (gateway-lucian / gateway-ludmila).
+    if (status !== 'connected' || restored.current || gw.agents.length === 0) return;
     restored.current = true;
-    const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX : loadAgent();
+    const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX : (agents.find(a => a.id === loadAgentId()) ?? INBOX);
     if (wanted.session !== activeSession) switchSession(wanted.session);
-  }, [status, activeSession, switchSession, outbox.length]);
+  }, [status, activeSession, switchSession, outbox.length, gw.agents.length, agents, INBOX]);
 
   // ---- Share Sheet import (once per load) --------------------------------
   useEffect(() => {
@@ -152,6 +155,8 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
 
   useEffect(() => {
     if (status !== 'connected' || outbox.length === 0 || flushing.current) return;
+    // Only into the Inbox, and only once we know which gateway (and so which Inbox) this is.
+    if (gw.agents.length === 0 || activeSession !== INBOX.session) return;
     flushing.current = true;
     void (async () => {
       for (const item of outbox) {
@@ -163,7 +168,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
       // Items queued while this flush ran were skipped by the guard — re-run for them
       setOutbox(prev => (prev.length > 0 ? [...prev] : prev));
     })();
-  }, [status, outbox, sendMessage]);
+  }, [status, outbox, sendMessage, activeSession, INBOX.session, gw.agents.length]);
 
   const send = useCallback((text: string, attachments: OutgoingAttachment[]) => {
     if (status !== 'connected') {
@@ -176,7 +181,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
     }
     if (attachments.length > 0) sentAttachments.current.set(text, attachments);
     void sendMessage(text, attachments.map(({ mimeType, fileName, content }) => ({ mimeType, fileName, content })));
-  }, [status, sendMessage, agent]);
+  }, [status, sendMessage, agent, INBOX.session]);
 
   const retry = useCallback((msg: ChatMessage) => {
     const text = visibleText(msg);
@@ -273,7 +278,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
 
       {/* Agent switch */}
       <nav className="shrink-0 flex gap-2 px-4 py-2 bg-pc-surface border-b border-pc-border" aria-label="Agent">
-        {AGENTS.map(a => (
+        {agents.map(a => (
           <button
             key={a.id}
             type="button"

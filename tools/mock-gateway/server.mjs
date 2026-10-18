@@ -11,7 +11,9 @@ import { WebSocketServer } from 'ws';
 
 const PORT = 18789;
 const TEST_TOKEN = 'local-test-token-not-a-secret';
-const MAIN = 'agent:gateway-lucian:main';
+// --agents=gateway-ludmila,admin pretends to be another person's gateway (default: Lucian's).
+const AGENTS = (process.argv.find(a => a.startsWith('--agents='))?.slice(9) || 'gateway-lucian,admin').split(',');
+const MAIN = `agent:${AGENTS[0]}:main`;
 
 const sessions = new Map([[MAIN, []]]);
 const received = [];
@@ -101,8 +103,8 @@ function reply(sessionKey, message, attachments) {
 
 const handlers = {
   'agent.identity.get': () => ({ name: 'OpenClaw' }),
-  'agents.list': () => ({ agents: [{ id: 'gateway-lucian', name: 'gateway-lucian' }] }),
-  'sessions.list': () => ({ sessions: [...sessions.keys()].map(key => ({ key, agentId: 'gateway-lucian', label: key.split(':').pop(), updatedAt: now() })) }),
+  'agents.list': () => ({ agents: AGENTS.map(id => ({ id, name: id })) }),
+  'sessions.list': () => ({ sessions: [...sessions.keys()].map(key => ({ key, agentId: key.split(':')[1], label: key.split(':').pop(), updatedAt: now() })) }),
   'chat.history': (p) => ({ messages: hist(p.sessionKey) }),
   'chat.send': (p) => {
     const blocks = [];
