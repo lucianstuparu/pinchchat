@@ -21,6 +21,7 @@ import { WARM_VARS, useWarmChrome } from './warmTheme';
 import { disablePush, enablePush, getPushState, type PushState } from './pushNotifications';
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
+import { AGENTS, INBOX, agentForSession, loadAgent, saveAgent, type MessengerAgent } from './agents';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
 
@@ -82,7 +83,12 @@ function mobileScreen(gw: ReturnType<typeof useGateway>) {
 }
 
 function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
-  const { status, messages, isGenerating, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener } = gw;
+  const { status, messages, isGenerating, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener, switchSession } = gw;
+  const agent = agentForSession(activeSession);
+  const chooseAgent = useCallback((next: MessengerAgent) => {
+    saveAgent(next);
+    if (next.session !== activeSession) switchSession(next.session);
+  }, [activeSession, switchSession]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [prefill, setPrefill] = useState<ComposerPrefill | null>(null);
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
@@ -112,6 +118,16 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const { notify } = useNotifications();
 
   useEffect(() => setBaseTitle(), []);
+
+  // ---- Agent: reopen the last one; shares and the outbox always go to the Inbox
+  const restored = useRef(false);
+  const sharedOnLoad = useRef(pendingShareId() !== null); // read before the share import clears it
+  useEffect(() => {
+    if (status !== 'connected' || restored.current) return;
+    restored.current = true;
+    const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX : loadAgent();
+    if (wanted.session !== activeSession) switchSession(wanted.session);
+  }, [status, activeSession, switchSession, outbox.length]);
 
   // ---- Share Sheet import (once per load) --------------------------------
   useEffect(() => {
@@ -151,12 +167,16 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
 
   const send = useCallback((text: string, attachments: OutgoingAttachment[]) => {
     if (status !== 'connected') {
+      if (agent.session !== INBOX.session) {
+        setHint(`Offline — messages to ${agent.label} cannot wait. Switch to Inbox to queue it.`);
+        return;
+      }
       setOutbox(prev => [...prev, { id: 'q-' + Date.now(), text, attachments, queuedAt: Date.now() }]);
       return;
     }
     if (attachments.length > 0) sentAttachments.current.set(text, attachments);
     void sendMessage(text, attachments.map(({ mimeType, fileName, content }) => ({ mimeType, fileName, content })));
-  }, [status, sendMessage]);
+  }, [status, sendMessage, agent]);
 
   const retry = useCallback((msg: ChatMessage) => {
     const text = visibleText(msg);
@@ -218,7 +238,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
       <header className="shrink-0 flex items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] bg-pc-surface border-b border-pc-border">
         <img src="/logo-192.png" alt="" className="h-9 w-9 rounded-full" />
         <div className="flex-1 min-w-0">
-          <h1 className="text-[17px] font-semibold leading-tight">OpenClaw</h1>
+          <h1 className="text-[17px] font-semibold leading-tight">{agent.session === INBOX.session ? 'OpenClaw' : agent.label}</h1>
           <p className={`text-xs leading-tight ${status === 'connected' ? 'text-pc-text-muted' : 'text-amber-600'}`}>{subtitle}</p>
         </div>
         <div className="relative">
@@ -251,11 +271,27 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
         </div>
       </header>
 
+      {/* Agent switch */}
+      <nav className="shrink-0 flex gap-2 px-4 py-2 bg-pc-surface border-b border-pc-border" aria-label="Agent">
+        {AGENTS.map(a => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => chooseAgent(a)}
+            disabled={outbox.length > 0 && a.session !== INBOX.session}
+            aria-pressed={a.session === agent.session}
+            className={`px-3.5 py-1 rounded-full text-sm border transition-colors disabled:opacity-50 ${a.session === agent.session ? 'bg-pc-accent text-white border-transparent' : 'border-pc-border text-pc-text-muted hover:bg-[var(--pc-hover)]'}`}
+          >
+            {a.label}
+          </button>
+        ))}
+      </nav>
+
       {/* Conversation */}
       <main ref={scrollRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-1" role="log" aria-live="polite">
         {isLoadingHistory && shown.length === 0 && <p className="text-center text-xs text-pc-text-muted py-6">Loading…</p>}
         {!isLoadingHistory && shown.length === 0 && outbox.length === 0 && (
-          <p className="text-center text-sm text-pc-text-muted px-8 py-10">Send anything — a note, a link, a photo. Shared items from other apps land here too.</p>
+          <p className="text-center text-sm text-pc-text-muted px-8 py-10">{agent.placeholder}</p>
         )}
 
         {shown.map((msg, i) => {
