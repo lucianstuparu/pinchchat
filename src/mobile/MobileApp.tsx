@@ -21,7 +21,7 @@ import { WARM_VARS, useWarmChrome } from './warmTheme';
 import { disablePush, enablePush, getPushState, type PushState } from './pushNotifications';
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { loadAgentId, messengerAgents, saveAgentId, type MessengerAgent } from './agents';
+import { fetchPerson, loadAgentId, messengerAgents, saveAgentId, type MessengerAgent } from './agents';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
 
@@ -84,7 +84,10 @@ function mobileScreen(gw: ReturnType<typeof useGateway>) {
 
 function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const { status, messages, isGenerating, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener, switchSession } = gw;
-  const agents = useMemo(() => messengerAgents(gw.agents), [gw.agents]);
+  const [person, setPerson] = useState<string | null>(null); // null until /whoami answered
+  useEffect(() => { void fetchPerson().then(setPerson); }, []);
+  const agents = useMemo(() => messengerAgents(gw.agents, person ?? ''), [gw.agents, person]);
+  const ready = gw.agents.length > 0 && person !== null; // we know whose Inbox this is
   const INBOX = agents[0];
   const agent = agents.find(a => a.session === activeSession) ?? INBOX;
   const chooseAgent = useCallback((next: MessengerAgent) => {
@@ -125,12 +128,12 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   const restored = useRef(false);
   const sharedOnLoad = useRef(pendingShareId() !== null); // read before the share import clears it
   useEffect(() => {
-    // Wait for the agent list: it says whose gateway this is (gateway-lucian / gateway-ludmila).
-    if (status !== 'connected' || restored.current || gw.agents.length === 0) return;
+    // Wait for the agent list and /whoami: together they say whose Inbox this is.
+    if (status !== 'connected' || restored.current || !ready) return;
     restored.current = true;
     const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX : (agents.find(a => a.id === loadAgentId()) ?? INBOX);
     if (wanted.session !== activeSession) switchSession(wanted.session);
-  }, [status, activeSession, switchSession, outbox.length, gw.agents.length, agents, INBOX]);
+  }, [status, activeSession, switchSession, outbox.length, ready, agents, INBOX]);
 
   // ---- Share Sheet import (once per load) --------------------------------
   useEffect(() => {
@@ -156,7 +159,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   useEffect(() => {
     if (status !== 'connected' || outbox.length === 0 || flushing.current) return;
     // Only into the Inbox, and only once we know which gateway (and so which Inbox) this is.
-    if (gw.agents.length === 0 || activeSession !== INBOX.session) return;
+    if (!ready || activeSession !== INBOX.session) return;
     flushing.current = true;
     void (async () => {
       for (const item of outbox) {
@@ -168,7 +171,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
       // Items queued while this flush ran were skipped by the guard — re-run for them
       setOutbox(prev => (prev.length > 0 ? [...prev] : prev));
     })();
-  }, [status, outbox, sendMessage, activeSession, INBOX.session, gw.agents.length]);
+  }, [status, outbox, sendMessage, activeSession, INBOX.session, ready]);
 
   const send = useCallback((text: string, attachments: OutgoingAttachment[]) => {
     if (status !== 'connected') {

@@ -1,9 +1,10 @@
 /**
- * The agents the messenger can talk to. Each person has their own gateway
- * (ai.manager D7: Lucian's and Ludmila's), so the list is built from the
- * connected gateway's agents: its `gateway-<person>` agent is the Inbox
- * (captures and routes everything, receives shares and the offline outbox),
- * and `admin` is the Admin & finance agent you ask directly.
+ * The agents the messenger can talk to, for the person logged in. Lucian and
+ * Ludmila share one gateway for now (ai.manager D7), so the app asks the
+ * server who is logged in (/whoami, from the Cloudflare Access identity) and
+ * picks that person's agents: `gateway-<person>` is the Inbox (captures and
+ * routes everything, receives shares and the offline outbox) and
+ * `admin-<person>` (or plain `admin`) the Admin & finance agent.
  */
 export interface MessengerAgent {
   id: string;
@@ -20,16 +21,30 @@ const DOMAIN_AGENTS: Array<Omit<MessengerAgent, 'session'>> = [
     placeholder: 'Ask about bills, deadlines and contracts — e.g. "what do I have to pay this week?" or "scan my mail for bills".' },
 ];
 
-/** Inbox first, then the domain agents this gateway actually has. */
-export function messengerAgents(gatewayAgents: string[]): MessengerAgent[] {
-  const gateway = gatewayAgents.find(a => a.startsWith('gateway-'));
+/** Who is logged in: a person name, or "" when unknown (e.g. opened on the LAN without Access). */
+export async function fetchPerson(): Promise<string> {
+  try {
+    const r = await fetch('/whoami', { cache: 'no-store', credentials: 'same-origin' });
+    const t = r.ok ? (await r.text()).trim() : '';
+    return /^[a-z][a-z0-9-]{0,30}$/.test(t) ? t : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Inbox first, then the domain agents this gateway has for this person. */
+export function messengerAgents(gatewayAgents: string[], person: string): MessengerAgent[] {
+  const gateway = (person && gatewayAgents.includes(`gateway-${person}`))
+    ? `gateway-${person}`
+    : gatewayAgents.find(a => a.startsWith('gateway-'));
   const inbox: MessengerAgent = {
     id: 'inbox', label: 'Inbox', placeholder: INBOX_TEXT,
     session: gateway ? `agent:${gateway}:main` : FALLBACK_INBOX,
   };
+  const own = (id: string) => (person && gatewayAgents.includes(`${id}-${person}`) ? `${id}-${person}` : id);
   return [inbox, ...DOMAIN_AGENTS
-    .filter(a => gatewayAgents.includes(a.id))
-    .map(a => ({ ...a, session: `agent:${a.id}:main` }))];
+    .filter(a => gatewayAgents.includes(own(a.id)))
+    .map(a => ({ ...a, session: `agent:${own(a.id)}:main` }))];
 }
 
 const KEY = 'openclaw-pwa:agent';
