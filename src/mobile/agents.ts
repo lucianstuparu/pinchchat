@@ -19,6 +19,8 @@ const INBOX_TEXT = 'Send anything — a note, a link, a photo. Shared items from
 const DOMAIN_AGENTS: Array<Omit<MessengerAgent, 'session'>> = [
   { id: 'admin', label: 'Admin',
     placeholder: 'Ask about bills, deadlines and contracts — e.g. "what do I have to pay this week?" or "scan my mail for bills".' },
+  { id: 'generalist', label: 'General',
+    placeholder: 'Everything else you sent: to-dos, the shopping list, notes — e.g. "what’s on the shopping list?" or "what do I have to do at home?".' },
 ];
 
 /** Who is logged in: a person name, or "" when unknown (e.g. opened on the LAN without Access). */

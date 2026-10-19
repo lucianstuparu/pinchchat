@@ -1,20 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { messengerAgents } from '../agents';
 
-const shared = ['main', 'gateway-lucian', 'admin', 'gateway-ludmila', 'admin-ludmila'];
+const shared = ['main', 'gateway-lucian', 'admin', 'gateway-ludmila', 'admin-ludmila', 'generalist', 'generalist-ludmila'];
 const sessions = (person: string, agents = shared) => messengerAgents(agents, person).map(a => `${a.id}=${a.session}`);
 
 describe('messengerAgents', () => {
   it('gives Lucian his Inbox and the plain admin agent', () => {
-    expect(sessions('lucian')).toEqual(['inbox=agent:gateway-lucian:main', 'admin=agent:admin:main']);
+    expect(sessions('lucian')).toEqual(['inbox=agent:gateway-lucian:main', 'admin=agent:admin:main', 'generalist=agent:generalist:main']);
   });
 
   it('gives Ludmila her own Inbox and admin-ludmila, never Lucian\'s', () => {
-    expect(sessions('ludmila')).toEqual(['inbox=agent:gateway-ludmila:main', 'admin=agent:admin-ludmila:main']);
+    expect(sessions('ludmila')).toEqual(['inbox=agent:gateway-ludmila:main', 'admin=agent:admin-ludmila:main', 'generalist=agent:generalist-ludmila:main']);
   });
 
   it('falls back to the first Inbox when nobody is identified', () => {
-    expect(sessions('')).toEqual(['inbox=agent:gateway-lucian:main', 'admin=agent:admin:main']);
+    expect(sessions('')).toEqual(['inbox=agent:gateway-lucian:main', 'admin=agent:admin:main', 'generalist=agent:generalist:main']);
   });
 
   it('works on a gateway that has only one person', () => {
