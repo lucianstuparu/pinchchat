@@ -127,11 +127,13 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
   // ---- Agent: reopen the last one; shares and the outbox always go to the Inbox
   const restored = useRef(false);
   const sharedOnLoad = useRef(pendingShareId() !== null); // read before the share import clears it
+  const agentOnLoad = useRef(new URLSearchParams(window.location.search).get('agent')); // e.g. a reminder opens Admin
   useEffect(() => {
     // Wait for the agent list and /whoami: together they say whose Inbox this is.
     if (status !== 'connected' || restored.current || !ready) return;
     restored.current = true;
-    const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX : (agents.find(a => a.id === loadAgentId()) ?? INBOX);
+    const wanted = sharedOnLoad.current || outbox.length > 0 ? INBOX
+      : (agents.find(a => a.id === (agentOnLoad.current ?? loadAgentId())) ?? INBOX);
     if (wanted.session !== activeSession) switchSession(wanted.session);
   }, [status, activeSession, switchSession, outbox.length, ready, agents, INBOX]);
 

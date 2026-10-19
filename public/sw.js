@@ -123,26 +123,54 @@ self.addEventListener('fetch', (event) => {
 // ---------------------------------------------------------------------------
 // Push notifications (openclaw-pwa fork addition — see MOBILE.md)
 //
-// Sent by oc-push on CT 105 (agents, digests, health alerts). Payload JSON:
-// { title, body, url, tag }. Tapping opens the app on `url`, reusing an open
-// window when there is one.
+// Sent by oc-push on CT 105 (agents, reminders, health alerts). Payload JSON:
+// { title, body, url, tag, actions?, data? }. Tapping opens the app on `url`, reusing an open
+// window when there is one. Reminders (ai.manager) carry actions Done / Snooze and data.item:
+// a button posts /reg/act on this origin (register-api on CT 103 via Caddy) without opening the app.
 // ---------------------------------------------------------------------------
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
   const title = data.title || 'OpenClaw';
+  const item = data.data && typeof data.data.item === 'string' ? data.data.item : undefined;
   event.waitUntil(self.registration.showNotification(title, {
     body: data.body || '',
     icon: '/logo-192.png',
     badge: '/favicon-32.png',
     tag: data.tag || undefined,
     renotify: !!data.tag,
-    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/?ui=mobile' },
+    actions: item && Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
+    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/?ui=mobile', item },
   }));
 });
 
+// A reminder button: change the register item, then confirm (or, if that failed, open the app).
+async function reminderAction(notification, action) {
+  const { item, url } = notification.data || {};
+  try {
+    const res = await fetch('/reg/act', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item, action }),
+    });
+    const r = await res.json();
+    if (!res.ok || !r.ok) throw new Error(r.error || String(res.status));
+    await self.registration.showNotification(action === 'done' ? `✓ Done: ${r.title}` : `Snoozed: ${r.title}`, {
+      body: action === 'done' ? `Marked ${r.status}.` : `Reminding you again on ${r.remind_on}.`,
+      icon: '/logo-192.png', badge: '/favicon-32.png', tag: notification.tag || undefined, silent: true,
+      data: { url },
+    });
+  } catch {
+    await self.clients.openWindow(new URL(url || '/?ui=mobile', self.location.origin).href);
+  }
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  if (event.action && event.notification.data && event.notification.data.item) {
+    event.waitUntil(reminderAction(event.notification, event.action));
+    return;
+  }
   const target = new URL(event.notification.data && event.notification.data.url || '/?ui=mobile', self.location.origin).href;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
