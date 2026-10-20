@@ -1,3 +1,10 @@
+> **2026-10-21:** two views live in this fork now. `src/mobile/` is the messenger described below
+> (plus, since October: agent tabs via /whoami, item cards for ⟨id⟩ markers, in-conversation search,
+> reminder notification buttons, Web Push). `src/app/` is the **desk** (ai.manager app-v2.md):
+> Now, Open loops, one chat, dictation and voice notes; opened with `?ui=app`, reusing the mobile
+> layer's bubbles, composer, question cards, share import and theme. The "Known limits" below are
+> partly outdated: push exists (oc-push on CT 105).
+
 # openclaw-pwa — messenger-style fork of PinchChat
 
 A WhatsApp-like client for one person talking to their OpenClaw gateway, built on
