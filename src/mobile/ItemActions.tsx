@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Check, Clock } from 'lucide-react';
-import { actOnItem, fetchItemStates, isClosed, type ItemState, type MessageItem } from './messageItems';
+import { Check, Clock, Undo2, Users } from 'lucide-react';
+import {
+  actOnItem, fetchItemStates, formatAmount, formatDay, isClosed, urgency,
+  type ItemAction, type ItemState, type MessageItem,
+} from './messageItems';
 
-const fmt = (d?: string) =>
-  d ? new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+/** The status line of an open card: what to know at a glance, in a colour that says how urgent. */
+function dueLine(s: ItemState | undefined, today: string): { text: string; tone: string } {
+  switch (urgency(s, today)) {
+    case 'overdue': return { text: `Overdue · was due ${formatDay(s!.due_date!)}`, tone: 'text-red-600' };
+    case 'today': return { text: 'Due today', tone: 'text-amber-600' };
+    case 'soon': return { text: `Due ${formatDay(s!.due_date!)}`, tone: 'text-amber-600' };
+    case 'later': return { text: `Due ${formatDay(s!.due_date!)}`, tone: 'text-pc-text-muted' };
+    default: return { text: s?.kind === 'buy' ? 'Shopping' : 'No date', tone: 'text-pc-text-muted' };
+  }
+}
 
-/** One row per register item named in a message: its state, and Done / Snooze. */
+const closedWord = (status: string) => (status === 'paid' ? 'Paid' : status === 'cancelled' ? 'Dropped' : 'Done');
+
+/** One card per register item named in a message: read at a glance, one tap to act. */
 export function ItemActions({ items }: { items: MessageItem[] }) {
   const [states, setStates] = useState<Record<string, ItemState>>({});
   const [today, setToday] = useState('');
@@ -21,7 +34,7 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
     return () => { alive = false; };
   }, [ids]);
 
-  const act = async (id: string, action: 'done' | 'snooze') => {
+  const act = async (id: string, action: ItemAction) => {
     setBusy(id); setError(null);
     try {
       const r = await actOnItem(id, action);
@@ -33,27 +46,64 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
     }
   };
 
+  // Overdue first, then by due date; items without a date last.
+  const order = [...items].sort((a, b) => (states[a.id]?.due_date ?? '9999').localeCompare(states[b.id]?.due_date ?? '9999'));
+
   return (
-    <div className="mt-1.5 -mx-1 space-y-1" aria-label="Items">
-      {items.map(item => {
+    <div className="mt-2 -mx-1.5 space-y-2" aria-label="Items">
+      {order.map(item => {
         const s = states[item.id];
-        const closed = isClosed(s);
-        const snoozed = !closed && !!s?.remind_on && !!today && s.remind_on > today;
+        const title = s?.title || item.label || item.id;
+        const amount = formatAmount(s?.amount, s?.currency);
+        const isBusy = busy === item.id;
+
+        if (isClosed(s)) {
+          return (
+            <div key={item.id} className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] text-pc-text-muted bg-[var(--pc-hover)]">
+              <Check size={15} className="shrink-0 text-emerald-600" />
+              <span className="min-w-0 flex-1 truncate line-through">{title}</span>
+              <span className="shrink-0">{closedWord(s!.status)}</span>
+              <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'reopen')}
+                className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--pc-hover-strong)] disabled:opacity-50" aria-label="Undo">
+                <Undo2 size={15} />
+              </button>
+            </div>
+          );
+        }
+
+        const due = dueLine(s, today);
+        const u = urgency(s, today);
+        const edge = u === 'overdue' ? 'border-l-red-500' : u === 'today' || u === 'soon' ? 'border-l-amber-500' : 'border-l-transparent';
+        const snoozed = !!s?.remind_on && !!today && s.remind_on > today;
+
         return (
-          <div key={item.id} className="rounded-xl border border-pc-border bg-[var(--pc-hover)] px-2.5 py-1.5">
-            <div className="text-[13px] leading-snug">{item.label || s?.title || item.id}</div>
-            <div className="mt-1 flex items-center gap-2 text-[12px]">
-              {closed ? (
-                <span className="inline-flex items-center gap-1 text-pc-text-muted"><Check size={13} /> {s!.status}</span>
-              ) : (
-                <>
-                  <button type="button" disabled={busy === item.id} onClick={() => void act(item.id, 'done')}
-                    className="rounded-full bg-pc-accent px-3 py-1 font-medium text-white disabled:opacity-60">Done</button>
-                  <button type="button" disabled={busy === item.id} onClick={() => void act(item.id, 'snooze')}
-                    className="rounded-full border border-pc-border px-3 py-1 disabled:opacity-60">Snooze 3 days</button>
-                  {snoozed && <span className="inline-flex items-center gap-1 text-pc-text-muted"><Clock size={12} /> {fmt(s!.remind_on)}</span>}
-                </>
+          <div key={item.id} className={`rounded-xl border border-pc-border border-l-[3px] ${edge} bg-pc-elevated px-3 py-2.5 shadow-[0_1px_1px_rgba(0,0,0,0.04)]`}>
+            <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide ${due.tone}`}>
+              <span>{due.text}{snoozed && <span className="text-pc-text-muted"> · snoozed to {formatDay(s!.remind_on!)}</span>}</span>
+              {s?.scope === 'shared' && (
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[var(--pc-hover-strong)] px-1.5 py-0.5 normal-case tracking-normal text-pc-text-muted">
+                  <Users size={11} /> shared
+                </span>
               )}
+            </div>
+            <div className="mt-0.5 flex items-start gap-3">
+              <div className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-pc-text-primary">{title}</div>
+              {amount && <div className="shrink-0 text-[17px] font-semibold tabular-nums leading-snug">{amount}</div>}
+            </div>
+            {s?.payee && s.payee !== title && <div className="mt-0.5 truncate text-[12px] text-pc-text-muted">{s.payee}</div>}
+            <div className="mt-2.5 flex items-center gap-1">
+              <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'done')}
+                className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-pc-accent text-[14px] font-semibold text-white active:opacity-80 disabled:opacity-60">
+                <Check size={16} /> {s?.kind === 'bill' ? 'Paid' : 'Done'}
+              </button>
+              <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'snooze')}
+                className="inline-flex h-10 items-center gap-1 rounded-full px-3 text-[13px] text-pc-text-secondary hover:bg-[var(--pc-hover)] disabled:opacity-60">
+                <Clock size={14} /> Snooze
+              </button>
+              <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'drop')}
+                className="inline-flex h-10 items-center rounded-full px-3 text-[13px] text-pc-text-muted hover:bg-[var(--pc-hover)] disabled:opacity-60">
+                Drop
+              </button>
             </div>
           </div>
         );

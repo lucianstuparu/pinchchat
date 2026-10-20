@@ -136,8 +136,37 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/__down') { downUntil = now() + Number(url.searchParams.get('ms') || 10000); for (const ws of clients) ws.terminate(); res.end('down until ' + new Date(downUntil).toISOString()); return; }
   if (url.pathname === '/__ask') { const r = askQuestion(); res.end(r.id); return; }
   if (url.pathname === '/__log') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(received.map(r => ({ ...r, params: { ...r.params, attachments: r.params?.attachments?.map(a => ({ fileName: a.fileName, mimeType: a.mimeType, base64Len: a.content?.length })) } })), null, 1)); return; }
+  // ai.manager register items (what the Admin / General cards read and change). Fixed sample data.
+  if (url.pathname === '/reg/status' || url.pathname === '/reg/act') {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      if (url.pathname === '/reg/act') {
+        const it = regItems[p.item];
+        if (!it) { res.statusCode = 404; res.end(JSON.stringify({ error: 'not in your registers' })); return; }
+        if (p.action === 'done') it.status = it.kind === 'bill' ? 'paid' : 'done';
+        if (p.action === 'drop') it.status = 'cancelled';
+        if (p.action === 'reopen') it.status = 'open';
+        if (p.action === 'snooze') it.remind_on = '2026-10-23';
+        res.end(JSON.stringify({ ok: true, action: p.action, title: it.title, status: it.status, remind_on: it.remind_on }));
+        return;
+      }
+      const items = Object.fromEntries((p.items || []).filter((i) => regItems[i]).map((i) => [i, regItems[i]]));
+      res.end(JSON.stringify({ items, today: '2026-10-20' }));
+    });
+    return;
+  }
   res.end('mock openclaw gateway');
 });
+
+const regItems = {
+  'adm-2026-10-18-5a672f': { status: 'open', kind: 'deadline', title: 'SFR/CertiDeal trade-in bonus', payee: 'CertiDeal', amount: 300, currency: 'EUR', due_date: '2026-10-22', remind_on: '2026-10-21', scope: 'private', store: 'admin' },
+  'adm-2026-10-18-032d99': { status: 'open', kind: 'bill', title: 'AEDES charges 4T2026', payee: 'Syndicat Le Clos des Hauts de Genève', amount: 693.78, currency: 'EUR', due_date: '2026-10-01', remind_on: '2026-10-23', scope: 'shared', store: 'admin' },
+  'adm-2026-10-18-9ae409': { status: 'open', kind: 'bill', title: 'Taxe foncière 2026', payee: 'DGFiP', amount: 1175, currency: 'EUR', due_date: '2026-10-26', remind_on: '2026-10-25', scope: 'shared', store: 'admin' },
+  'adm-2026-10-19-aaaaaa': { status: 'open', kind: 'task', title: 'Call the plumber about the boiler', due_date: '2026-10-27', remind_on: '2026-10-26', scope: 'shared', store: 'todo', domain: 'home' },
+};
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 26214400 });
 server.on('upgrade', (req, socket, head) => {

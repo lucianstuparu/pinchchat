@@ -28,6 +28,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   plugins: [react(), tailwindcss(), swVersionPlugin()],
+  // Local preview against tools/mock-gateway: the register endpoints the mobile cards use.
+  preview: { proxy: { '/reg': 'http://127.0.0.1:18789' } },
   build: {
     rollupOptions: {
       output: {

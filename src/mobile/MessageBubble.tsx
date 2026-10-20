@@ -122,7 +122,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
         // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
         style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${dx}px)` } : {}) }}
-        className={`relative max-w-[80%] rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${dx ? '' : 'transition-transform'} ${
+        className={`relative ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-2xl px-3 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] ${dx ? '' : 'transition-transform'} ${
           canReply ? 'select-none [-webkit-touch-callout:none]' : ''
         } ${
           mine
