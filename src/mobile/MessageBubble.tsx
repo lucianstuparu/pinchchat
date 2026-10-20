@@ -5,6 +5,8 @@ import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
 import { buildImageSrc } from '../lib/image';
 import { formatTime, visibleText } from './messageView';
+import { extractItems } from './messageItems';
+import { ItemActions } from './ItemActions';
 
 const mdComponents: Components = {
   a: ({ node, ...props }) => {
@@ -47,7 +49,8 @@ const LONG_PRESS_MS = 450;
 
 export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true }: Props) {
   const mine = msg.role === 'user';
-  const text = visibleText(msg);
+  // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
+  const { text, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
   const images = msg.blocks.filter(b => b.type === 'image') as Array<{ type: 'image'; mediaType: string; data?: string; url?: string }>;
   const typing = msg.isStreaming && !text;
   const canReply = !!onReply && !msg.isStreaming && (text.length > 0 || images.length > 0);
@@ -148,6 +151,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
           </div>
         ) : null}
+        {!typing && !msg.isStreaming && items.length > 0 && <ItemActions items={items} />}
 
         <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[11px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>
