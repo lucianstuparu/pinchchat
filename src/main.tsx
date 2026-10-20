@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import MobileApp from './mobile/MobileApp'
+import DeskApp from './app/DeskApp'
 import { getUiMode } from './mobile/uiMode'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -37,7 +38,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
-        {getUiMode() === 'mobile' ? <MobileApp /> : <App />}
+        {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}
       </ThemeProvider>
     </ErrorBoundary>
   </React.StrictMode>,

@@ -137,6 +137,31 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/__ask') { const r = askQuestion(); res.end(r.id); return; }
   if (url.pathname === '/__log') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(received.map(r => ({ ...r, params: { ...r.params, attachments: r.params?.attachments?.map(a => ({ fileName: a.fileName, mimeType: a.mimeType, base64Len: a.content?.length })) } })), null, 1)); return; }
   // ai.manager register items (what the Admin / General cards read and change). Fixed sample data.
+  if (['/reg/now', '/reg/loops', '/reg/item'].includes(url.pathname)) {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      const today = '2026-10-20';
+      if (url.pathname === '/reg/loops') { res.end(JSON.stringify({ today, loops: regLoops })); return; }
+      if (url.pathname === '/reg/item') {
+        const it = regItems[p.item] || regLoops.find((l) => l.id === p.item);
+        if (!it) { res.statusCode = 404; res.end(JSON.stringify({ error: 'not in your lists' })); return; }
+        res.end(JSON.stringify({ today, item: { ...it, id: p.item, store: it.store || 'loops', scope: it.scope || 'private', notes: it.notes },
+          origin: it.source ? { kind: 'message', id: it.source, ts: '2026-10-19T17:30:00Z', text: 'home call the plumber about the boiler next Tuesday', type: 'text' } : null }));
+        return;
+      }
+      const sec = (d) => !d ? 'later' : d < today ? 'overdue' : d === today ? 'today' : d <= '2026-10-27' ? 'week' : 'later';
+      const pr = { P1: 4, P2: 3, P3: 2, P4: 1 };
+      const items = Object.entries(regItems).filter(([, i]) => !['paid', 'done', 'cancelled'].includes(i.status) && i.kind !== 'buy')
+        .map(([id, i]) => { const s = sec(i.due_date); const w = (pr[i.priority] || 2) * (s === 'overdue' ? 1.5 : s === 'today' ? 1.3 : s === 'week' ? 1.15 : 1);
+          return { id, ...i, priority: i.priority || 'P3', section: s, weight: w }; })
+        .sort((a, b) => b.weight - a.weight);
+      res.end(JSON.stringify({ today, items }));
+    });
+    return;
+  }
   if (url.pathname === '/reg/status' || url.pathname === '/reg/act') {
     let body = '';
     req.on('data', (c) => { body += c; });
@@ -161,10 +186,16 @@ const server = http.createServer((req, res) => {
   res.end('mock openclaw gateway');
 });
 
+const regLoops = [
+  { id: 'lp-2026-10-19-aaaaaa', title: 'Retire the ConBee', domain: 'tech', state: 'Car charger and VINDSTYRKA moved; 2 covers left', next_step: 'pair the 2 covers on Z2M', status: 'open', last_touched: '2026-10-18', scope: 'private', kind: 'loop' },
+  { id: 'lp-2026-10-19-bbbbbb', title: 'Car insurance switch', domain: 'finance', state: 'Two quotes requested', next_step: 'compare when the second quote arrives', status: 'open', last_touched: '2026-10-20', scope: 'shared', kind: 'loop' },
+];
 const regItems = {
   'adm-2026-10-18-5a672f': { status: 'open', kind: 'deadline', title: 'SFR/CertiDeal trade-in bonus', payee: 'CertiDeal', amount: 300, currency: 'EUR', due_date: '2026-10-22', remind_on: '2026-10-21', scope: 'private', store: 'admin' },
   'adm-2026-10-18-032d99': { status: 'open', kind: 'bill', title: 'AEDES charges 4T2026', payee: 'Syndicat Le Clos des Hauts de Genève', amount: 693.78, currency: 'EUR', due_date: '2026-10-01', remind_on: '2026-10-23', scope: 'shared', store: 'admin' },
   'adm-2026-10-18-9ae409': { status: 'open', kind: 'bill', title: 'Taxe foncière 2026', payee: 'DGFiP', amount: 1175, currency: 'EUR', due_date: '2026-10-26', remind_on: '2026-10-25', scope: 'shared', store: 'admin' },
+  'tsk-2026-10-20-c0ffee': { status: 'todo', kind: 'task', title: 'Renew passport', priority: 'P1', consequence: 'travel in December impossible', due_date: '2026-11-15', remind_on: '2026-11-08', scope: 'private', store: 'tasks', domain: 'admin', source: 'a-2026-10-19-004' },
+  'tsk-2026-10-20-dead01': { status: 'waiting', kind: 'task', title: 'Ludmila: Gmail consent', priority: 'P2', scope: 'private', store: 'tasks', domain: 'tech' },
   'adm-2026-10-19-aaaaaa': { status: 'open', kind: 'task', title: 'Call the plumber about the boiler', due_date: '2026-10-27', remind_on: '2026-10-26', scope: 'shared', store: 'todo', domain: 'home' },
 };
 

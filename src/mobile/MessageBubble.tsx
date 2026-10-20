@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, Clock, Copy, FileText, Reply, User } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
@@ -30,6 +30,8 @@ interface Props {
   onReply?: (msg: ChatMessage) => void;
   /** First message of a run shows the sender's avatar; the rest keep its space. */
   showAvatar?: boolean;
+  /** How to show the items a message names (default: cards with Done / Snooze). */
+  renderItems?: (items: Array<{ id: string; label: string }>) => ReactNode;
 }
 
 function Avatar({ mine, visible }: { mine: boolean; visible: boolean }) {
@@ -47,7 +49,7 @@ const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true }: Props) {
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems }: Props) {
   const mine = msg.role === 'user';
   // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
   const { text, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
@@ -151,7 +153,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
           </div>
         ) : null}
-        {!typing && !msg.isStreaming && items.length > 0 && <ItemActions items={items} />}
+        {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items) : <ItemActions items={items} />)}
 
         <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[11px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>

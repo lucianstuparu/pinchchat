@@ -5,12 +5,12 @@
  * Precedence: ?ui=mobile|full in the URL (persisted) > stored choice >
  * VITE_DEFAULT_UI build setting > 'full' (upstream behaviour).
  */
-export type UiMode = 'mobile' | 'full';
+export type UiMode = 'mobile' | 'app' | 'full';
 
 const STORAGE_KEY = 'pinchchat:ui';
 
 function isUiMode(v: unknown): v is UiMode {
-  return v === 'mobile' || v === 'full';
+  return v === 'mobile' || v === 'app' || v === 'full';
 }
 
 export function getUiMode(): UiMode {

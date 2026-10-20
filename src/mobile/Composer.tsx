@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, SendHorizontal } from 'lucide-react';
+import { Mic, Plus, SendHorizontal, Square } from 'lucide-react';
+import { canDictate, canRecord, dictate, record, type Dictation, type Recorder } from '../app/voice';
 import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
 import { encodeAttachment, AttachmentTooLargeError, type OutgoingAttachment } from './attachments';
@@ -24,17 +25,60 @@ interface Props {
   /** Message being replied to; its quote is prepended on send. */
   replyTo?: { text: string; mine: boolean } | null;
   onReplyCancel?: () => void;
+  /** Mic button: tap = dictate into the box, hold = record a voice note (sent as audio). */
+  voice?: boolean;
+  lang?: string;
+  placeholder?: string;
 }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
-export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel }: Props) {
+export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, lang = 'ro-RO', placeholder = 'Message' }: Props) {
   const [text, setText] = useState(() => (prefill?.text ? prefill.text + '\n' : ''));
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ---- voice: tap the mic to dictate (toggle), hold it to record a voice note
+  const [mode, setMode] = useState<'idle' | 'dictating' | 'recording'>('idle');
+  const dict = useRef<Dictation | null>(null);
+  const rec = useRef<Recorder | null>(null);
+  const base = useRef('');
+  const hold = useRef<number | null>(null);
+  const held = useRef(false);
+  const stopDictation = () => { dict.current?.stop(); dict.current = null; };
+  const toggleDictation = () => {
+    if (mode === 'dictating') { stopDictation(); setMode('idle'); return; }
+    base.current = text ? text.replace(/\s*$/, ' ') : '';
+    const d = dictate(lang, (final, interim) => setText(base.current + final + interim), (err) => {
+      setMode('idle'); dict.current = null;
+      if (err && err !== 'aborted') setError(`Dictation: ${err}`);
+    });
+    if (!d) { setError('Dictation is not available in this browser'); return; }
+    dict.current = d; setMode('dictating');
+  };
+  const startRecording = async () => {
+    try { rec.current = await record(); setMode('recording'); }
+    catch { setError('Microphone not available'); }
+  };
+  const stopRecording = async () => {
+    const r = rec.current; rec.current = null; setMode('idle');
+    const note = await r?.stop();
+    if (note) onSend('', [note]);
+  };
+  const micDown = () => {
+    if (!canRecord() || mode !== 'idle') return;
+    held.current = false;
+    hold.current = window.setTimeout(() => { held.current = true; void startRecording(); }, 450);
+  };
+  const micUp = () => {
+    if (hold.current) { window.clearTimeout(hold.current); hold.current = null; }
+    if (mode === 'recording') { void stopRecording(); return; }
+    if (!held.current) toggleDictation();
+  };
+  useEffect(() => () => { stopDictation(); }, []);
 
   // After a share/retry injection, focus with the cursor at the end, ready for a note
   useEffect(() => {
@@ -135,6 +179,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
             ref={taRef}
             rows={1}
             value={text}
+            readOnly={mode !== 'idle'}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !isTouch()) {
@@ -142,11 +187,25 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
                 send();
               }
             }}
-            placeholder="Message"
+            placeholder={mode === 'recording' ? 'Recording… release to send' : mode === 'dictating' ? 'Listening…' : placeholder}
             enterKeyHint={isTouch() ? 'enter' : 'send'}
             className="flex-1 resize-none bg-transparent py-2 pl-1 text-[16px] leading-[22px] text-pc-text placeholder:text-pc-text-faint outline-none"
             aria-label="Message"
           />
+          {voice && (canDictate() || canRecord()) && (
+            <button
+              type="button"
+              onPointerDown={micDown}
+              onPointerUp={micUp}
+              onPointerCancel={micUp}
+              onContextMenu={e => e.preventDefault()}
+              className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center select-none ${mode === 'idle' ? 'text-pc-text-muted hover:bg-[var(--pc-hover)]' : 'bg-red-500 text-white animate-pulse'}`}
+              style={{ touchAction: 'none' }}
+              aria-label={mode === 'recording' ? 'Release to send voice note' : mode === 'dictating' ? 'Stop dictation' : 'Dictate (tap) or voice note (hold)'}
+            >
+              {mode === 'idle' ? <Mic size={20} /> : <Square size={16} />}
+            </button>
+          )}
         </div>
         <button
           type="button"

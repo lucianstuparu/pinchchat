@@ -29,7 +29,7 @@ export interface ItemState {
 
 export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen';
 
-const MARKER = /\s*⟨(adm-\d{4}-\d{2}-\d{2}-[0-9a-f]{6})⟩/g;
+const MARKER = /\s*⟨((?:adm|tsk|lp)-\d{4}-\d{2}-\d{2}-[0-9a-f]{6})⟩/g;
 const LIST_LINE = /^\s*(?:[-*•]|\d+[.)])\s+/;
 
 /**
