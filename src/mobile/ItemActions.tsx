@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Clock, Undo2, Users } from 'lucide-react';
+import { Ban, CalendarClock, Check, CheckCircle2, CircleDot, Clock, ListChecks, Receipt, Repeat, ShoppingCart, Undo2, Users, X } from 'lucide-react';
 import {
   actOnItem, fetchItemStates, formatAmount, formatDay, isClosed, urgency,
   type ItemAction, type ItemState, type MessageItem,
@@ -18,12 +18,17 @@ function dueLine(s: ItemState | undefined, today: string): { text: string; tone:
 
 const closedWord = (status: string) => (status === 'paid' ? 'Paid' : status === 'cancelled' ? 'Dropped' : 'Done');
 
+/** One icon per kind of item, so a glance tells a bill from a task from a shopping item. */
+const KIND_ICONS = { bill: Receipt, deadline: CalendarClock, subscription: Repeat, contract: Receipt, task: ListChecks, buy: ShoppingCart } as const;
+const kindIcon = (kind?: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? CircleDot;
+
 /** One card per register item named in a message: read at a glance, one tap to act. */
 export function ItemActions({ items }: { items: MessageItem[] }) {
   const [states, setStates] = useState<Record<string, ItemState>>({});
   const [today, setToday] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [snoozedNow, setSnoozedNow] = useState<Set<string>>(new Set()); // snoozed by a tap here
   const ids = items.map(i => i.id).join(',');
 
   useEffect(() => {
@@ -39,6 +44,7 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
     try {
       const r = await actOnItem(id, action);
       setStates(s => ({ ...s, [id]: { ...s[id], status: r.status, remind_on: r.remind_on } }));
+      setSnoozedNow(prev => { const n = new Set(prev); if (action === 'snooze') n.add(id); else n.delete(id); return n; });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not change it');
     } finally {
@@ -60,7 +66,9 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
         if (isClosed(s)) {
           return (
             <div key={item.id} className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] text-pc-text-muted bg-[var(--pc-hover)]">
-              <Check size={15} className="shrink-0 text-emerald-600" />
+              {s!.status === 'cancelled'
+                ? <Ban size={15} className="shrink-0 text-pc-text-faint" />
+                : <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />}
               <span className="min-w-0 flex-1 truncate line-through">{title}</span>
               <span className="shrink-0">{closedWord(s!.status)}</span>
               <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'reopen')}
@@ -74,7 +82,9 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
         const due = dueLine(s, today);
         const u = urgency(s, today);
         const edge = u === 'overdue' ? 'border-l-red-500' : u === 'today' || u === 'soon' ? 'border-l-amber-500' : 'border-l-transparent';
-        const snoozed = !!s?.remind_on && !!today && s.remind_on > today;
+        const snoozed = snoozedNow.has(item.id) && !!s?.remind_on;
+        const Kind = kindIcon(s?.kind);
+        const tint = u === 'overdue' ? 'bg-red-100 text-red-600' : u === 'today' || u === 'soon' ? 'bg-amber-100 text-amber-700' : 'bg-[var(--pc-hover-strong)] text-pc-text-secondary';
 
         return (
           <div key={item.id} className={`rounded-xl border border-pc-border border-l-[3px] ${edge} bg-pc-elevated px-3 py-2.5 shadow-[0_1px_1px_rgba(0,0,0,0.04)]`}>
@@ -86,11 +96,16 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
                 </span>
               )}
             </div>
-            <div className="mt-0.5 flex items-start gap-3">
-              <div className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-pc-text-primary">{title}</div>
+            <div className="mt-1 flex items-start gap-2.5">
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tint}`} aria-hidden>
+                <Kind size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold leading-snug text-pc-text-primary">{title}</div>
+                {s?.payee && s.payee !== title && <div className="truncate text-[12px] text-pc-text-muted">{s.payee}</div>}
+              </div>
               {amount && <div className="shrink-0 text-[17px] font-semibold tabular-nums leading-snug">{amount}</div>}
             </div>
-            {s?.payee && s.payee !== title && <div className="mt-0.5 truncate text-[12px] text-pc-text-muted">{s.payee}</div>}
             <div className="mt-2.5 flex items-center gap-1">
               <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'done')}
                 className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-pc-accent text-[14px] font-semibold text-white active:opacity-80 disabled:opacity-60">
@@ -101,8 +116,8 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
                 <Clock size={14} /> Snooze
               </button>
               <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'drop')}
-                className="inline-flex h-10 items-center rounded-full px-3 text-[13px] text-pc-text-muted hover:bg-[var(--pc-hover)] disabled:opacity-60">
-                Drop
+                className="inline-flex h-10 items-center gap-1 rounded-full px-3 text-[13px] text-pc-text-muted hover:bg-[var(--pc-hover)] disabled:opacity-60">
+                <X size={14} /> Drop
               </button>
             </div>
           </div>

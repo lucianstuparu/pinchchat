@@ -5,7 +5,7 @@
  * a persisted outbox, Share Sheet import, and native ask_user choice cards.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, MoreVertical } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
 import { LoginScreen } from '../components/LoginScreen';
@@ -22,6 +22,8 @@ import { disablePush, enablePush, getPushState, type PushState } from './pushNot
 import type { OutgoingAttachment } from './attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { fetchPerson, loadAgentId, messengerAgents, saveAgentId, type MessengerAgent } from './agents';
+import { TopBar } from './TopBar';
+import { searchMessages, snippet } from './searchMessages';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
 
@@ -83,7 +85,7 @@ function mobileScreen(gw: ReturnType<typeof useGateway>) {
 }
 
 function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
-  const { status, messages, isGenerating, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener, switchSession } = gw;
+  const { status, messages, isLoadingHistory, activeSession, sendMessage, createNewSession, logout, getClient, addEventListener, switchSession } = gw;
   const [person, setPerson] = useState<string | null>(null); // null until /whoami answered
   useEffect(() => { void fetchPerson().then(setPerson); }, []);
   const agents = useMemo(() => messengerAgents(gw.agents, person ?? ''), [gw.agents, person]);
@@ -94,7 +96,8 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
     saveAgentId(next.id);
     if (next.session !== activeSession) switchSession(next.session);
   }, [activeSession, switchSession]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [prefill, setPrefill] = useState<ComposerPrefill | null>(null);
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [outbox, setOutbox] = useState<OutboxItem[]>(loadOutbox);
@@ -233,69 +236,51 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
     setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
   };
 
-  const subtitle =
-    status === 'connected'
-      ? (isGenerating ? 'typing…' : 'online')
-      : status === 'connecting'
-        ? 'connecting…'
-        : status === 'pairing'
-          ? 'waiting for pairing approval'
-          : outbox.length > 0 ? `offline — ${outbox.length} waiting to send` : 'offline';
+  const statusLine =
+    status === 'connected' ? null
+      : status === 'connecting' ? 'Connecting…'
+        : status === 'pairing' ? 'Waiting for pairing approval'
+          : outbox.length > 0 ? `Offline — ${outbox.length} waiting to send` : 'Offline';
+
+  // Tabs with a reply the person has not seen yet (other agents' sessions).
+  const unread = useMemo(
+    () => new Set(agents.filter(a => a.session !== activeSession && gw.sessions.some(s => s.key === a.session && s.hasUnread)).map(a => a.id)),
+    [agents, activeSession, gw.sessions],
+  );
+
+  const results = useMemo(() => (search ? searchMessages(shown, search) : []), [shown, search]);
+  const jumpTo = (id: string) => {
+    setSearch(null);
+    setFlash(id);
+    window.setTimeout(() => document.getElementById(`m-${id}`)?.scrollIntoView({ block: 'center' }), 50);
+    window.setTimeout(() => setFlash(null), 1800);
+  };
 
   return (
     <div className="relative h-dvh flex flex-col bg-pc-base text-pc-text overflow-hidden">
-      {/* Top bar */}
-      <header className="shrink-0 flex items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] bg-pc-surface border-b border-pc-border">
-        <img src="/logo-192.png" alt="" className="h-9 w-9 rounded-full" />
-        <div className="flex-1 min-w-0">
-          <h1 className="text-[17px] font-semibold leading-tight">{agent.session === INBOX.session ? 'OpenClaw' : agent.label}</h1>
-          <p className={`text-xs leading-tight ${status === 'connected' ? 'text-pc-text-muted' : 'text-amber-600'}`}>{subtitle}</p>
-        </div>
-        <div className="relative">
-          <button type="button" onClick={() => setMenuOpen(o => !o)} className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-[var(--pc-hover)]" aria-label="Menu" aria-expanded={menuOpen}>
-            <MoreVertical size={20} />
-          </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-10 z-20 w-56 rounded-xl border border-pc-border bg-pc-elevated shadow-lg py-1 text-[15px]">
-                <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenuOpen(false); void createNewSession(); }}>New conversation</button>
-                {pushState !== 'unsupported' && (
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)] disabled:opacity-60"
-                    disabled={pushState === 'blocked' || pushState === 'busy'}
-                    onClick={() => void togglePush()}
-                  >
-                    {pushState === 'on' ? 'Notifications: on — turn off'
-                      : pushState === 'blocked' ? 'Notifications blocked in Chrome settings'
-                      : pushState === 'busy' ? 'Notifications…'
-                      : 'Turn on notifications'}
-                  </button>
-                )}
-                <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => switchUiMode('full')}>Advanced (full PinchChat)</button>
-                <button type="button" className="w-full text-left px-4 py-2.5 text-red-500 hover:bg-[var(--pc-hover)]" onClick={() => { setMenuOpen(false); logout(); }}>Log out</button>
-              </div>
-            </>
-          )}
-        </div>
-      </header>
-
-      {/* Agent switch */}
-      <nav className="shrink-0 flex gap-2 px-4 py-2 bg-pc-surface border-b border-pc-border" aria-label="Agent">
-        {agents.map(a => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => chooseAgent(a)}
-            disabled={outbox.length > 0 && a.session !== INBOX.session}
-            aria-pressed={a.session === agent.session}
-            className={`px-3.5 py-1 rounded-full text-sm border transition-colors disabled:opacity-50 ${a.session === agent.session ? 'bg-pc-accent text-white border-transparent' : 'border-pc-border text-pc-text-muted hover:bg-[var(--pc-hover)]'}`}
-          >
-            {a.label}
-          </button>
-        ))}
-      </nav>
+      <TopBar
+        agents={agents}
+        active={agent}
+        onChoose={chooseAgent}
+        lockedTo={outbox.length > 0 ? INBOX : null}
+        unread={unread}
+        statusLine={statusLine}
+        search={search}
+        onSearch={setSearch}
+        resultCount={results.length}
+        menu={[
+          { label: 'New conversation', onClick: () => void createNewSession() },
+          ...(pushState !== 'unsupported' ? [{
+            label: pushState === 'on' ? 'Notifications: on — turn off'
+              : pushState === 'blocked' ? 'Notifications blocked in Chrome settings'
+              : pushState === 'busy' ? 'Notifications…' : 'Turn on notifications',
+            onClick: () => void togglePush(),
+            disabled: pushState === 'blocked' || pushState === 'busy',
+          }] : []),
+          { label: 'Advanced (full PinchChat)', onClick: () => switchUiMode('full') },
+          { label: 'Log out', onClick: logout, danger: true },
+        ]}
+      />
 
       {/* Conversation */}
       <main ref={scrollRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-1" role="log" aria-live="polite">
@@ -304,12 +289,29 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
           <p className="text-center text-sm text-pc-text-muted px-8 py-10">{agent.placeholder}</p>
         )}
 
-        {shown.map((msg, i) => {
+        {search !== null && search.trim().length >= 2 && (
+          <ul className="px-3 space-y-1" aria-label="Search results">
+            {results.map(m => {
+              const sn = snippet(visibleText(m), search);
+              return (
+                <li key={m.id}>
+                  <button type="button" onClick={() => jumpTo(m.id)} className="w-full rounded-xl bg-pc-surface px-3 py-2 text-left hover:bg-[var(--pc-hover)]">
+                    <div className="mb-0.5 text-[11px] text-pc-text-muted">{m.role === 'user' ? 'You' : agent.label} · {dayLabel(m.timestamp)}</div>
+                    <div className="line-clamp-2 text-[14px] leading-snug">{sn.before}<mark className="rounded bg-amber-200 px-0.5 text-pc-text-primary">{sn.match}</mark>{sn.after}</div>
+                  </button>
+                </li>
+              );
+            })}
+            {results.length === 0 && <li className="py-8 text-center text-sm text-pc-text-muted">Nothing matches “{search.trim()}”</li>}
+          </ul>
+        )}
+
+        {(search === null || search.trim().length < 2) && shown.map((msg, i) => {
           const prev = shown[i - 1];
           const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
           const firstOfRun = newDay || prev.role !== msg.role;
           return (
-            <div key={msg.id} className={firstOfRun && i > 0 ? 'pt-1.5' : undefined}>
+            <div key={msg.id} id={`m-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-1.5' : ''} ${flash === msg.id ? 'rounded-2xl bg-amber-100/60' : ''}`}>
               {newDay && (
                 <div className="flex justify-center py-2">
                   <span className="rounded-lg bg-pc-surface px-3 py-1 text-[12px] text-pc-text-muted shadow-sm">{dayLabel(msg.timestamp)}</span>
