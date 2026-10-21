@@ -87,6 +87,14 @@ export function formatAmount(amount?: number, currency?: string): string {
   return (symbols[c] ?? (c ? `${c} ` : '')) + n;
 }
 
+/** One emoji per domain (same table as the agents' domains.json). */
+export const DOMAIN_EMOJI: Record<string, string> = {
+  home: '🏠', admin: '🗂️', finance: '💶', family: '👪', life: '🌱', health: '❤️', shopping: '🛒', tech: '💻', ideas: '💡',
+  general: '📥', icrc: '🕊️', phd: '🎓', iheid: '🎓', itccs: '🤝', 'citizen-next': '🗳️', cipm: '🏛️', 'casa-artlia': '🏡',
+  'unicef-lp': '📘', zitec: '🏢',
+};
+export const domainEmoji = (d?: string) => (d && DOMAIN_EMOJI[d]) || '';
+
 export const formatDay = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 /** "3 d ago", "today", "2 w ago" — for loops. */

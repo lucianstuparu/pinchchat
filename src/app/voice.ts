@@ -30,12 +30,13 @@ export function dictate(lang: string, onText: (final: string, interim: string) =
   if (!C) return null;
   const r = new C();
   r.lang = lang; r.continuous = true; r.interimResults = true;
-  let finalText = '';
   r.onresult = (e) => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
+    // Rebuild from all results every time: Android Chrome re-sends earlier results with a reset
+    // resultIndex, so appending would repeat words.
+    let finalText = '', interim = '';
+    for (let i = 0; i < e.results.length; i++) {
       const res = e.results[i];
-      if (res.isFinal) finalText += res[0].transcript + ' ';
+      if (res.isFinal) finalText += res[0].transcript.trim() + ' ';
       else interim += res[0].transcript;
     }
     onText(finalText, interim);

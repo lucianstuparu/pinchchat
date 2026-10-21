@@ -1,5 +1,6 @@
 import { memo, useRef, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, Clock, Copy, FileText, Reply, User } from 'lucide-react';
+import { AlertCircle, Check, CheckSquare, Clock, Copy, FileText, Reply } from 'lucide-react';
+import { AgentAvatar, MeAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
@@ -32,24 +33,22 @@ interface Props {
   showAvatar?: boolean;
   /** How to show the items a message names (default: cards with Done / Snooze). */
   renderItems?: (items: Array<{ id: string; label: string }>) => ReactNode;
+  /** Multi-select (copy several messages): enter it from the long-press menu, tap to toggle. */
+  selecting?: boolean;
+  selected?: boolean;
+  onSelect?: (msg: ChatMessage) => void;
 }
 
 function Avatar({ mine, visible }: { mine: boolean; visible: boolean }) {
   if (!visible) return <span className="w-7 shrink-0" aria-hidden />;
-  return mine ? (
-    <span className="mt-0.5 h-7 w-7 shrink-0 self-start rounded-full bg-pc-accent text-white flex items-center justify-center shadow-sm" aria-label="You">
-      <User size={16} />
-    </span>
-  ) : (
-    <img src="/logo-192.png" alt="OpenClaw" className="mt-0.5 h-7 w-7 shrink-0 self-start rounded-full shadow-sm" />
-  );
+  return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar /> : <AgentAvatar />}</span>;
 }
 
 const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems }: Props) {
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect }: Props) {
   const mine = msg.role === 'user';
   // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
   const { text, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
@@ -104,7 +103,13 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   };
 
   return (
-    <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-2xl' : ''}`}
+      onClick={selecting ? () => onSelect?.(msg) : undefined}>
+      {selecting && (
+        <span className={`self-center ${selected ? 'text-pc-accent' : 'text-pc-text-faint'}`} aria-label={selected ? 'selected' : 'not selected'}>
+          <CheckSquare size={18} />
+        </span>
+      )}
       {!mine && <Avatar mine={false} visible={showAvatar} />}
       {dx > 0 && (
         <span
@@ -177,6 +182,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             {text && (
               <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={copy}>
                 <Copy size={16} /> Copy
+              </button>
+            )}
+            {onSelect && (
+              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenu(false); onSelect(msg); }}>
+                <CheckSquare size={16} /> Select
               </button>
             )}
           </div>

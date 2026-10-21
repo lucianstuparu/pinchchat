@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { ChevronRight, Circle, Clock, Users } from 'lucide-react';
-import { formatAmount, formatDay, type NowItem, type Section } from './api';
+import { domainEmoji, formatAmount, formatDay, type NowItem, type Section } from './api';
 
 /**
  * The Now band (app v2 §2): a flat, Todoist-like list of what needs the person, ranked.
@@ -71,7 +71,7 @@ function Row({ item, today, onDone, onSnooze, onOpen, busy }: { item: NowItem; t
         </button>
         <button type="button" onClick={() => onOpen(item)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] leading-snug text-pc-text-primary">{item.title}</span>
+            <span className="block truncate text-[15px] leading-snug text-pc-text-primary">{domainEmoji(item.domain) && <span className="mr-1.5" aria-hidden>{domainEmoji(item.domain)}</span>}{item.title}</span>
             {(chip || item.scope === 'shared' || item.consequence) && (
               <span className="mt-0.5 flex items-center gap-2 text-[12px] leading-tight">
                 {chip && <span className={chip.cls}>{chip.text}</span>}
