@@ -1,7 +1,7 @@
 > **2026-10-21:** two views live in this fork now. `src/mobile/` is the messenger described below
 > (plus, since October: agent tabs via /whoami, item cards for ⟨id⟩ markers, in-conversation search,
 > reminder notification buttons, Web Push). `src/app/` is the **desk** (ai.manager app-v2.md):
-> Now, Open loops, one chat, dictation and voice notes; opened with `?ui=app`, reusing the mobile
+> Now, Open loops, one chat, dictation and voice notes; the default (`?view=app`), reusing the mobile
 > layer's bubbles, composer, question cards, share import and theme. The "Known limits" below are
 > partly outdated: push exists (oc-push on CT 105).
 
@@ -54,7 +54,7 @@ Keep this list current — it is what makes `git merge upstream/main` tractable.
 | File | Change | Why |
 |---|---|---|
 | `src/main.tsx` | 3 lines: import + `getUiMode() === 'mobile' ? <MobileApp/> : <App/>` | entry switch |
-| `public/manifest.json` | name, colours, `start_url: /?ui=mobile`, `share_target` | install as "OpenClaw", receive shares |
+| `public/manifest.json` | name, colours, `start_url: /`, `share_target` | install as "OpenClaw", receive shares |
 | `public/sw.js` | appended "Share target" block; cache name per build (`pinchchat-__BUILD_VERSION__`) plus a stable `pinchchat-share-inbox` cache, old shares migrated on activate | store shared content, works offline; deploys clear old app caches |
 | `package.json`, `scripts/stamp-sw.mjs` | `build` runs `stamp-sw.mjs` after `vite build` (hash of dist/index.html into dist/sw.js) | per-build cache name without a manual bump |
 | `src/hooks/useNotifications.ts` | `APP_NAME` from `VITE_APP_NAME` | tab title |
@@ -77,8 +77,9 @@ returned `getClient` / `addEventListener`. Keep it that way.
 **Never** set a gateway token at build time: anything in `VITE_*` is compiled
 into the public JavaScript. The token is entered once on the login screen and
 stays in that device's local storage.
-
-`?ui=full` / `?ui=mobile` switches UI and remembers the choice. The installed
+`?view=app|mobile|full` switches UI and remembers the choice (it was `?ui=` until 2026-10-21; the
+old parameter and its stored choice are ignored so installed apps move to the desk). The installed
+app launches, and receives shares, in the desk unless another view was chosen from the menu.
 app always launches, and receives shares, in the messenger.
 
 ## Known limits

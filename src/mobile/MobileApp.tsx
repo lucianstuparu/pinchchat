@@ -277,6 +277,7 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
             onClick: () => void togglePush(),
             disabled: pushState === 'blocked' || pushState === 'busy',
           }] : []),
+          { label: 'New desk (with voice)', onClick: () => switchUiMode('app') },
           { label: 'Advanced (full PinchChat)', onClick: () => switchUiMode('full') },
           { label: 'Log out', onClick: logout, danger: true },
         ]}

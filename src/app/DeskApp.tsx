@@ -1,7 +1,7 @@
 /**
  * The desk (ai.manager app v2): one place for everything. Three bands — Now (what needs you),
  * Open loops (where you were) and one chat with the person's front agent — plus a composer with
- * dictation and voice notes. Opt-in with ?ui=app; the older messenger (?ui=mobile) stays until this
+ * dictation and voice notes. The default since 2026-10-21; the older messenger (?view=mobile) stays until this
  * one has proven itself. Protocol work comes from the upstream useGateway hook; the fork's mobile
  * layer provides the bubbles, composer, question cards, share import and theme.
  */

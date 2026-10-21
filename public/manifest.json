@@ -3,7 +3,7 @@
   "name": "OpenClaw",
   "short_name": "OpenClaw",
   "description": "Private messenger for your OpenClaw assistant. Share links, photos and files straight into the conversation.",
-  "start_url": "/?ui=mobile",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": [

@@ -2,12 +2,17 @@
  * Chooses between the desk (src/app, the default since 2026-10-21), the older
  * messenger-style mobile UI (src/mobile) and the full upstream PinchChat UI.
  *
- * Precedence: ?ui=app|mobile|full in the URL (persisted) > stored choice >
+ * Precedence: ?view=app|mobile|full in the URL (persisted) > stored choice >
  * VITE_DEFAULT_UI build setting > 'full' (upstream behaviour).
+ *
+ * The parameter was ?ui= until 2026-10-21. The installed app's old start_url was
+ * /?ui=mobile and the old choice was stored under pinchchat:ui, which kept phones on
+ * the older messenger after the desk became the default. Both are now ignored.
  */
 export type UiMode = 'mobile' | 'app' | 'full';
 
-const STORAGE_KEY = 'pinchchat:ui';
+const STORAGE_KEY = 'pinchchat:view';
+const PARAM = 'view';
 
 function isUiMode(v: unknown): v is UiMode {
   return v === 'mobile' || v === 'app' || v === 'full';
@@ -15,7 +20,7 @@ function isUiMode(v: unknown): v is UiMode {
 
 export function getUiMode(): UiMode {
   try {
-    const fromUrl = new URLSearchParams(window.location.search).get('ui');
+    const fromUrl = new URLSearchParams(window.location.search).get(PARAM);
     if (isUiMode(fromUrl)) {
       localStorage.setItem(STORAGE_KEY, fromUrl);
       return fromUrl;
@@ -37,6 +42,7 @@ export function switchUiMode(mode: UiMode) {
     // Ignore — the URL parameter below still carries the choice for this load
   }
   const url = new URL(window.location.href);
-  url.searchParams.set('ui', mode);
+  url.searchParams.delete('ui');
+  url.searchParams.set(PARAM, mode);
   window.location.href = url.toString();
 }
