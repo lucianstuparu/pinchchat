@@ -1,25 +1,35 @@
-import { ChevronRight, Users } from 'lucide-react';
-import { ago, type Loop } from './api';
+import { ArrowRight, MessagesSquare, Users } from 'lucide-react';
+import { ago, domainEmoji, type Loop } from './api';
 
-/** The Open loops band (app v2 §6): one line per unfinished exploration, "continue" drops it into the chat. */
+/**
+ * "In progress" (app v2 §6, stored as loops): things being thought through, with where they stand
+ * and the next step. "Continue" picks the conversation up in the chat.
+ */
 export function LoopsList({ loops, today, onContinue, onOpen }: { loops: Loop[]; today: string; onContinue: (l: Loop) => void; onOpen: (l: Loop) => void }) {
-  if (loops.length === 0) return <p className="px-4 py-3 text-[14px] text-pc-text-muted">No open loops. Say "keep this open" in the chat to start one.</p>;
+  if (loops.length === 0) {
+    return (
+      <div className="flex flex-col items-center px-8 py-12 text-center">
+        <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-accent"><MessagesSquare size={22} /></span>
+        <p className="text-[16px] font-semibold">Nothing in progress</p>
+        <p className="mt-1 text-[14px] text-pc-text-muted">Say “think through …” in the chat and it stays here until it is settled.</p>
+      </div>
+    );
+  }
   return (
-    <div className="px-4 divide-y divide-[var(--pc-separator)]">
-      {loops.slice(0, 8).map(l => (
-        <div key={l.id} className="flex items-center gap-2 py-2">
-          <button type="button" onClick={() => onContinue(l)} className="min-w-0 flex-1 text-left">
+    <div className="divide-y divide-[var(--pc-separator)]">
+      {loops.map(l => (
+        <div key={l.id} className="flex items-center gap-2 py-3 pl-4 pr-3">
+          <button type="button" onClick={() => onOpen(l)} className="min-w-0 flex-1 text-left">
             <span className="flex items-center gap-1.5">
-              <span className="truncate text-[15px] leading-snug text-pc-text-primary">{l.title}</span>
+              {domainEmoji(l.domain) && <span aria-hidden className="text-[13px]">{domainEmoji(l.domain)}</span>}
+              <span className="truncate text-[16px] leading-snug text-pc-text-primary">{l.title}</span>
               {l.scope === 'shared' && <Users size={12} className="shrink-0 text-pc-text-faint" aria-label="shared" />}
-              <span className="ml-auto shrink-0 text-[11px] text-pc-text-faint">{ago(l.last_touched, today)}</span>
             </span>
-            <span className="mt-0.5 block truncate text-[12px] text-pc-text-muted">
-              {l.next_step ? <>next: {l.next_step}</> : l.state}
-            </span>
+            <span className="mt-0.5 block truncate text-[13px] text-pc-text-muted">{l.next_step ? <>Next: {l.next_step}</> : l.state}</span>
+            {l.last_touched && <span className="mt-0.5 block text-[12px] text-pc-text-faint">Last touched {ago(l.last_touched, today)}</span>}
           </button>
-          <button type="button" onClick={() => onOpen(l)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-pc-text-faint hover:bg-[var(--pc-hover)]" aria-label={`Open "${l.title}"`}>
-            <ChevronRight size={16} />
+          <button type="button" onClick={() => onContinue(l)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] px-3 text-[14px] font-medium text-pc-accent active:opacity-70" aria-label={`Continue “${l.title}”`}>
+            Continue <ArrowRight size={14} />
           </button>
         </div>
       ))}

@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, Receipt, Repeat, ShoppingCart, Undo2, X } from 'lucide-react';
-import { act, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet } from './api';
+import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Receipt, Repeat, ShoppingCart, Undo2, X } from 'lucide-react';
+import { act, domainEmoji, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet } from './api';
 
 /**
- * The item sheet (app v2 §2): what an item is, where it came from, its history, and the actions.
- * Opens from a Now row, a chip in the chat, or a loop.
+ * Details of one item (app v2 §2): what it is, where it came from, and what can be done with it.
+ * Opens from a To do row, a chip in the chat, or an In progress topic.
  */
 interface Props {
   id: string;
   onClose: () => void;
   onChanged: () => void;
-  /** Put text into the composer (ask about it, continue a loop, schedule). */
+  /** Put text into the composer (ask about it, continue, schedule). */
   onAsk: (text: string, send?: boolean) => void;
 }
 
 const CLOSED = ['paid', 'done', 'cancelled', 'closed'];
-const KIND_ICON: Record<string, typeof Receipt> = { bill: Receipt, deadline: CalendarClock, subscription: Repeat, contract: Receipt, task: ListChecks, buy: ShoppingCart, loop: MessageSquare };
+const KIND: Record<string, { icon: typeof Receipt; label: string }> = {
+  bill: { icon: Receipt, label: 'Bill' }, deadline: { icon: CalendarClock, label: 'Deadline' }, subscription: { icon: Repeat, label: 'Subscription' },
+  contract: { icon: Receipt, label: 'Contract' }, task: { icon: ListChecks, label: 'Task' }, buy: { icon: ShoppingCart, label: 'Shopping' },
+  loop: { icon: MessagesSquare, label: 'In progress' },
+};
+const STATUS: Record<string, string> = { todo: 'To do', open: 'Open', next: 'Next', waiting: 'Waiting', paid: 'Paid', done: 'Done', cancelled: 'Not needed', closed: 'Finished' };
+const PRIORITY = [['P1', 'Urgent'], ['P2', 'High'], ['P3', 'Normal'], ['P4', 'Low']] as const;
 
 export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
@@ -35,84 +41,104 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
   const it = sheet?.item;
   const closed = !!it && CLOSED.includes(it.status);
   const kind = (it?.kind as string) || (it?.store === 'loops' ? 'loop' : 'task');
-  const Icon = KIND_ICON[kind] ?? ListChecks;
+  const K = KIND[kind] ?? KIND.task;
   const str = (k: string) => (it && typeof it[k] === 'string' ? (it[k] as string) : undefined);
   const num = (k: string) => (it && typeof it[k] === 'number' ? (it[k] as number) : undefined);
+  const isTopic = kind === 'loop';
+
+  const rows: Array<[string, string]> = it ? ([
+    ['Amount', num('amount') != null ? formatAmount(num('amount'), str('currency')) : ''],
+    ['Due', str('due_date') ? formatDay(str('due_date')!) : ''],
+    ['Scheduled', str('scheduled')?.replace('T', ' ') ?? ''],
+    ['Reminder', str('remind_on') && !closed ? formatDay(str('remind_on')!) : ''],
+    ['To', str('payee') ?? ''],
+    ['If missed', str('consequence') ?? ''],
+    ['Where it stands', str('state') ?? ''],
+    ['Next step', str('next_step') ?? ''],
+    ['Outcome', str('outcome') ?? ''],
+  ] as Array<[string, string]>).filter(([, v]) => v) : [];
+
+  const secondary = 'flex flex-col items-center justify-center gap-1 rounded-2xl bg-pc-surface py-3 text-[13px] text-pc-text active:bg-[var(--pc-hover-strong)] disabled:opacity-50';
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={it?.title ?? 'Item'}>
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl bg-pc-elevated px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-xl md:max-w-lg md:rounded-2xl">
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-pc-border md:hidden" />
-        {!it && !error && <p className="py-6 text-center text-sm text-pc-text-muted">Loading…</p>}
+    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={it?.title ?? 'Item'}>
+      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
+      <div className="relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[22px] bg-pc-elevated px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl md:max-w-lg md:rounded-[22px]">
+        <div className="mx-auto mb-2 h-[5px] w-9 rounded-full bg-pc-text-faint/50 md:hidden" />
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+        </div>
+        {!it && !error && <p className="py-10 text-center text-sm text-pc-text-muted">Loading…</p>}
         {error && <p className="py-2 text-sm text-red-500">{error}</p>}
         {it && (
           <>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--pc-hover-strong)] text-pc-text-secondary"><Icon size={18} /></span>
-              <div className="min-w-0 flex-1">
-                <h2 className={`text-[17px] font-semibold leading-snug ${closed ? 'line-through text-pc-text-muted' : 'text-pc-text-primary'}`}>{it.title}</h2>
-                <p className="mt-0.5 text-[12px] text-pc-text-muted">
-                  {[kind, str('priority'), it.scope === 'shared' ? 'shared' : null, str('domain'), it.status].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-              <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--pc-hover)]" aria-label="Close"><X size={18} /></button>
+            <div className="-mt-2 mb-4">
+              <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-pc-accent">
+                <K.icon size={14} /> {K.label}{domainEmoji(str('domain')) ? ` · ${domainEmoji(str('domain'))} ${str('domain')}` : ''}{it.scope === 'shared' ? ' · shared' : ''}
+              </p>
+              <h2 className={`pr-6 text-[22px] font-bold leading-tight ${closed ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{it.title}</h2>
+              {closed && <p className="mt-1 text-[14px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
             </div>
 
-            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[14px]">
-              {num('amount') != null && <><dt className="text-pc-text-muted">Amount</dt><dd className="tabular-nums">{formatAmount(num('amount'), str('currency'))}</dd></>}
-              {str('due_date') && <><dt className="text-pc-text-muted">Due</dt><dd>{formatDay(str('due_date')!)}</dd></>}
-              {str('scheduled') && <><dt className="text-pc-text-muted">Scheduled</dt><dd>{str('scheduled')!.replace('T', ' ')}</dd></>}
-              {str('remind_on') && !closed && <><dt className="text-pc-text-muted">Next nudge</dt><dd>{formatDay(str('remind_on')!)}</dd></>}
-              {str('payee') && <><dt className="text-pc-text-muted">Payee</dt><dd>{str('payee')}</dd></>}
-              {str('consequence') && <><dt className="text-pc-text-muted">If missed</dt><dd>{str('consequence')}</dd></>}
-              {str('state') && <><dt className="text-pc-text-muted">State</dt><dd>{str('state')}</dd></>}
-              {str('next_step') && <><dt className="text-pc-text-muted">Next step</dt><dd>{str('next_step')}</dd></>}
-              {str('outcome') && <><dt className="text-pc-text-muted">Outcome</dt><dd>{str('outcome')}</dd></>}
-            </dl>
-            {str('notes') && <p className="mt-2 whitespace-pre-wrap text-[13px] text-pc-text-secondary">{str('notes')}</p>}
+            {rows.length > 0 && (
+              <dl className="mb-3 divide-y divide-[var(--pc-separator)] rounded-2xl bg-pc-surface px-4">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between gap-4 py-2.5 text-[15px]">
+                    <dt className="shrink-0 text-pc-text-muted">{k}</dt>
+                    <dd className="min-w-0 text-right tabular-nums">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {str('notes') && <p className="mb-3 whitespace-pre-wrap rounded-2xl bg-pc-surface px-4 py-3 text-[14px] text-pc-text-secondary">{str('notes')}</p>}
 
             {sheet?.origin && (
-              <div className="mt-3 rounded-xl bg-[var(--pc-hover)] px-3 py-2 text-[13px]">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-pc-text-muted">From</p>
+              <div className="mb-3 rounded-2xl bg-pc-surface px-4 py-3 text-[14px]">
+                <p className="mb-1 text-[12px] font-medium text-pc-text-muted">Came from</p>
                 {sheet.origin.kind === 'message'
-                  ? <p className="mt-0.5 whitespace-pre-wrap">{sheet.origin.text}<span className="block text-[11px] text-pc-text-faint">{sheet.origin.type} · {sheet.origin.ts?.slice(0, 10)}</span></p>
-                  : <p className="mt-0.5 text-pc-text-secondary">an email (ask Admin to open it)</p>}
+                  ? <p className="whitespace-pre-wrap">“{sheet.origin.text}”<span className="mt-1 block text-[12px] text-pc-text-faint">{sheet.origin.ts?.slice(0, 10)}</span></p>
+                  : <p className="text-pc-text-secondary">An email. Ask about it to have it opened.</p>}
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {closed ? (
-                <button type="button" disabled={busy} onClick={() => void run('reopen')} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px] disabled:opacity-60"><Undo2 size={15} /> Reopen</button>
-              ) : (
-                <>
-                  <button type="button" disabled={busy} onClick={() => void run('done')} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-pc-accent px-4 text-[14px] font-semibold text-white disabled:opacity-60">
-                    <Check size={16} /> {kind === 'bill' ? 'Paid' : kind === 'loop' ? 'Close' : 'Done'}
-                  </button>
-                  {kind !== 'loop' && (
-                    <button type="button" disabled={busy} onClick={() => void run('snooze')} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px] disabled:opacity-60"><Clock size={15} /> Snooze 3 d</button>
-                  )}
-                  {kind === 'loop'
-                    ? <button type="button" onClick={() => { onAsk(`Continue: ${it.title} ⟨${id}⟩`, true); onClose(); }} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px]"><MessageSquare size={15} /> Continue</button>
-                    : <button type="button" onClick={() => { onAsk(`About ⟨${id}⟩: `); onClose(); }} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px]"><MessageSquare size={15} /> Ask about it</button>}
+            {closed ? (
+              <button type="button" disabled={busy} onClick={() => void run('reopen')} className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
+                <Undo2 size={18} /> Reopen
+              </button>
+            ) : (
+              <>
+                <button type="button" disabled={busy} onClick={() => void run('done')}
+                  className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-pc-accent text-[16px] font-semibold text-white active:opacity-80 disabled:opacity-60">
+                  <Check size={19} strokeWidth={2.5} /> {kind === 'bill' ? 'Mark as paid' : isTopic ? 'It’s settled' : 'Done'}
+                </button>
+                <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
+                  {isTopic
+                    ? <button type="button" onClick={() => { onAsk(`Continue: ${it.title} ⟨${id}⟩`, true); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Continue</button>
+                    : <button type="button" disabled={busy} onClick={() => void run('snooze')} className={secondary}><Clock size={19} className="text-pc-accent" /> In 3 days</button>}
+                  {!isTopic && <button type="button" onClick={() => { onAsk(`About ⟨${id}⟩: `); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Ask</button>}
                   {it.store === 'tasks' && !str('scheduled') && (
-                    <button type="button" onClick={() => { onAsk(`Schedule ⟨${id}⟩ for `); onClose(); }} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px]"><CalendarClock size={15} /> Schedule</button>
+                    <button type="button" onClick={() => { onAsk(`Schedule ⟨${id}⟩ for `); onClose(); }} className={secondary}><CalendarClock size={19} className="text-pc-accent" /> Schedule</button>
                   )}
                   {it.store === 'admin' && (
-                    <button type="button" disabled={busy} onClick={() => void run('to-task')} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-pc-border px-4 text-[14px] disabled:opacity-60"><ListChecks size={15} /> Make it a task</button>
+                    <button type="button" disabled={busy} onClick={() => void run('to-task')} className={secondary}><ListChecks size={19} className="text-pc-accent" /> Make a task</button>
                   )}
-                  <button type="button" disabled={busy} onClick={() => void run('drop')} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[14px] text-pc-text-muted disabled:opacity-60"><Ban size={15} /> Drop</button>
-                </>
-              )}
-            </div>
-            {!closed && it.store !== 'loops' && (
-              <div className="mt-3 flex items-center gap-1 text-[12px] text-pc-text-muted">
-                Priority
-                {(['P1', 'P2', 'P3', 'P4'] as const).map(p => (
-                  <button key={p} type="button" disabled={busy} onClick={() => void run('priority', { priority: p })}
-                    className={`h-7 rounded-full px-2.5 ${str('priority') === p || (!str('priority') && p === 'P3') ? 'bg-pc-accent text-white' : 'border border-pc-border'}`}>{p}</button>
-                ))}
-              </div>
+                  <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Not needed</button>
+                </div>
+                {!isTopic && (
+                  <div className="mt-4">
+                    <p className="mb-1.5 px-1 text-[13px] text-pc-text-muted">Priority</p>
+                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-pc-surface p-1">
+                      {PRIORITY.map(([p, label]) => {
+                        const on = str('priority') === p || (!str('priority') && p === 'P3');
+                        return (
+                          <button key={p} type="button" disabled={busy} onClick={() => void run('priority', { priority: p })}
+                            className={`h-8 rounded-lg text-[13px] font-medium ${on ? `bg-pc-elevated shadow-sm ${p === 'P1' ? 'text-red-500' : 'text-pc-text'}` : 'text-pc-text-muted'}`}>{label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

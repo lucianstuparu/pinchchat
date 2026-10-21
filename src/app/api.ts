@@ -106,3 +106,15 @@ export function ago(d: string | undefined, today: string): string {
   if (days < 14) return `${days} d ago`;
   return `${Math.round(days / 7)} w ago`;
 }
+
+/** The date line of a to-do: Overdue / Today / Tomorrow / a date, with its colour class. */
+export function whenLabel(item: NowItem, today: string): { text: string; cls: string } | null {
+  const due = item.due_date || item.scheduled?.slice(0, 10);
+  if (item.section === 'waiting') return { text: 'Waiting', cls: 'text-pc-text-muted' };
+  if (!due) return null;
+  if (item.section === 'overdue') return { text: `Overdue · ${formatDay(due)}`, cls: 'text-red-500' };
+  if (item.section === 'today') return { text: 'Today', cls: 'text-pc-accent' };
+  if (due === nextDay(today)) return { text: 'Tomorrow', cls: 'text-pc-accent' };
+  return { text: formatDay(due), cls: 'text-pc-text-muted' };
+}
+const nextDay = (d: string) => new Date(Date.parse(d) + 86_400_000).toISOString().slice(0, 10);

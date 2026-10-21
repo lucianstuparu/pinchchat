@@ -24,24 +24,58 @@ export const canRecord = () => typeof window !== 'undefined' && 'MediaRecorder' 
 
 export interface Dictation { stop: () => void }
 
-/** Start dictating; `onText(final, interim)` is called as words arrive. Resolves when it ends. */
-export function dictate(lang: string, onText: (final: string, interim: string) => void, onEnd: (error?: string) => void): Dictation | null {
+/** Dictation languages offered in the app; the choice is kept per device. */
+export const DICTATION_LANGS = [
+  { code: 'ro-RO', short: 'RO', name: 'Română' },
+  { code: 'en-GB', short: 'EN', name: 'English' },
+  { code: 'fr-FR', short: 'FR', name: 'Français' },
+] as const;
+const LANG_KEY = 'openclaw-pwa:dictation-lang';
+export function getDictationLang(): string {
+  try { const v = localStorage.getItem(LANG_KEY); if (v && DICTATION_LANGS.some(l => l.code === v)) return v; } catch { /* default */ }
+  return 'ro-RO';
+}
+export function setDictationLang(code: string) { try { localStorage.setItem(LANG_KEY, code); } catch { /* not kept */ } }
+
+const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/**
+ * Joins the recogniser's pieces into one text without repeats. Chrome on Android sends each
+ * finished phrase with everything said before it in the session ("call", "call the bank",
+ * "call the bank on Friday"), and sometimes re-sends a piece; desktop Chrome sends separate
+ * pieces. A piece that already contains the text so far replaces it, a piece the text already
+ * ends with is skipped, anything else is appended.
+ */
+export function mergePieces(pieces: string[]): string {
+  let acc = '';
+  for (const raw of pieces) {
+    const p = raw.trim();
+    if (!p) continue;
+    const a = norm(acc), n = norm(p);
+    if (!a || n.startsWith(a)) acc = p;
+    else if (a.endsWith(n) || a.includes(n)) continue;
+    else acc = `${acc} ${p}`;
+  }
+  return acc;
+}
+
+/** Start dictating; `onText(text)` gets the whole text so far (finished + in progress). */
+export function dictate(lang: string, onText: (text: string, interim: boolean) => void, onEnd: (error?: string) => void): Dictation | null {
   const C = Ctor();
   if (!C) return null;
   const r = new C();
   r.lang = lang; r.continuous = true; r.interimResults = true;
   r.onresult = (e) => {
-    // Rebuild from all results every time: Android Chrome re-sends earlier results with a reset
-    // resultIndex, so appending would repeat words.
-    let finalText = '', interim = '';
+    const finals: string[] = [];
+    let interim = '';
     for (let i = 0; i < e.results.length; i++) {
       const res = e.results[i];
-      if (res.isFinal) finalText += res[0].transcript.trim() + ' ';
-      else interim += res[0].transcript;
+      if (res.isFinal) finals.push(res[0].transcript);
+      else interim = res[0].transcript;   // the last one in progress is the whole current phrase
     }
-    onText(finalText, interim);
+    onText(mergePieces(interim ? [...finals, interim] : finals), !!interim);
   };
-  r.onerror = (e) => onEnd(e.error === 'no-speech' ? undefined : e.error);
+  r.onerror = (e) => onEnd(e.error === 'no-speech' || e.error === 'aborted' ? undefined : e.error);
   r.onend = () => onEnd();
   r.start();
   return { stop: () => r.stop() };
@@ -63,7 +97,7 @@ export async function record(): Promise<Recorder> {
       rec.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        if (Date.now() - started < 700 || blob.size < 1000) return resolve(null);   // a tap, not a note
+        if (Date.now() - started < 400 || blob.size === 0) return resolve(null);   // a slip of the finger
         const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
         const buf = new Uint8Array(await blob.arrayBuffer());
         let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
