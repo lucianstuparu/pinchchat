@@ -1,8 +1,8 @@
 /**
- * Chooses between the messenger-style mobile UI (src/mobile) and the full
- * upstream PinchChat UI.
+ * Chooses between the desk (src/app, the default since 2026-10-21), the older
+ * messenger-style mobile UI (src/mobile) and the full upstream PinchChat UI.
  *
- * Precedence: ?ui=mobile|full in the URL (persisted) > stored choice >
+ * Precedence: ?ui=app|mobile|full in the URL (persisted) > stored choice >
  * VITE_DEFAULT_UI build setting > 'full' (upstream behaviour).
  */
 export type UiMode = 'mobile' | 'app' | 'full';

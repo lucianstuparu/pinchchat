@@ -81,7 +81,7 @@ self.addEventListener('fetch', (event) => {
 // Share target (openclaw-pwa fork addition — see MOBILE.md)
 //
 // Android's Share Sheet POSTs multipart data to /share (manifest share_target).
-// Store it in Cache Storage and redirect to /?ui=mobile&share=<id>; the app
+// Store it in Cache Storage and redirect to /?share=<id>; the app
 // (src/share/shareInbox.ts, which searches every cache) prefills the composer
 // from it. Stored in SHARE_CACHE, which the activate handler never deletes.
 // Handled entirely here, so it works offline and before any login.
@@ -113,9 +113,9 @@ self.addEventListener('fetch', (event) => {
       await cache.put(`/share-inbox/${id}/meta.json`, new Response(JSON.stringify(meta), {
         headers: { 'content-type': 'application/json' },
       }));
-      return Response.redirect(`/?ui=mobile&share=${id}`, 303);
+      return Response.redirect(`/?share=${id}`, 303);
     } catch (err) {
-      return Response.redirect('/?ui=mobile&share=failed', 303);
+      return Response.redirect('/?share=failed', 303);
     }
   })());
 });
@@ -140,7 +140,7 @@ self.addEventListener('push', (event) => {
     tag: data.tag || undefined,
     renotify: !!data.tag,
     actions: item && Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
-    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/?ui=mobile', item },
+    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/', item },
   }));
 });
 
@@ -161,7 +161,7 @@ async function reminderAction(notification, action) {
       data: { url },
     });
   } catch {
-    await self.clients.openWindow(new URL(url || '/?ui=mobile', self.location.origin).href);
+    await self.clients.openWindow(new URL(url || '/', self.location.origin).href);
   }
 }
 
@@ -171,7 +171,7 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(reminderAction(event.notification, event.action));
     return;
   }
-  const target = new URL(event.notification.data && event.notification.data.url || '/?ui=mobile', self.location.origin).href;
+  const target = new URL(event.notification.data && event.notification.data.url || '/', self.location.origin).href;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of windows) {
