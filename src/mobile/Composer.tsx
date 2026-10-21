@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, AudioLines, Mic, Paperclip, Plus, Square, Trash2, X } from 'lucide-react';
+import { ArrowUp, AudioLines, Check, Loader2, Mic, Paperclip, Plus, Square, Trash2, X } from 'lucide-react';
 import { DICTATION_LANGS, canDictate, canRecord, dictate, getDictationLang, record, setDictationLang, type Dictation, type Recorder } from '../app/voice';
 import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
@@ -31,13 +31,15 @@ interface Props {
    * transcribes it with Whisper).
    */
   voice?: boolean;
+  /** Speech to text on the server (Whisper), for browsers without their own recogniser. */
+  transcribe?: (audio: OutgoingAttachment) => Promise<string>;
   placeholder?: string;
 }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, placeholder = 'Message' }: Props) {
+export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, transcribe, placeholder = 'Message' }: Props) {
   const [text, setText] = useState(() => (prefill?.text ? prefill.text + '\n' : ''));
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ---- voice
-  const [mode, setMode] = useState<'idle' | 'dictating' | 'starting' | 'recording'>('idle');
+  const [mode, setMode] = useState<'idle' | 'dictating' | 'starting' | 'recording' | 'transcribing'>('idle');
+  const forText = useRef(false);   // the recording is for speech to text (server), not a voice message
+  const serverStt = !!transcribe && !canDictate() && canRecord();
   const [lang, setLang] = useState(getDictationLang);
   const dict = useRef<Dictation | null>(null);
   const rec = useRef<Recorder | null>(null);
@@ -77,9 +81,10 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     if (mode === 'dictating') { const keep = text; stopDictation(); startDictation(code, keep); }
   };
 
-  const startRecording = async () => {
+  const startRecording = async (text = false) => {
     setPlusOpen(false);
     if (mode !== 'idle') return;
+    forText.current = text;
     setError(null); setMode('starting');
     try { rec.current = await record(); setSecs(0); setMode('recording'); }
     catch { setMode('idle'); setError('Microphone not available: allow it for this app in Chrome’s site settings'); }
@@ -88,6 +93,14 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     const r = rec.current; rec.current = null; setMode('idle');
     const note = await r?.stop();
     if (!keep) return;
+    if (forText.current) {
+      if (!note || !transcribe) { setError('Nothing was recorded'); return; }
+      setMode('transcribing');
+      try { const t = (await transcribe(note)).trim(); if (t) setText(prev => (prev ? prev.replace(/\s*$/, ' ') : '') + t); else setError('No speech recognised'); }
+      catch { setError('Could not turn the recording into text'); }
+      finally { setMode('idle'); }
+      return;
+    }
     if (note) onSend('🎤 Voice message', [note]);   // a caption, so the bubble shows and the agent knows what it is
     else setError('Nothing was recorded');
   };
@@ -155,7 +168,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const recording = mode === 'recording' || mode === 'starting';
+  const recording = mode === 'recording' || mode === 'starting' || mode === 'transcribing';
   const round = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full';
   const langShort = DICTATION_LANGS.find(l => l.code === lang)?.short ?? 'RO';
 
@@ -190,7 +203,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
       <input ref={fileRef} type="file" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <div className="flex items-end gap-1.5">
         {recording ? (
-          <button type="button" onClick={() => void stopRecording(false)} className={`${round} text-red-500 active:bg-[var(--pc-hover-strong)]`} aria-label="Discard voice message">
+          <button type="button" disabled={mode === 'transcribing'} onClick={() => void stopRecording(false)} className={`${round} text-red-500 active:bg-[var(--pc-hover-strong)] disabled:opacity-40`} aria-label="Discard recording">
             <Trash2 size={20} />
           </button>
         ) : (
@@ -209,7 +222,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
                     <Paperclip size={19} className="text-pc-accent" /> Photo or file
                   </button>
                   <div className="mx-4 h-px bg-[var(--pc-separator)]" />
-                  <button type="button" role="menuitem" onClick={() => void startRecording()}
+                  <button type="button" role="menuitem" onClick={() => void startRecording(false)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                     <AudioLines size={19} className="text-pc-accent" />
                     <span>Voice message<span className="block text-[12px] text-pc-text-muted">sent as audio</span></span>
@@ -223,7 +236,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
         {recording ? (
           <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-[20px] bg-pc-surface px-4" role="status" aria-live="polite">
             <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-            <span className="text-[15px] tabular-nums">{mode === 'starting' ? 'Starting…' : clock(secs)}</span>
+            <span className="text-[15px] tabular-nums">{mode === 'starting' ? 'Starting…' : mode === 'transcribing' ? 'Turning it into text…' : clock(secs)}</span>
             <span className="flex min-w-0 flex-1 items-center justify-end gap-[3px] overflow-hidden" aria-hidden>
               {Array.from({ length: 18 }).map((_, i) => (
                 <span key={i} className="w-[3px] rounded-full bg-[rgba(var(--pc-accent-rgb),0.55)]"
@@ -256,6 +269,11 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
                 {langShort}
               </button>
             )}
+            {voice && serverStt && mode === 'idle' && (
+              <button type="button" onClick={() => void startRecording(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Speak to type" title="Speak to type">
+                <Mic size={21} />
+              </button>
+            )}
             {voice && canDictate() && (
               <button type="button" onClick={toggleDictation}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${mode === 'dictating' ? 'text-red-500' : 'text-pc-text-muted active:text-pc-text'}`}
@@ -269,9 +287,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
         )}
 
         {recording ? (
-          <button type="button" disabled={mode === 'starting'} onClick={() => void stopRecording(true)}
-            className={`${round} bg-pc-accent text-white transition-transform active:scale-95 disabled:opacity-50`} aria-label="Send voice message">
-            <ArrowUp size={21} strokeWidth={2.5} />
+          <button type="button" disabled={mode !== 'recording'} onClick={() => void stopRecording(true)}
+            className={`${round} bg-pc-accent text-white transition-transform active:scale-95 disabled:opacity-50`} aria-label={forText.current ? 'Done speaking' : 'Send voice message'}>
+            {mode === 'transcribing' ? <Loader2 size={20} className="animate-spin" /> : forText.current ? <Check size={21} strokeWidth={2.5} /> : <ArrowUp size={21} strokeWidth={2.5} />}
           </button>
         ) : (canSend || !voice) && (
           <button type="button" onClick={send} disabled={!canSend}

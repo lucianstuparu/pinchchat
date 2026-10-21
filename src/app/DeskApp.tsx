@@ -28,7 +28,7 @@ import { disablePush, enablePush, getPushState, type PushState } from '../mobile
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { searchMessages, snippet } from '../mobile/searchMessages';
-import { act, domainEmoji, fetchLoops, fetchNow, whenLabel, whoami, SessionExpired, type Loop, type NowItem } from './api';
+import { act, domainEmoji, fetchLoops, fetchNow, transcribeAudio, whenLabel, whoami, SessionExpired, type Loop, type NowItem } from './api';
 import { NowList } from './NowList';
 import { LoopsList } from './LoopsList';
 import { ItemSheet } from './ItemSheet';
@@ -437,7 +437,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
               </button>
             ))}
           </div>
-          <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice placeholder="Type or tap the mic" />
+          <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Type or tap the mic" />
         </div>
       )}
 

@@ -61,6 +61,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+export const transcribeAudio = (audio: { content: string; mimeType: string }) =>
+  post<{ text: string; lang: string | null }>('/reg/transcribe', { audio: audio.content, mimeType: audio.mimeType }).then(r => r.text);
 export const fetchNow = () => post<{ today: string; items: NowItem[] }>('/reg/now', {});
 export const fetchLoops = () => post<{ today: string; loops: Loop[] }>('/reg/loops', {});
 export const fetchSheet = (item: string) => post<Sheet>('/reg/item', { item });
