@@ -13,6 +13,8 @@ import { applyPantry, type PantryOp } from './pantry';
 const applyAll = (s: Snapshot, op: Op, person: string): Snapshot => ({
   ...s, items: applyLocal(s.items, op, person),
   pantry: op.op.startsWith('pantry-') ? applyPantry(s.pantry ?? [], op as PantryOp, person) : s.pantry,
+  products: op.op === 'favorite' ? (s.products ?? []).map(p => p.id !== op.product ? p : {
+    ...p, fav_by: op.on ? [...new Set([...(p.fav_by ?? []), person])] : (p.fav_by ?? []).filter(x => x !== person) }) : s.products,
 });
 
 const SNAP_KEY = 'shop:snapshot';

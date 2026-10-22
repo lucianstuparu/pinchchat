@@ -4,7 +4,7 @@
  * where and at what price they were last bought. Shared by the household.
  */
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MessageSquare, Package, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Heart, MessageSquare, Package, Plus, Search, X } from 'lucide-react';
 import { fold, novaBadge, type Nutrition, type Product, type Purchase, type Store } from './logic';
 import { photoUrl } from './photos';
 
@@ -27,27 +27,37 @@ function Thumb({ p, size = 48 }: { p: Product; size?: number }) {
     : <span className="flex shrink-0 items-center justify-center rounded-xl bg-pc-surface text-pc-text-faint" style={{ width: size, height: size }}><Package size={size / 2.4} /></span>;
 }
 
-export function ProductRow({ p, onOpen, storeName }: { p: Product; onOpen: (id: string) => void; storeName: (t: string) => string }) {
+export function ProductRow({ p, onOpen, storeName, liked, onAdd }: { p: Product; onOpen: (id: string) => void; storeName: (t: string) => string; liked?: boolean; onAdd?: () => void }) {
   return (
-    <button type="button" onClick={() => onOpen(p.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+    <div className="flex items-center pr-3">
+    <button type="button" onClick={() => onOpen(p.id)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
       <Thumb p={p} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] leading-snug">{p.name}</span>
+        <span className="flex items-center gap-1.5"><span className="truncate text-[16px] leading-snug">{p.name}</span>{liked && <Heart size={13} className="shrink-0 fill-red-500 text-red-500" aria-label="favourite" />}</span>
         <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-pc-text-muted">
           <NovaBadge nova={p.health?.nova} small />
           <span className="truncate">{[p.brand, p.size, p.stats ? `${money(p.stats.last_price, p.stats.currency)}${p.stats.last_store ? ` at ${storeName(p.stats.last_store)}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
         </span>
       </span>
-      <ChevronRight size={17} className="shrink-0 text-pc-text-faint" />
+      {!onAdd && <ChevronRight size={17} className="shrink-0 text-pc-text-faint" />}
     </button>
+    {onAdd && <button type="button" onClick={onAdd} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-pc-accent px-3 text-[13px] font-semibold text-[var(--pc-on-accent)]" aria-label={`Add ${p.name} to the list`}><Plus size={15} /> Add</button>}
+    </div>
   );
 }
 
 /** All products, searchable. */
-export function ProductsSheet({ products, onOpen, onClose, storeName }: { products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string }) {
+export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd }: {
+  products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string;
+  person: string; onList: (id: string) => boolean; onAdd: (p: Product) => void;
+}) {
   const [q, setQ] = useState('');
+  const likedByMe = (p: Product) => (p.fav_by ?? []).includes(person);
+  const favs = products.filter(likedByMe);
+  const [tab, setTab] = useState<'fav' | 'all'>(favs.length ? 'fav' : 'all');
   const words = fold(q).split(/\s+/).filter(Boolean);
   const shown = products
+    .filter(p => tab === 'all' || likedByMe(p))
     .filter(p => { const hay = fold([p.name, p.brand, ...(p.aliases ?? []), ...(p.tags ?? [])].join(' ')); return words.every(w => hay.includes(w)); })
     .sort((a, b) => (b.stats?.last_date ?? b.updated ?? '').localeCompare(a.stats?.last_date ?? a.updated ?? ''));
   return (
@@ -58,6 +68,12 @@ export function ProductsSheet({ products, onOpen, onClose, storeName }: { produc
         <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-2">
           <h2 className="text-[22px] font-bold">Products</h2>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+        </div>
+        <div className="mx-4 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
+          {([['fav', `Favourites${favs.length ? ` ${favs.length}` : ''}`], ['all', `All ${products.length}`]] as const).map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+              className={`h-8 rounded-[8px] text-[14px] font-medium ${tab === k ? 'bg-pc-elevated shadow-sm' : 'text-pc-text-muted'}`}>{label}</button>
+          ))}
         </div>
         <div className="mx-4 mb-2 flex h-9 shrink-0 items-center gap-2 rounded-[10px] bg-pc-surface px-2.5">
           <Search size={16} className="shrink-0 text-pc-text-muted" />
@@ -71,10 +87,13 @@ export function ProductsSheet({ products, onOpen, onClose, storeName }: { produc
               <p className="text-[17px] font-semibold">No products yet</p>
               <p className="mt-1 text-[15px] text-pc-text-muted">Take a photo of a label with the camera button: the assistant reads it, files the product and says how healthy it is.</p>
             </div>
+          ) : shown.length === 0 && tab === 'fav' && !q.trim() ? (
+            <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">No favourites yet. Open a product and tap the heart, or tell the assistant “I like this one” with a photo. They wait here, one tap from the list.</p>
           ) : shown.length === 0 ? (
             <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
           ) : (
-            <div className="divide-y divide-[var(--pc-separator)]">{shown.map(p => <ProductRow key={p.id} p={p} onOpen={onOpen} storeName={storeName} />)}</div>
+            <div className="divide-y divide-[var(--pc-separator)]">{shown.map(p => <ProductRow key={p.id} p={p} onOpen={onOpen} storeName={storeName} liked={likedByMe(p)}
+              onAdd={tab === 'fav' && !onList(p.id) ? () => onAdd(p) : undefined} />)}</div>
           )}
         </div>
       </div>
@@ -83,9 +102,9 @@ export function ProductsSheet({ products, onOpen, onClose, storeName }: { produc
 }
 
 /** One product: photos, health, nutrition, ingredients, buying history, and what to do with it. */
-export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, onAsk, onList }: {
+export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, onAsk, onList, liked, onLike }: {
   product: Product; purchases: Purchase[]; stores: Store[]; onClose: () => void;
-  onAdd: () => void; onAsk: (text: string) => void; onList: boolean;
+  onAdd: () => void; onAsk: (text: string) => void; onList: boolean; liked: boolean; onLike: (on: boolean) => void;
 }) {
   const [showIngredients, setShowIngredients] = useState(false);
   const [photo, setPhoto] = useState(0);
@@ -111,8 +130,16 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
         )}
 
         <div className="px-4 pt-3">
-          <p className="text-[13px] font-medium text-pc-text-muted">{[p.brand, p.size].filter(Boolean).join(' · ')}</p>
-          <h2 className="text-[22px] font-bold leading-tight">{p.name}</h2>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-pc-text-muted">{[p.brand, p.size].filter(Boolean).join(' · ')}</p>
+              <h2 className="text-[22px] font-bold leading-tight">{p.name}</h2>
+            </div>
+            <button type="button" onClick={() => onLike(!liked)} aria-pressed={liked} aria-label={liked ? 'Remove from favourites' : 'Add to favourites'}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-surface active:scale-95">
+              <Heart size={21} className={liked ? 'fill-red-500 text-red-500' : 'text-pc-text-muted'} />
+            </button>
+          </div>
 
           {p.health && (p.health.nova || p.health.note) && (
             <div className="mt-3 rounded-2xl bg-pc-surface px-4 py-3">

@@ -65,6 +65,10 @@ const shopPurchases = [
 function shopApply(op) {
   const nowIso = new Date().toISOString();
   if (String(op.op).startsWith('pantry-')) return pantryOp(op);
+  if (op.op === 'favorite') {   // the app runs as 'me' against the mock (no Access identity)
+    const prd = shopProducts.find(x => x.id === op.product); if (!prd) return { error: 'no product' };
+    const f = new Set(prd.fav_by || []); if (op.on) f.add('me'); else f.delete('me'); prd.fav_by = [...f]; return { ok: true, product: prd };
+  }
   if (op.op === 'ask' && /^\[Pantry\]/.test(op.text || '')) {   // imitate the Shopper on the pantry
     if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
     const a = { id: op.id, text: op.text, status: 'working', ts: nowIso };

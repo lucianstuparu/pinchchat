@@ -23,6 +23,8 @@ export interface Product {
   id: string; name: string; brand?: string; size?: string; barcode?: string; photos: string[]; ingredients?: string;
   nutrition?: Nutrition; health?: { nova?: number; flags?: string[]; note?: string; date?: string }; tags?: string[]; aliases?: string[];
   added_by?: string; created?: string; updated?: string;
+  /** People who like it (to buy again some time). */
+  fav_by?: string[];
   stats?: { times: number; last_date: string; last_store?: string; last_price?: number; currency?: string };
 }
 export interface Purchase { id: string; title: string; product?: string; qty?: string; price?: number; currency?: string; store?: string; date: string; by?: string; source?: string; receipt?: string }
@@ -32,6 +34,7 @@ export type Op =
   | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string }
   | { op: 'ask'; id: string; text: string; store?: string; photos?: string[] }
   | { op: 'photo'; ref: string; data: string }
+  | { op: 'favorite'; product: string; on: boolean }
   | PantryOp
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
@@ -117,7 +120,7 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
-  if (op.op === 'ask' || op.op === 'photo' || op.op.startsWith('pantry-')) return items;   // not list items
+  if (op.op === 'ask' || op.op === 'photo' || op.op === 'favorite' || op.op.startsWith('pantry-')) return items;   // not list items
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {

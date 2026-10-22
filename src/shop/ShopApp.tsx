@@ -221,12 +221,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}
           lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
       )}
-      {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName} />}
+      {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName}
+        person={person || 'me'} onList={id => open.some(i => i.product === id)}
+        onAdd={p => apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] })} />}
       {productId && (() => {
         const p = productOf(productId);
         if (!p) return null;
         const onList = open.some(i => i.product === p.id);
         return <ProductSheet product={p} purchases={snap.purchases ?? []} stores={stores} onList={onList} onClose={() => setProductId(null)}
+          liked={(p.fav_by ?? []).includes(person || 'me')} onLike={on => apply({ op: 'favorite', product: p.id, on })}
           onAdd={() => { apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] }); setProductId(null); setShowProducts(false); }}
           onAsk={(t) => { setPrefill(t); setProductId(null); setShowProducts(false); }} />;
       })()}
