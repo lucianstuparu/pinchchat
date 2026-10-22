@@ -17,9 +17,21 @@ import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
 import { addDays, daysUntil, newPantryId, whereIcon } from './pantry';
 import { useShop } from './useShop';
+import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
 const STORE_KEY = 'shop:store';
-const readStore = () => { try { return localStorage.getItem(STORE_KEY) || null; } catch { return null; } };
+const readStore = () => {
+  // An arrival notification opens the app on /?store=<tag>: that shop, remembered from then on.
+  const url = new URL(window.location.href);
+  const fromUrl = url.searchParams.get('store');
+  if (fromUrl) {
+    url.searchParams.delete('store'); url.searchParams.delete('notice');
+    window.history.replaceState(null, '', url.pathname + url.search);
+    try { localStorage.setItem(STORE_KEY, fromUrl); } catch { /* fine */ }
+    return fromUrl;
+  }
+  try { return localStorage.getItem(STORE_KEY) || null; } catch { return null; }
+};
 const fmtDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 const daysTo = (d: string, today: string) => Math.round((Date.parse(d) - Date.parse(today || new Date().toISOString().slice(0, 10))) / 86_400_000);
 
@@ -45,6 +57,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [search, setSearch] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  // Notifications of the Shopping app itself (arrival at a shop); separate from oc's.
+  const [pushState, setPushState] = useState<PushState | 'busy'>('off');
+  useEffect(() => { void getPushState().then(setPushState).catch(() => setPushState('unsupported')); }, []);
+  const togglePush = async () => {
+    const from = pushState; setPushState('busy');
+    try { setPushState(from === 'on' ? await disablePush() : await enablePush()); } catch { setPushState(from); }
+  };
   const [showProducts, setShowProducts] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [showPantry, setShowPantry] = useState(false);
@@ -234,7 +253,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           onAsk={(t) => { setPrefill(t); setProductId(null); setShowProducts(false); }} />;
       })()}
       {settings && (
-        <SettingsSheet fixedAccent person={person || null} mode={mode} look={look} onLook={onLook} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
+        <SettingsSheet fixedAccent person={person || null} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
       )}
     </div>
   );

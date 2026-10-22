@@ -71,7 +71,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
         </Group>
 
         {push && onTogglePush && push !== 'unsupported' && (
-          <Group foot={push === 'blocked' ? 'Blocked in Chrome. Allow notifications for this app in Chrome’s site settings.' : 'Reminders and answers that arrive while the app is closed.'}>
+          <Group foot={push === 'blocked' ? 'Blocked in Chrome. Allow notifications for this app in Chrome’s site settings.' : fixedAccent ? 'When you arrive at a shop: what to get there. Needs the Home Assistant app with location on.' : 'Reminders and answers that arrive while the app is closed.'}>
             <button type="button" onClick={onTogglePush} disabled={push === 'blocked' || push === 'busy'} className="flex w-full items-center gap-3 px-4 py-2.5 text-left disabled:opacity-60" role="switch" aria-checked={pushOn}>
               <Icon bg="#ff3b30"><Bell size={16} /></Icon>
               <span className="flex-1 text-[16px]">Notifications</span>
