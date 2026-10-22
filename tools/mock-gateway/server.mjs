@@ -28,8 +28,22 @@ const shopItems = [
   si('shp-2026-10-20-e5f6a7', 'Philips kettle', ['leclerc'], { kind: 'return', due_date: '2026-10-24', notes: 'receipt in the drawer' }),
   si('shp-2026-10-20-f6a7b8', 'Bread', ['paniere'], { status: 'bought', bought_on: '2026-10-21', bought_by: 'ludmila', updated: '2026-10-21T18:00:00Z' }),
 ];
+const shopAsks = [];
 function shopApply(op) {
   const nowIso = new Date().toISOString();
+  if (op.op === 'ask') {   // imitate the assistant: after 3 s, drop an item named after "no more", else add it
+    if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
+    const a = { id: op.id, text: op.text, store: op.store, status: 'working', ts: nowIso };
+    shopAsks.push(a);
+    setTimeout(() => {
+      const m = /(?:no more|nu mai am nevoie de)\s+(.+)/i.exec(op.text);
+      const hit = m && shopItems.find(i => i.status === 'open' && i.title.toLowerCase().includes(m[1].toLowerCase()));
+      if (hit) { hit.status = 'cancelled'; a.reply = `Removed ${hit.title} ⟨${hit.id}⟩`; }
+      else { const e = si(`shp-2026-10-22-${Math.random().toString(16).slice(2, 8)}`, op.text.replace(/^(we need|add)\s+/i, ''), op.store ? [op.store] : []); shopItems.push(e); a.reply = `Added ${e.title} ⟨${e.id}⟩`; }
+      a.status = 'done';
+    }, 3000);
+    return { ok: true, ask: a, fresh: true };
+  }
   if (op.op === 'add') {
     if (shopItems.some(i => i.id === op.id)) return { ok: true, duplicate: true };
     const e = si(op.id, op.title, op.tags || [], { kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
@@ -193,7 +207,7 @@ const server = http.createServer((req, res) => {
       const p = JSON.parse(body || '{}');
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN }));
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks }));
     });
     return;
   }

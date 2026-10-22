@@ -59,7 +59,7 @@ export function useShop(person: string) {
         : await post<Snapshot>('/shop/list', {});
       // Changes made while this was in flight stay queued and are re-applied on the new state.
       const rest = queueRef.current.slice(sending.length);
-      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [] };
+      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [] };
       write(SNAP_KEY, fresh);
       setQueue(rest);
       setSnap({ ...fresh, items: rest.reduce((items, op) => applyLocal(items, op, person), fresh.items) });
@@ -89,13 +89,13 @@ export function useShop(person: string) {
     return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onOnline); window.clearInterval(t); };
   }, [flush]);
 
-  // While the assistant is sorting something, look again every few seconds.
-  const sortingNow = snap.items.some(i => i.sorting);
+  // While the assistant works on an instruction, look again every few seconds.
+  const working = (snap.asks ?? []).some(a => a.status === 'working');
   useEffect(() => {
-    if (!sortingNow || sync === 'offline' || sync === 'signed-out') return;
-    const t = window.setTimeout(() => void flush(), 4000);
+    if (!working || sync === 'offline' || sync === 'signed-out') return;
+    const t = window.setTimeout(() => void flush(), 3000);
     return () => window.clearTimeout(t);
-  }, [sortingNow, snap, sync, flush]);
+  }, [working, snap, sync, flush]);
 
   return { snap, queue, sync, lastSync, apply, refresh: flush };
 }

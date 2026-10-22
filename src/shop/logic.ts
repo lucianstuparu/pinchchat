@@ -8,16 +8,16 @@ export interface Item {
   id: string; kind: 'buy' | 'return'; title: string; tags: string[]; qty?: string; notes?: string; due_date?: string; link?: string;
   status: 'open' | 'bought' | 'returned' | 'cancelled'; scope: 'shared' | 'private';
   added_by?: string; created?: string; updated?: string; bought_on?: string; bought_by?: string; bought_at?: string;
-  /** The assistant is turning the raw text into proper items. */
-  sorting?: boolean;
 }
 export interface Known { title: string; tags: string[]; n: number }
-export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[] }
+/** An instruction for the assistant, typed or said in the app, and its answer. */
+export interface Ask { id: string; text: string; store?: string; status: 'queued' | 'working' | 'done' | 'failed'; reply?: string; ts: string }
+export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[] }
 
 export type Op =
   | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string;
-      /** Have the assistant sort the raw text (title, shop, quantity, several items); store = the shop list in view. */
-      smart?: boolean; store?: string }
+ }
+  | { op: 'ask'; id: string; text: string; store?: string }
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
@@ -51,6 +51,15 @@ export function atStore(item: Pick<Item, 'tags'>, store: string | null, stores: 
   return own.includes(store) || (s?.also ?? []).some(t => own.includes(t));
 }
 
+/** An id for an instruction (the server runs each id once, however often the app resends it). */
+export function newAskId(now = new Date()): string {
+  const hex = Array.from(crypto.getRandomValues(new Uint8Array(3)), b => b.toString(16).padStart(2, '0')).join('');
+  return `ask-${now.toISOString().slice(0, 10)}-${hex}`;
+}
+
+/** The assistant's answer without the item markers (they are for the oc chat). */
+export const plainReply = (s = '') => s.replace(/\s*⟨[a-z]+-[\d-]+[0-9a-f]+⟩/g, '').trim();
+
 /** A new id in the server's format, so an item added offline keeps its id. */
 export function newItemId(now = new Date()): string {
   const hex = Array.from(crypto.getRandomValues(new Uint8Array(3)), b => b.toString(16).padStart(2, '0')).join('');
@@ -80,12 +89,13 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
+  if (op.op === 'ask') return items;   // the assistant does it on the server
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {
       id: op.id, kind: op.kind === 'return' ? 'return' : 'buy', title: op.title.trim(), tags: [...new Set((op.tags ?? []).map(tagOf).filter(Boolean))],
       qty: op.qty, notes: op.notes, due_date: op.due_date, link: op.link, status: 'open', scope: op.scope === 'private' ? 'private' : 'shared',
-      added_by: person, created: now, updated: now, sorting: op.smart || undefined,
+      added_by: person, created: now, updated: now,
     }];
   }
   return items.map(i => {

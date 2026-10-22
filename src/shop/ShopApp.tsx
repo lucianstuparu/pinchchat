@@ -11,7 +11,7 @@ import { SettingsSheet } from '../app/SettingsSheet';
 import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { atStore, fold, newItemId, storeTagsOf, suggest, type Item, type Known, type Op, type Store } from './logic';
+import { atStore, fold, newAskId, newItemId, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Store } from './logic';
 import { useShop } from './useShop';
 
 const STORE_KEY = 'shop:store';
@@ -134,7 +134,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               <div className="flex flex-col items-center px-10 py-16 text-center">
                 <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-accent"><ShoppingBasket size={26} /></span>
                 <p className="text-[17px] font-semibold">{store ? `Nothing to get at ${storeName(store)}` : 'The list is empty'}</p>
-                <p className="mt-1 text-[15px] text-pc-text-muted">Type or say it below, the way you would say it: “we need oat milk and two kefirs from Lidl”. The assistant sorts it.</p>
+                <p className="mt-1 text-[15px] text-pc-text-muted">Tell the assistant below, by voice or typing: “we need oat milk and two kefirs from Lidl”, “no more kefir”, “bought everything at Carrefour”.</p>
               </div>
             )}
 
@@ -164,7 +164,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       </main>
 
       {search === null && (
-        <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} storeName={storeName} known={snap.known} items={snap.items}
+        <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
+          asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
+            ? [{ id: op.id, text: op.text, status: (sync === 'offline' || sync === 'signed-out' ? 'queued' : 'working') as Ask['status'], ts: new Date().toISOString() }] : []))]}
           onAdd={(op) => { apply(op); setPrefill(null); }} />
       )}
 
@@ -228,12 +230,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
       <button type="button" onClick={() => onOpen(item.id)} className="flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left">
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[17px] leading-snug ${done || flash ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{item.title}</span>
-          {item.sorting && (
-            <span className="mt-0.5 flex items-center gap-1 text-[13px] leading-tight text-pc-accent">
-              <Sparkles size={12} className="animate-pulse" /> The assistant is sorting this…
-            </span>
-          )}
-          {!item.sorting && (sub.length > 0 || item.scope === 'private' || due !== null) && (
+          {(sub.length > 0 || item.scope === 'private' || due !== null) && (
             <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-pc-text-muted">
               {due !== null && !done && <span className={due <= 2 ? 'font-medium text-red-500' : 'text-amber-700 dark:text-amber-400'}>{due < 0 ? 'Overdue' : due === 0 ? 'Last day' : `by ${fmtDay(item.due_date!)}`}</span>}
               {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
@@ -246,10 +243,14 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
   );
 }
 
-function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
-  prefill: string | null; store: string | null; stores: Store[]; storeName: (t: string) => string; known: Known[]; items: Item[];
-  onAdd: (op: Op) => void;
+function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
+  prefill: string | null; store: string | null; stores: Store[]; known: Known[]; items: Item[];
+  asks: Ask[]; onAdd: (op: Op) => void;
 }) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // The last few instructions (within half an hour of the newest), newest last, until dismissed.
+  const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
+  const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-3);
   const [text, setText] = useState(prefill ?? '');
   const [listening, setListening] = useState(false);
   const dict = useRef<Dictation | null>(null);
@@ -257,14 +258,14 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
   const hints = suggest(text, known, items);
   const tagsFor = (own: string[]) => (own.some(t => stores.some(s => s.tag === t)) || !store ? own : [...own, store]);
 
-  /** A suggestion is added as it is; anything typed or said goes to the assistant to sort. */
+  /** A suggestion is added as it is; anything typed or said is an instruction for the assistant. */
   const add = (picked?: Known) => {
     if (listening) { dict.current?.stop(); setListening(false); }
     if (picked) {
       onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
     } else {
       if (!text.trim()) return;
-      onAdd({ op: 'add', id: newItemId(), title: text.trim(), tags: store ? [store] : [], smart: true, store: store ?? undefined });
+      onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined });
     }
     setText('');
     input.current?.focus();
@@ -279,6 +280,24 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
 
   return (
     <div className="shrink-0 border-t border-pc-border bg-pc-base px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+      {recent.length > 0 && (
+        <div className="mb-2 space-y-1.5 px-1" aria-live="polite" aria-label="Assistant">
+          {recent.map(a => (
+            <div key={a.id} className="flex items-start gap-2 rounded-2xl bg-pc-surface px-3 py-2">
+              <Sparkles size={15} className={`mt-0.5 shrink-0 text-pc-accent ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
+              <div className="min-w-0 flex-1 text-[14px] leading-snug">
+                <p className="truncate text-pc-text-muted">“{a.text}”</p>
+                <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
+                  {a.status === 'queued' ? 'Waiting for a connection…' : a.status === 'working' ? 'Working on it…' : plainReply(a.reply) || 'Done.'}
+                </p>
+              </div>
+              {(a.status === 'done' || a.status === 'failed') && (
+                <button type="button" onClick={() => setHidden(h => new Set(h).add(a.id))} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       {hints.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} aria-label="Suggestions">
           {hints.map(h => (
@@ -292,7 +311,7 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
         <div className={`flex h-11 min-w-0 flex-1 items-center rounded-[22px] border bg-pc-surface pl-4 pr-1 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.6)]' : 'border-transparent'}`}>
           <input ref={input} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" autoComplete="off"
-            placeholder={listening ? 'Listening…' : store ? `Add for ${storeName(store)}, or say it` : 'Add something, or say it'} aria-label="New item"
+            placeholder={listening ? 'Listening…' : 'Tell the assistant: add, change, remove…'} aria-label="Instruction for the assistant"
             className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="flex h-9 w-8 items-center justify-center" aria-label="Clear">
