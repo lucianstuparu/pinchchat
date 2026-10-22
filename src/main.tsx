@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import MobileApp from './mobile/MobileApp'
@@ -7,6 +7,11 @@ import { getUiMode } from './mobile/uiMode'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
 import './index.css'
+
+// The shopping app (shop.stuparu.eu) is a separate build of the same fork: VITE_APP=shop.
+// eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
+const ShopApp = lazy(() => import('./shop/ShopApp'))
+const isShop = import.meta.env.VITE_APP === 'shop'
 
 // Register service worker for PWA support (offline caching, installability)
 if ('serviceWorker' in navigator) {
@@ -37,9 +42,13 @@ if ('serviceWorker' in navigator) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider>
-        {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}
-      </ThemeProvider>
+      {isShop ? (
+        <Suspense fallback={null}><ShopApp /></Suspense>
+      ) : (
+        <ThemeProvider>
+          {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}
+        </ThemeProvider>
+      )}
     </ErrorBoundary>
   </React.StrictMode>,
 )

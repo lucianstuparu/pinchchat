@@ -52,7 +52,9 @@
 /* Global focus-visible ring for keyboard navigation (a11y).
    Elements with Tailwind focus:ring-* already handle their own styling,
    so we target elements that don't have explicit ring classes. */
-:focus-visible {
+/* Fields that draw their own focus (class outline-none) opt out: this unlayered rule would
+   otherwise beat Tailwind's layered outline-none. */
+:focus-visible:not(.outline-none) {
   outline: 2px solid var(--pc-accent-dim);
   outline-offset: 2px;
 }

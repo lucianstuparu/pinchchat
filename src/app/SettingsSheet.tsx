@@ -10,9 +10,13 @@ interface Props {
   mode: 'light' | 'dark';
   look: Look;
   onLook: (l: Look) => void;
-  push: PushState | 'busy';
-  onTogglePush: () => void;
-  onView: (v: 'mobile' | 'full') => void;
+  /** Omit both to hide the notifications row (an app without push). */
+  push?: PushState | 'busy';
+  onTogglePush?: () => void;
+  /** Omit to hide "Other views" (an app without them). */
+  onView?: (v: 'mobile' | 'full') => void;
+  /** Extra groups between Speak to type and Sign out. */
+  children?: ReactNode;
   onLogout: () => void;
   onClose: () => void;
 }
@@ -40,7 +44,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   );
 }
 
-export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose }: Props) {
+export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children }: Props) {
   const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
   const pushOn = push === 'on';
@@ -64,7 +68,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
           </div>
         </Group>
 
-        {push !== 'unsupported' && (
+        {push && onTogglePush && push !== 'unsupported' && (
           <Group foot={push === 'blocked' ? 'Blocked in Chrome. Allow notifications for this app in Chrome’s site settings.' : 'Reminders and answers that arrive while the app is closed.'}>
             <button type="button" onClick={onTogglePush} disabled={push === 'blocked' || push === 'busy'} className="flex w-full items-center gap-3 px-4 py-2.5 text-left disabled:opacity-60" role="switch" aria-checked={pushOn}>
               <Icon bg="#ff3b30"><Bell size={16} /></Icon>
@@ -106,7 +110,9 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
           </div>
         </Group>
 
-        <Group title="Other views">
+        {children}
+
+        {onView && <Group title="Other views">
           <button type="button" onClick={() => onView('mobile')} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
             <Icon bg="#8e8e93"><MessageCircle size={16} /></Icon>
             <span className="flex-1 text-[16px]">Classic messenger</span>
@@ -117,7 +123,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             <span className="flex-1 text-[16px]">Full PinchChat (advanced)</span>
             <ChevronRight size={17} className="text-pc-text-faint" />
           </button>
-        </Group>
+        </Group>}
 
         <Group>
           <button type="button" onClick={onLogout} className="flex w-full items-center justify-center gap-2 px-4 py-3 text-[16px] text-red-500">

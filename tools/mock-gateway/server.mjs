@@ -9,6 +9,43 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
 
+
+// ---- shopping sample data (see the /shop routes)
+let shopOffline = false;
+const SHOP_STORES = [
+  { tag: 'carrefour', name: 'Carrefour', also: ['carrefour-market'] }, { tag: 'carrefour-market', name: 'Carrefour Market', also: ['carrefour'] },
+  { tag: 'lidl', name: 'Lidl', also: [] }, { tag: 'grand-frais', name: 'Grand Frais', also: [] }, { tag: 'leclerc', name: 'Leclerc', also: [] },
+  { tag: 'migros', name: 'Migros', also: [] }, { tag: 'paniere', name: 'La Panière', also: [] }, { tag: 'pharmacy', name: 'Pharmacy', also: [] },
+];
+const SHOP_KNOWN = [{ title: 'Oat milk', tags: ['lidl'], n: 9 }, { title: 'Kefir', tags: [], n: 4 }, { title: 'Bananas', tags: [], n: 6 }, { title: 'Olive oil', tags: ['grand-frais'], n: 2 }];
+const si = (id, title, tags, extra = {}) => ({ id, kind: 'buy', title, tags, status: 'open', scope: 'shared', added_by: 'lucian', created: '2026-10-20T08:00:00Z', updated: '2026-10-20T08:00:00Z', ...extra });
+const shopItems = [
+  si('shp-2026-10-22-c61037', 'Sare pentru mașina de spălat vase', ['carrefour'], { source: 'a-2026-10-22-001' }),
+  si('shp-2026-10-21-a1b2c3', 'Oat milk', ['lidl'], { qty: '2' }),
+  si('shp-2026-10-21-b2c3d4', 'Kefir', []),
+  si('shp-2026-10-21-c3d4e5', 'Vitamin D', ['pharmacy'], { scope: 'private' }),
+  si('shp-2026-10-21-d4e5f6', 'Mangoes', ['grand-frais'], { added_by: 'ludmila' }),
+  si('shp-2026-10-20-e5f6a7', 'Philips kettle', ['leclerc'], { kind: 'return', due_date: '2026-10-24', notes: 'receipt in the drawer' }),
+  si('shp-2026-10-20-f6a7b8', 'Bread', ['paniere'], { status: 'bought', bought_on: '2026-10-21', bought_by: 'ludmila', updated: '2026-10-21T18:00:00Z' }),
+];
+function shopApply(op) {
+  const nowIso = new Date().toISOString();
+  if (op.op === 'add') {
+    if (shopItems.some(i => i.id === op.id)) return { ok: true, duplicate: true };
+    const e = si(op.id, op.title, op.tags || [], { kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
+    shopItems.push(e); return { ok: true, item: e };
+  }
+  const e = shopItems.find(i => i.id === op.id);
+  if (!e) return { error: 'not in your lists' };
+  if (op.op === 'tick' && e.status === 'open') Object.assign(e, { status: e.kind === 'return' ? 'returned' : 'bought', bought_on: nowIso.slice(0, 10), bought_by: 'lucian', bought_at: op.store });
+  if (op.op === 'untick') Object.assign(e, { status: 'open', bought_on: undefined, bought_by: undefined });
+  if (op.op === 'drop') e.status = 'cancelled';
+  if (op.op === 'scope') e.scope = op.scope;
+  if (op.op === 'edit') for (const k of ['title', 'tags', 'qty', 'notes', 'due_date', 'kind']) if (op[k] !== undefined) e[k] = op[k] || undefined;
+  e.updated = nowIso;
+  return { ok: true, item: e };
+}
+
 const PORT = 18789;
 const TEST_TOKEN = 'local-test-token-not-a-secret';
 // --agents=gateway-ludmila,admin pretends to be another person's gateway (default: Lucian's).
@@ -136,6 +173,21 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/__down') { downUntil = now() + Number(url.searchParams.get('ms') || 10000); for (const ws of clients) ws.terminate(); res.end('down until ' + new Date(downUntil).toISOString()); return; }
   if (url.pathname === '/__ask') { const r = askQuestion(); res.end(r.id); return; }
   if (url.pathname === '/__log') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(received.map(r => ({ ...r, params: { ...r.params, attachments: r.params?.attachments?.map(a => ({ fileName: a.fileName, mimeType: a.mimeType, base64Len: a.content?.length })) } })), null, 1)); return; }
+  // The shopping app's API (shop.stuparu.eu, /shop/list and /shop/ops). In-memory sample list;
+  // the rules are a short copy of the server's shop.mjs. /__shop_offline?on=1 makes it fail like no network.
+  if (url.pathname === '/__shop_offline') { shopOffline = url.searchParams.get('on') === '1'; res.end(`shop offline ${shopOffline}`); return; }
+  if (url.pathname === '/shop/list' || url.pathname === '/shop/ops') {
+    if (shopOffline) { req.socket.destroy(); return; }
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      const results = (p.ops || []).map(shopApply);
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN }));
+    });
+    return;
+  }
   // ai.manager register items (what the Admin / General cards read and change). Fixed sample data.
   if (['/reg/now', '/reg/loops', '/reg/item'].includes(url.pathname)) {
     let body = '';
