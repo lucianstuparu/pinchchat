@@ -26,11 +26,12 @@ export class SignedOut extends Error {}
 const read = <T,>(k: string, fallback: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked: still works in memory */ } };
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, timeoutMs = 15_000): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
-  } catch {
+    res = await fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') throw new Error('slow');   // the server took too long
     throw new Error('offline');   // no network, or a Cloudflare Access redirect (opaque)
   }
   if (res.redirected || res.type === 'opaqueredirect' || res.status === 401) throw new SignedOut('signed out');
@@ -40,7 +41,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /** Speech to text through Whisper on the server: the recorded audio in, the text out. */
 export async function transcribeShop(audio: { content: string; mimeType: string }): Promise<string> {
-  const r = await post<{ text: string }>('/shop/transcribe', { audio: audio.content, mimeType: audio.mimeType });
+  // Whisper on CT 104 takes ~12 s for a sentence and longer for longer speech (21.7 s seen): wait 3 minutes.
+  const r = await post<{ text: string }>('/shop/transcribe', { audio: audio.content, mimeType: audio.mimeType }, 180_000);
   return r.text ?? '';
 }
 

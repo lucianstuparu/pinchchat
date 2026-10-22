@@ -408,7 +408,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
       else if (!t) setMicError('Nothing was understood. Try again a bit closer.');
     } catch (e) {
-      setMicError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.' : 'Could not turn it into text. Try again.');
+      setMicError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.'
+        : e instanceof Error && e.message === 'slow' ? 'Writing it took too long. Try a shorter piece.' : 'Could not turn it into text. Try again.');
     } finally { setMic('idle'); }
   };
   useEffect(() => {
