@@ -8,16 +8,26 @@ export interface Item {
   id: string; kind: 'buy' | 'return'; title: string; tags: string[]; qty?: string; notes?: string; due_date?: string; link?: string;
   status: 'open' | 'bought' | 'returned' | 'cancelled'; scope: 'shared' | 'private';
   added_by?: string; created?: string; updated?: string; bought_on?: string; bought_by?: string; bought_at?: string;
+  /** The catalogue product this item is (prd-…). */
+  product?: string;
 }
 export interface Known { title: string; tags: string[]; n: number }
 /** An instruction for the assistant, typed or said in the app, and its answer. */
-export interface Ask { id: string; text: string; store?: string; status: 'queued' | 'working' | 'done' | 'failed'; reply?: string; ts: string }
-export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[] }
+export interface Ask { id: string; text: string; photos?: string[]; store?: string; status: 'queued' | 'working' | 'done' | 'failed'; reply?: string; ts: string }
+export interface Nutrition { kcal?: number; protein?: number; fat?: number; sat_fat?: number; carbs?: number; sugar?: number; fiber?: number; salt?: number }
+export interface Product {
+  id: string; name: string; brand?: string; size?: string; barcode?: string; photos: string[]; ingredients?: string;
+  nutrition?: Nutrition; health?: { nova?: number; flags?: string[]; note?: string; date?: string }; tags?: string[]; aliases?: string[];
+  added_by?: string; created?: string; updated?: string;
+  stats?: { times: number; last_date: string; last_store?: string; last_price?: number; currency?: string };
+}
+export interface Purchase { id: string; title: string; product?: string; qty?: string; price?: number; currency?: string; store?: string; date: string; by?: string; source?: string; receipt?: string }
+export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[] }
 
 export type Op =
-  | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string;
- }
-  | { op: 'ask'; id: string; text: string; store?: string }
+  | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string }
+  | { op: 'ask'; id: string; text: string; store?: string; photos?: string[] }
+  | { op: 'photo'; ref: string; data: string }
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
@@ -60,6 +70,19 @@ export function newAskId(now = new Date()): string {
 /** The assistant's answer without the item markers (they are for the oc chat). */
 export const plainReply = (s = '') => s.replace(/\s*⟨[a-z]+-[\d-]+[0-9a-f]+⟩/g, '').trim();
 
+/** A name for a photo, in the server's format (month folder, random name). */
+export function newPhotoRef(now = new Date()): string {
+  const hex = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('');
+  return `${now.toISOString().slice(0, 7)}/ph-${hex}.jpg`;
+}
+
+/** NOVA group: label and colour class (1 unprocessed … 4 ultra-processed). */
+export function novaBadge(nova?: number): { label: string; cls: string } | null {
+  if (!nova) return null;
+  const cls = ['', 'bg-emerald-600', 'bg-lime-600', 'bg-amber-500', 'bg-red-500'][nova] ?? 'bg-pc-text-muted';
+  return { label: `NOVA ${nova}`, cls };
+}
+
 /** A new id in the server's format, so an item added offline keeps its id. */
 export function newItemId(now = new Date()): string {
   const hex = Array.from(crypto.getRandomValues(new Uint8Array(3)), b => b.toString(16).padStart(2, '0')).join('');
@@ -89,12 +112,12 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
-  if (op.op === 'ask') return items;   // the assistant does it on the server
+  if (op.op === 'ask' || op.op === 'photo') return items;   // the assistant does it on the server
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {
       id: op.id, kind: op.kind === 'return' ? 'return' : 'buy', title: op.title.trim(), tags: [...new Set((op.tags ?? []).map(tagOf).filter(Boolean))],
-      qty: op.qty, notes: op.notes, due_date: op.due_date, link: op.link, status: 'open', scope: op.scope === 'private' ? 'private' : 'shared',
+      qty: op.qty, notes: op.notes, due_date: op.due_date, link: op.link, product: op.product, status: 'open', scope: op.scope === 'private' ? 'private' : 'shared',
       added_by: person, created: now, updated: now,
     }];
   }

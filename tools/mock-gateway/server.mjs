@@ -29,8 +29,37 @@ const shopItems = [
   si('shp-2026-10-20-f6a7b8', 'Bread', ['paniere'], { status: 'bought', bought_on: '2026-10-21', bought_by: 'ludmila', updated: '2026-10-21T18:00:00Z' }),
 ];
 const shopAsks = [];
+const shopPhotos = new Map();   // ref -> Buffer (photo ops)
+const shopProducts = [{
+  id: 'prd-2026-10-20-0a0a0a', name: 'Kefir nature', brand: 'Lactel', size: '1 L', photos: [],
+  ingredients: 'Lait fermente au kefir (lait, ferments lactiques et levures).',
+  nutrition: { kcal: 52, protein: 3.3, fat: 1.5, sat_fat: 1, carbs: 4.5, sugar: 4.5, fiber: 0, salt: 0.1 },
+  health: { nova: 1, flags: ['live cultures'], note: 'Plain kefir: milk and cultures only. Good for gut flora diversity.', date: '2026-10-20' },
+  tags: ['dairy'], aliases: ['chefir', 'kefir'], added_by: 'ludmila', created: '2026-10-20T08:00:00Z', updated: '2026-10-20T08:00:00Z',
+  stats: { times: 3, last_date: '2026-10-19', last_store: 'lidl', last_price: 1.89, currency: 'EUR' },
+}];
+const shopPurchases = [
+  { id: 'pur-2026-10-19-000001', title: 'Kefir nature', product: 'prd-2026-10-20-0a0a0a', price: 1.89, currency: 'EUR', store: 'lidl', date: '2026-10-19', by: 'ludmila', source: 'receipt' },
+  { id: 'pur-2026-10-12-000002', title: 'Kefir nature', product: 'prd-2026-10-20-0a0a0a', price: 1.79, currency: 'EUR', store: 'lidl', date: '2026-10-12', by: 'lucian', source: 'receipt' },
+];
 function shopApply(op) {
   const nowIso = new Date().toISOString();
+  if (op.op === 'photo') { if (!shopPhotos.has(op.ref)) shopPhotos.set(op.ref, Buffer.from(op.data, 'base64')); return { ok: true, ref: op.ref }; }
+  if (op.op === 'ask' && op.photos?.length) {   // imitate the Shopper reading a label
+    if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
+    const a = { id: op.id, text: op.text, photos: op.photos, store: op.store, status: 'working', ts: nowIso };
+    shopAsks.push(a);
+    setTimeout(() => {
+      const prd = { id: 'prd-2026-10-22-' + Math.random().toString(16).slice(2, 8), name: 'Activia nature', brand: 'Danone', size: '4 x 125 g', photos: op.photos,
+        ingredients: 'Lait ecreme, creme, ferments lactiques (dont Bifidus), amidon modifie (E1422), carraghenanes (E407).',
+        nutrition: { kcal: 72, protein: 4.3, fat: 3.2, sat_fat: 2.1, carbs: 5.6, sugar: 5.6, fiber: 0, salt: 0.15 },
+        health: { nova: 4, flags: ['carrageenan E407', 'modified starch E1422'], note: 'NOVA 4 because of carrageenan (E407) and modified starch; evidence in humans is mixed. Live cultures are a plus; a plain yoghurt gives them without E407.', date: '2026-10-22' },
+        tags: ['dairy'], aliases: ['iaurt Activia'], added_by: 'lucian', created: nowIso, updated: nowIso };
+      shopProducts.push(prd);
+      a.reply = `Saved Activia nature to the catalogue (NOVA 4, E407) <${prd.id}>`; a.status = 'done';
+    }, 3000);
+    return { ok: true, ask: a, fresh: true };
+  }
   if (op.op === 'ask') {   // imitate the assistant: after 3 s, drop an item named after "no more", else add it
     if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
     const a = { id: op.id, text: op.text, store: op.store, status: 'working', ts: nowIso };
@@ -46,7 +75,7 @@ function shopApply(op) {
   }
   if (op.op === 'add') {
     if (shopItems.some(i => i.id === op.id)) return { ok: true, duplicate: true };
-    const e = si(op.id, op.title, op.tags || [], { kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
+    const e = si(op.id, op.title, op.tags || [], { product: op.product, kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
     if (op.smart) {   // imitate the assistant: after 3 s, a tidy title and the shop it heard
       e.sorting = true;
       setTimeout(() => {
@@ -199,6 +228,11 @@ const server = http.createServer((req, res) => {
   // The shopping app's API (shop.stuparu.eu, /shop/list and /shop/ops). In-memory sample list;
   // the rules are a short copy of the server's shop.mjs. /__shop_offline?on=1 makes it fail like no network.
   if (url.pathname === '/__shop_offline') { shopOffline = url.searchParams.get('on') === '1'; res.end(`shop offline ${shopOffline}`); return; }
+  if (url.pathname.startsWith('/shop/media/')) {
+    const buf = shopPhotos.get(decodeURIComponent(url.pathname.slice('/shop/media/'.length)));
+    if (!buf) { res.statusCode = 404; res.end(); return; }
+    res.setHeader('content-type', 'image/jpeg'); res.end(buf); return;
+  }
   if (url.pathname === '/shop/list' || url.pathname === '/shop/ops') {
     if (shopOffline) { req.socket.destroy(); return; }
     let body = '';
@@ -207,7 +241,7 @@ const server = http.createServer((req, res) => {
       const p = JSON.parse(body || '{}');
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks }));
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases }));
     });
     return;
   }

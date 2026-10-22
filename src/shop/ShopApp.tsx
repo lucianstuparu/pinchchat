@@ -5,13 +5,15 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, RefreshCw, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, Package, RefreshCw, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { atStore, fold, newAskId, newItemId, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Store } from './logic';
+import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
+import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
+import { photoUrl, shrinkPhoto } from './photos';
 import { useShop } from './useShop';
 
 const STORE_KEY = 'shop:store';
@@ -41,6 +43,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [search, setSearch] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [showProducts, setShowProducts] = useState(false);
+  const [productId, setProductId] = useState<string | null>(null);
   const [showBought, setShowBought] = useState(false);
   const storeName = (tag: string) => stores.find(s => s.tag === tag)?.name ?? tag;
 
@@ -57,6 +61,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const q = fold((search ?? '').trim());
   const found = q.length >= 1 ? snap.items.filter(i => i.status !== 'cancelled' && fold(`${i.title} ${i.notes ?? ''} ${i.tags.join(' ')}`).includes(q)) : [];
 
+  const products = snap.products ?? [];
+  const productOf = (id?: string) => (id ? products.find(p => p.id === id) : undefined);
+  const foundProducts = q.length >= 1 ? products.filter(p => fold([p.name, p.brand, ...(p.aliases ?? [])].join(' ')).includes(q)) : [];
   const tick = (i: Item) => apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
 
   // ---- shared from another app (share sheet): the text becomes the new item
@@ -99,6 +106,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               {sync === 'offline' || sync === 'signed-out'
                 ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
                 : null}
+              <button type="button" onClick={() => setShowProducts(true)} className={iconBtn} aria-label="Products"><Package size={21} /></button>
               <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
               <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
                 {person ? person[0].toUpperCase() : '⋯'}
@@ -118,15 +126,21 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         {search !== null ? (
           <div className="pt-2">
             {q.length === 0 && <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Search everything on the list and what was bought lately.</p>}
-            {q.length > 0 && found.length === 0 && <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Nothing matches “{search?.trim()}”</p>}
-            {found.length > 0 && <Rows items={found} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} />}
+            {foundProducts.length > 0 && (
+              <section className="mb-2">
+                <h2 className="px-4 pb-0.5 pt-1 text-[13px] font-semibold text-pc-text-muted">Products</h2>
+                <div className="divide-y divide-[var(--pc-separator)]">{foundProducts.map(p => <ProductRow key={p.id} p={p} onOpen={setProductId} storeName={storeName} />)}</div>
+              </section>
+            )}
+            {q.length > 0 && found.length === 0 && foundProducts.length === 0 && <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Nothing matches “{search?.trim()}”</p>}
+            {found.length > 0 && <Rows items={found} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />}
           </div>
         ) : (
           <>
             {returns.length > 0 && (
               <section className="mx-3 mt-3 overflow-hidden rounded-2xl bg-pc-surface">
                 <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><Undo2 size={14} /> To return · {returns.length}</h2>
-                <Rows items={returns} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} tinted />
+                <Rows items={returns} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} tinted />
               </section>
             )}
 
@@ -141,13 +155,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
             {forThisShop.length > 0 && (
               <section className="pt-1">
                 {store && anywhere.length > 0 && <h2 className="px-4 pb-0.5 pt-3 text-[13px] font-semibold text-pc-text-muted">At {storeName(store)}</h2>}
-                <Rows items={forThisShop} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} hideStore={store} />
+                <Rows items={forThisShop} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} hideStore={store} />
               </section>
             )}
             {anywhere.length > 0 && (
               <section>
                 <h2 className="px-4 pb-0.5 pt-4 text-[13px] font-semibold text-pc-text-muted">Anywhere</h2>
-                <Rows items={anywhere} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} />
+                <Rows items={anywhere} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />
               </section>
             )}
 
@@ -156,7 +170,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
                 <button type="button" onClick={() => setShowBought(b => !b)} className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showBought}>
                   {showBought ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Bought lately · {bought.length}
                 </button>
-                {showBought && <Rows items={bought} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} />}
+                {showBought && <Rows items={bought} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />}
               </section>
             )}
           </>
@@ -166,13 +180,22 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       {search === null && (
         <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
           asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
-            ? [{ id: op.id, text: op.text, status: (sync === 'offline' || sync === 'signed-out' ? 'queued' : 'working') as Ask['status'], ts: new Date().toISOString() }] : []))]}
+            ? [{ id: op.id, text: op.text, photos: op.photos, status: (sync === 'offline' || sync === 'signed-out' ? 'queued' : 'working') as Ask['status'], ts: new Date().toISOString() }] : []))]}
           onAdd={(op) => { apply(op); setPrefill(null); }} />
       )}
 
       {editing && (() => {
         const item = snap.items.find(i => i.id === editing);
-        return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={apply} /> : null;
+        return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={apply} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
+      })()}
+      {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName} />}
+      {productId && (() => {
+        const p = productOf(productId);
+        if (!p) return null;
+        const onList = open.some(i => i.product === p.id);
+        return <ProductSheet product={p} purchases={snap.purchases ?? []} stores={stores} onList={onList} onClose={() => setProductId(null)}
+          onAdd={() => { apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] }); setProductId(null); setShowProducts(false); }}
+          onAsk={(t) => { setPrefill(t); setProductId(null); setShowProducts(false); }} />;
       })()}
       {settings && (
         <SettingsSheet fixedAccent person={person || null} mode={mode} look={look} onLook={onLook} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
@@ -190,18 +213,20 @@ function Chip({ on, onClick, label, n }: { on: boolean; onClick: () => void; lab
   );
 }
 
-function Rows({ items, stores, storeName, onTick, onOpen, today, hideStore, tinted }: {
+function Rows({ items, stores, storeName, onTick, onOpen, today, hideStore, tinted, productOf }: {
   items: Item[]; stores: Store[]; storeName: (t: string) => string; onTick: (i: Item) => void; onOpen: (id: string) => void; today: string; hideStore?: string | null; tinted?: boolean;
+  productOf: (id?: string) => Product | undefined;
 }) {
   return (
     <div className="divide-y divide-[var(--pc-separator)]">
-      {items.map(i => <Row key={i.id} item={i} stores={stores} storeName={storeName} onTick={onTick} onOpen={onOpen} today={today} hideStore={hideStore} tinted={tinted} />)}
+      {items.map(i => <Row key={i.id} item={i} stores={stores} storeName={storeName} onTick={onTick} onOpen={onOpen} today={today} hideStore={hideStore} tinted={tinted} product={productOf(i.product)} />)}
     </div>
   );
 }
 
-function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted }: {
+function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted, product }: {
   item: Item; stores: Store[]; storeName: (t: string) => string; onTick: (i: Item) => void; onOpen: (id: string) => void; today: string; hideStore?: string | null; tinted?: boolean;
+  product?: Product;
 }) {
   const [flash, setFlash] = useState(false);
   const done = item.status !== 'open';
@@ -230,14 +255,16 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
       <button type="button" onClick={() => onOpen(item.id)} className="flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left">
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[17px] leading-snug ${done || flash ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{item.title}</span>
-          {(sub.length > 0 || item.scope === 'private' || due !== null) && (
+          {(sub.length > 0 || item.scope === 'private' || due !== null || product?.health?.nova) && (
             <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-pc-text-muted">
+              {product?.health?.nova && <NovaBadge nova={product.health.nova} small />}
               {due !== null && !done && <span className={due <= 2 ? 'font-medium text-red-500' : 'text-amber-700 dark:text-amber-400'}>{due < 0 ? 'Overdue' : due === 0 ? 'Last day' : `by ${fmtDay(item.due_date!)}`}</span>}
               {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
               {item.scope === 'private' && <span className="inline-flex shrink-0 items-center gap-0.5"><Lock size={11} /> just me</span>}
             </span>
           )}
         </span>
+        {product?.photos[0] && <img src={photoUrl(product.photos[0])} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg bg-pc-surface object-cover" />}
       </button>
     </div>
   );
@@ -255,7 +282,23 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const [listening, setListening] = useState(false);
   const dict = useRef<Dictation | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
   const hints = suggest(text, known, items);
+  /** Photos (a label, a shelf, a receipt) go to the assistant with whatever is in the field. */
+  const sendPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    const refs: string[] = [];
+    for (const f of Array.from(files).slice(0, 6)) {
+      try { const ref = newPhotoRef(); onAdd({ op: 'photo', ref, data: await shrinkPhoto(f) }); refs.push(ref); } catch { /* unreadable image: skipped */ }
+    }
+    setBusy(false);
+    if (camera.current) camera.current.value = '';
+    if (refs.length === 0) return;
+    onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined, photos: refs });
+    setText('');
+  };
   const tagsFor = (own: string[]) => (own.some(t => stores.some(s => s.tag === t)) || !store ? own : [...own, store]);
 
   /** A suggestion is added as it is; anything typed or said is an instruction for the assistant. */
@@ -286,7 +329,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             <div key={a.id} className="flex items-start gap-2 rounded-2xl bg-pc-surface px-3 py-2">
               <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
               <div className="min-w-0 flex-1 text-[14px] leading-snug">
-                <p className="truncate text-pc-text-muted">“{a.text}”</p>
+                <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}📷 ${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
                 <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
                   {a.status === 'queued' ? 'Waiting for a connection…' : a.status === 'working' ? 'Working on it…' : plainReply(a.reply) || 'Done.'}
                 </p>
@@ -308,7 +351,11 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
+      <input ref={camera} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
+        <button type="button" disabled={busy} onClick={() => camera.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+          <Camera size={21} />
+        </button>
         <div className={`flex h-11 min-w-0 flex-1 items-center rounded-[22px] border bg-pc-surface pl-4 pr-1 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.6)]' : 'border-transparent'}`}>
           <input ref={input} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" autoComplete="off"
             placeholder={listening ? 'Listening…' : 'Tell the assistant: add, change, remove…'} aria-label="Instruction for the assistant"
@@ -332,8 +379,9 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   );
 }
 
-function ItemSheet({ item, stores, today, onClose, apply }: {
+function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: {
   item: Item; stores: Store[]; today: string; onClose: () => void; apply: ReturnType<typeof useShop>['apply'];
+  product?: Product; onProduct: (id: string) => void;
 }) {
   const [title, setTitle] = useState(item.title);
   const [qty, setQty] = useState(item.qty ?? '');
@@ -398,6 +446,16 @@ function ItemSheet({ item, stores, today, onClose, apply }: {
         </div>
 
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (brand, size…)" rows={2} className={`${field} mt-3 resize-none`} aria-label="Notes" />
+        {product && (
+          <button type="button" onClick={() => onProduct(product.id)} className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-pc-surface px-3 py-2.5 text-left">
+            {product.photos[0] ? <img src={photoUrl(product.photos[0])} alt="" className="h-11 w-11 rounded-lg object-cover" /> : <Package size={22} className="text-pc-text-faint" />}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-medium">{product.name}</span>
+              <span className="flex items-center gap-1.5 text-[13px] text-pc-text-muted"><NovaBadge nova={product.health?.nova} small />{product.brand}</span>
+            </span>
+            <ChevronRight size={17} className="text-pc-text-faint" />
+          </button>
+        )}
         {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[14px] text-[var(--pc-accent-ink)]">{item.link}</a>}
 
         {item.status === 'open' ? (

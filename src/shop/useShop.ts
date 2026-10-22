@@ -59,7 +59,7 @@ export function useShop(person: string) {
         : await post<Snapshot>('/shop/list', {});
       // Changes made while this was in flight stay queued and are re-applied on the new state.
       const rest = queueRef.current.slice(sending.length);
-      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [] };
+      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [] };
       write(SNAP_KEY, fresh);
       setQueue(rest);
       setSnap({ ...fresh, items: rest.reduce((items, op) => applyLocal(items, op, person), fresh.items) });
