@@ -33,6 +33,15 @@ function shopApply(op) {
   if (op.op === 'add') {
     if (shopItems.some(i => i.id === op.id)) return { ok: true, duplicate: true };
     const e = si(op.id, op.title, op.tags || [], { kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
+    if (op.smart) {   // imitate the assistant: after 3 s, a tidy title and the shop it heard
+      e.sorting = true;
+      setTimeout(() => {
+        const shop = SHOP_STORES.find(st => op.title.toLowerCase().includes(st.name.toLowerCase()));
+        e.title = op.title.replace(/(de la|from|at).*$/i, '').replace(/^(we need|trebuie sa iau|buy)\s+/i, '').trim().replace(/^./, c => c.toUpperCase());
+        if (shop) e.tags = [shop.tag];
+        delete e.sorting; e.updated = new Date().toISOString();
+      }, 3000);
+    }
     shopItems.push(e); return { ok: true, item: e };
   }
   const e = shopItems.find(i => i.id === op.id);

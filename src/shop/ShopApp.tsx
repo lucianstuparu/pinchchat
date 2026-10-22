@@ -5,13 +5,13 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, RefreshCw, Search, ShoppingBasket, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, RefreshCw, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { atStore, fold, newItemId, parseQuickAdd, storeTagsOf, suggest, type Item, type Known, type Op, type Store } from './logic';
+import { atStore, fold, newItemId, storeTagsOf, suggest, type Item, type Known, type Op, type Store } from './logic';
 import { useShop } from './useShop';
 
 const STORE_KEY = 'shop:store';
@@ -134,7 +134,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               <div className="flex flex-col items-center px-10 py-16 text-center">
                 <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-accent"><ShoppingBasket size={26} /></span>
                 <p className="text-[17px] font-semibold">{store ? `Nothing to get at ${storeName(store)}` : 'The list is empty'}</p>
-                <p className="mt-1 text-[15px] text-pc-text-muted">Add below, or tell the assistant in OpenClaw: “we need oat milk from Lidl”.</p>
+                <p className="mt-1 text-[15px] text-pc-text-muted">Type or say it below, the way you would say it: “we need oat milk and two kefirs from Lidl”. The assistant sorts it.</p>
               </div>
             )}
 
@@ -228,7 +228,12 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
       <button type="button" onClick={() => onOpen(item.id)} className="flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left">
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[17px] leading-snug ${done || flash ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{item.title}</span>
-          {(sub.length > 0 || item.scope === 'private' || due !== null) && (
+          {item.sorting && (
+            <span className="mt-0.5 flex items-center gap-1 text-[13px] leading-tight text-pc-accent">
+              <Sparkles size={12} className="animate-pulse" /> The assistant is sorting this…
+            </span>
+          )}
+          {!item.sorting && (sub.length > 0 || item.scope === 'private' || due !== null) && (
             <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-pc-text-muted">
               {due !== null && !done && <span className={due <= 2 ? 'font-medium text-red-500' : 'text-amber-700 dark:text-amber-400'}>{due < 0 ? 'Overdue' : due === 0 ? 'Last day' : `by ${fmtDay(item.due_date!)}`}</span>}
               {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
@@ -246,19 +251,22 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
   onAdd: (op: Op) => void;
 }) {
   const [text, setText] = useState(prefill ?? '');
-  const [ret, setRet] = useState(false);
   const [listening, setListening] = useState(false);
   const dict = useRef<Dictation | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const hints = suggest(text, known, items);
-  const parsed = parseQuickAdd(text, stores);
   const tagsFor = (own: string[]) => (own.some(t => stores.some(s => s.tag === t)) || !store ? own : [...own, store]);
 
-  const add = (title = parsed.title, own = parsed.tags) => {
-    if (!title.trim()) return;
+  /** A suggestion is added as it is; anything typed or said goes to the assistant to sort. */
+  const add = (picked?: Known) => {
     if (listening) { dict.current?.stop(); setListening(false); }
-    onAdd({ op: 'add', id: newItemId(), title, qty: parsed.qty, tags: tagsFor(own), scope: parsed.private ? 'private' : 'shared', kind: ret ? 'return' : 'buy' });
-    setText(''); setRet(false);
+    if (picked) {
+      onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
+    } else {
+      if (!text.trim()) return;
+      onAdd({ op: 'add', id: newItemId(), title: text.trim(), tags: store ? [store] : [], smart: true, store: store ?? undefined });
+    }
+    setText('');
     input.current?.focus();
   };
   const toggleMic = () => {
@@ -274,27 +282,17 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
       {hints.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} aria-label="Suggestions">
           {hints.map(h => (
-            <button key={h.title} type="button" onClick={() => add(h.title, [...new Set([...parsed.tags, ...h.tags])])}
+            <button key={h.title} type="button" onClick={() => add(h)}
               className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-pc-border px-3 text-[14px] active:bg-[var(--pc-hover-strong)]">
               {h.title}
             </button>
           ))}
         </div>
       )}
-      {text.trim() && (
-        <div className="mb-1.5 flex items-center gap-2 px-2 text-[12px] text-pc-text-muted">
-          <button type="button" onClick={() => setRet(r => !r)} className={`h-6 rounded-full px-2.5 font-medium ${ret ? 'bg-amber-500 text-white' : 'bg-pc-surface text-pc-text-secondary'}`}>
-            {ret ? '↩ To return' : 'To buy'}
-          </button>
-          <span className="truncate">
-            {[parsed.qty && `×${parsed.qty}`, ...tagsFor(parsed.tags).map(t => stores.some(s => s.tag === t) ? storeName(t) : `#${t}`), parsed.private ? 'just me' : 'shared'].filter(Boolean).join(' · ')}
-          </span>
-        </div>
-      )}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
         <div className={`flex h-11 min-w-0 flex-1 items-center rounded-[22px] border bg-pc-surface pl-4 pr-1 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.6)]' : 'border-transparent'}`}>
           <input ref={input} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" autoComplete="off"
-            placeholder={listening ? 'Listening…' : store ? `Add for ${storeName(store)}` : 'Add an item'} aria-label="New item"
+            placeholder={listening ? 'Listening…' : store ? `Add for ${storeName(store)}, or say it` : 'Add something, or say it'} aria-label="New item"
             className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="flex h-9 w-8 items-center justify-center" aria-label="Clear">
@@ -307,7 +305,7 @@ function AddBar({ prefill, store, stores, storeName, known, items, onAdd }: {
             </button>
           )}
         </div>
-        <button type="submit" disabled={!parsed.title.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-white transition-transform active:scale-95 disabled:opacity-40" aria-label="Add">
+        <button type="submit" disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-white transition-transform active:scale-95 disabled:opacity-40" aria-label="Add">
           <ArrowUp size={21} strokeWidth={2.5} />
         </button>
       </form>

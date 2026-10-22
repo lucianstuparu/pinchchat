@@ -89,5 +89,13 @@ export function useShop(person: string) {
     return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onOnline); window.clearInterval(t); };
   }, [flush]);
 
+  // While the assistant is sorting something, look again every few seconds.
+  const sortingNow = snap.items.some(i => i.sorting);
+  useEffect(() => {
+    if (!sortingNow || sync === 'offline' || sync === 'signed-out') return;
+    const t = window.setTimeout(() => void flush(), 4000);
+    return () => window.clearTimeout(t);
+  }, [sortingNow, snap, sync, flush]);
+
   return { snap, queue, sync, lastSync, apply, refresh: flush };
 }
