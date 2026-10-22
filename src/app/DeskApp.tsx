@@ -34,6 +34,7 @@ import { LoopsList } from './LoopsList';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { SettingsSheet } from './SettingsSheet';
+import { useNotice } from './notice';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
 interface OutboxItem { id: string; text: string; attachments: OutgoingAttachment[]; queuedAt: number }
@@ -108,6 +109,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [busy, setBusy] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [notice, dismissNotice] = useNotice();
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [refreshing, setRefreshing] = useState(false);
   const refresh = useCallback(async () => {
@@ -417,6 +419,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           <div className="min-h-0 flex-1 overflow-y-auto">{listBody(tab)}</div>
         </aside>
         <div className="relative flex min-w-0 flex-1 flex-col">
+          {search === null && notice && (
+            <div className="mx-3 mt-2 flex items-start gap-3 rounded-2xl border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
+              <Bell size={18} className="mt-0.5 shrink-0 text-pc-accent" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold leading-snug">{notice.title}</p>
+                {notice.body && <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-snug text-pc-text-secondary">{notice.body}</p>}
+                <p className="mt-1 text-[12px] text-pc-text-muted">
+                  Notification · {new Date(notice.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  {notice.item && <> · <button type="button" onClick={() => { setSheet(notice.item!); dismissNotice(); }} className="font-medium text-pc-accent">Open it</button></>}
+                </p>
+              </div>
+              <button type="button" onClick={dismissNotice} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Dismiss"><X size={16} /></button>
+            </div>
+          )}
           {search === null && pinnedBar}
           <main ref={scrollRef} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2" role="log" aria-live="polite">
             {search !== null ? searchResults : <div className="space-y-1 pt-1 md:px-2">{chat}</div>}

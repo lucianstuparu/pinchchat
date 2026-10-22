@@ -171,16 +171,23 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(reminderAction(event.notification, event.action));
     return;
   }
-  const target = new URL(event.notification.data && event.notification.data.url || '/', self.location.origin).href;
+  // The app shows what was tapped (a card at the top), so every notification explains itself
+  // (2026-10-22). Kept in the share cache (never cleared by updates), never in the URL.
+  const n = event.notification;
+  const notice = { title: n.title, body: n.body, item: n.data && n.data.item, ts: Date.now() };
+  const target = new URL(n.data && n.data.url || '/', self.location.origin);
+  target.searchParams.set('notice', '1');
   event.waitUntil((async () => {
+    const cache = await caches.open(SHARE_CACHE);
+    await cache.put('/notice-inbox/latest', new Response(JSON.stringify(notice), { headers: { 'Content-Type': 'application/json' } }));
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of windows) {
       if (new URL(w.url).origin === self.location.origin) {
         await w.focus();
-        if (w.url !== target && 'navigate' in w) await w.navigate(target).catch(() => {});
+        w.postMessage({ type: 'notice', notice });
         return;
       }
     }
-    await self.clients.openWindow(target);
+    await self.clients.openWindow(target.href);
   })());
 });
