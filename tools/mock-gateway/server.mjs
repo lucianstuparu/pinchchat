@@ -22,14 +22,34 @@ const si = (id, title, tags, extra = {}) => ({ id, kind: 'buy', title, tags, sta
 const shopItems = [
   si('shp-2026-10-22-c61037', 'Sare pentru mașina de spălat vase', ['carrefour'], { source: 'a-2026-10-22-001' }),
   si('shp-2026-10-21-a1b2c3', 'Oat milk', ['lidl'], { qty: '2' }),
-  si('shp-2026-10-21-b2c3d4', 'Kefir', []),
+  si('shp-2026-10-21-b2c3d4', 'Kefir', [], { shelf: 14 }),
   si('shp-2026-10-21-c3d4e5', 'Vitamin D', ['pharmacy'], { scope: 'private' }),
   si('shp-2026-10-21-d4e5f6', 'Mangoes', ['grand-frais'], { added_by: 'ludmila' }),
   si('shp-2026-10-20-e5f6a7', 'Philips kettle', ['leclerc'], { kind: 'return', due_date: '2026-10-24', notes: 'receipt in the drawer' }),
   si('shp-2026-10-20-f6a7b8', 'Bread', ['paniere'], { status: 'bought', bought_on: '2026-10-21', bought_by: 'ludmila', updated: '2026-10-21T18:00:00Z' }),
 ];
 const shopAsks = [];
-const shopPhotos = new Map();   // ref -> Buffer (photo ops)
+const shopPhotos = new Map();
+const addD = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+const shopPantry = [
+  { id: 'pan-2026-10-20-000001', kind: 'pantry', title: 'Piept de pui', where: 'fridge', due_date: addD(1), status: 'open', added_by: 'ludmila', created: '2026-10-20T08:00:00Z' },
+  { id: 'pan-2026-10-20-000002', kind: 'pantry', title: 'Hummus', where: 'fridge', due_date: addD(-1), status: 'open', added_by: 'lucian', created: '2026-10-20T08:00:00Z' },
+  { id: 'pan-2026-10-20-000003', kind: 'pantry', title: 'Iaurt grecesc', qty: '3', where: 'fridge', due_date: addD(12), guessed: true, status: 'open', added_by: 'lucian', created: '2026-10-20T08:00:00Z' },
+  { id: 'pan-2026-10-20-000004', kind: 'pantry', title: 'Mazare', where: 'freezer', status: 'open', added_by: 'lucian', created: '2026-10-20T08:00:00Z' },
+];
+function pantryOp(op) {
+  if (op.op === 'pantry-add') {
+    if (shopPantry.some(e => e.id === op.id)) return { ok: true, duplicate: true };
+    const e = { id: op.id, kind: 'pantry', title: op.title, product: op.product, qty: op.qty, where: op.where || 'fridge', due_date: op.expires || (op.in_days ? addD(op.in_days) : undefined), status: 'open', added_by: 'lucian', created: new Date().toISOString() };
+    shopPantry.push(e); return { ok: true, entry: e };
+  }
+  const e = shopPantry.find(x => x.id === op.id);
+  if (!e) return { error: 'not in the pantry' };
+  if (op.op === 'pantry-close') Object.assign(e, { status: op.how, closed_by: 'lucian', closed_on: addD(0) });
+  if (op.op === 'pantry-reopen') Object.assign(e, { status: 'open', closed_by: undefined, closed_on: undefined });
+  if (op.op === 'pantry-edit') { for (const k of ['title', 'qty', 'where']) if (op[k] !== undefined) e[k] = op[k] || undefined; if (op.expires !== undefined) { e.due_date = op.expires || undefined; e.guessed = false; } }
+  return { ok: true, entry: e };
+}   // ref -> Buffer (photo ops)
 const shopProducts = [{
   id: 'prd-2026-10-20-0a0a0a', name: 'Kefir nature', brand: 'Lactel', size: '1 L', photos: [],
   ingredients: 'Lait fermente au kefir (lait, ferments lactiques et levures).',
@@ -44,6 +64,18 @@ const shopPurchases = [
 ];
 function shopApply(op) {
   const nowIso = new Date().toISOString();
+  if (String(op.op).startsWith('pantry-')) return pantryOp(op);
+  if (op.op === 'ask' && /^\[Pantry\]/.test(op.text || '')) {   // imitate the Shopper on the pantry
+    if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
+    const a = { id: op.id, text: op.text, status: 'working', ts: nowIso };
+    shopAsks.push(a);
+    setTimeout(() => {
+      const t = op.text.replace('[Pantry] ', '');
+      const e = pantryOp({ op: 'pantry-add', id: 'pan-2026-10-22-' + Math.random().toString(16).slice(2, 8), title: t.replace(/ expires.*$/i, ''), in_days: 2 }).entry;
+      a.reply = `Noted ${e.title}, expires ${e.due_date}`; a.status = 'done';
+    }, 2500);
+    return { ok: true, ask: a, fresh: true };
+  }
   if (op.op === 'photo') { if (!shopPhotos.has(op.ref)) shopPhotos.set(op.ref, Buffer.from(op.data, 'base64')); return { ok: true, ref: op.ref }; }
   if (op.op === 'ask' && op.photos?.length) {   // imitate the Shopper reading a label
     if (shopAsks.some(a => a.id === op.id)) return { ok: true, fresh: false };
@@ -241,7 +273,7 @@ const server = http.createServer((req, res) => {
       const p = JSON.parse(body || '{}');
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases }));
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry }));
     });
     return;
   }

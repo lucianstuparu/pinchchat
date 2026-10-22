@@ -1,3 +1,5 @@
+import type { PantryEntry, PantryOp } from './pantry';
+
 /**
  * The shopping list's logic, shared by the app and its tests: the same rules as the server's
  * shop.mjs (tags, which items show at which shop, how an operation changes an item), so the app
@@ -10,6 +12,8 @@ export interface Item {
   added_by?: string; created?: string; updated?: string; bought_on?: string; bought_by?: string; bought_at?: string;
   /** The catalogue product this item is (prd-…). */
   product?: string;
+  /** Days it usually keeps (from the server): ticking it offers to put it in the pantry. */
+  shelf?: number;
 }
 export interface Known { title: string; tags: string[]; n: number }
 /** An instruction for the assistant, typed or said in the app, and its answer. */
@@ -22,12 +26,13 @@ export interface Product {
   stats?: { times: number; last_date: string; last_store?: string; last_price?: number; currency?: string };
 }
 export interface Purchase { id: string; title: string; product?: string; qty?: string; price?: number; currency?: string; store?: string; date: string; by?: string; source?: string; receipt?: string }
-export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[] }
+export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[] }
 
 export type Op =
   | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string }
   | { op: 'ask'; id: string; text: string; store?: string; photos?: string[] }
   | { op: 'photo'; ref: string; data: string }
+  | PantryOp
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
@@ -112,7 +117,7 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
-  if (op.op === 'ask' || op.op === 'photo') return items;   // the assistant does it on the server
+  if (op.op === 'ask' || op.op === 'photo' || op.op.startsWith('pantry-')) return items;   // not list items
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {

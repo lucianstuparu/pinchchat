@@ -7,6 +7,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_STORES, applyLocal, type Op, type Snapshot } from './logic';
+import { applyPantry, type PantryOp } from './pantry';
+
+/** One change on the local copy: list items and the pantry. */
+const applyAll = (s: Snapshot, op: Op, person: string): Snapshot => ({
+  ...s, items: applyLocal(s.items, op, person),
+  pantry: op.op.startsWith('pantry-') ? applyPantry(s.pantry ?? [], op as PantryOp, person) : s.pantry,
+});
 
 const SNAP_KEY = 'shop:snapshot';
 const QUEUE_KEY = 'shop:queue';
@@ -37,7 +44,7 @@ export function useShop(person: string) {
   // restarted in the shop, offline, still shows what was ticked).
   const [snap, setSnap] = useState<Snapshot>(() => {
     const s = read(SNAP_KEY, EMPTY);
-    return { ...s, items: read(QUEUE_KEY, [] as Op[]).reduce((items, op) => applyLocal(items, op, person), s.items) };
+    return read(QUEUE_KEY, [] as Op[]).reduce((acc, op) => applyAll(acc, op, person), s);
   });
   const [sync, setSync] = useState<SyncState>('idle');
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -59,10 +66,10 @@ export function useShop(person: string) {
         : await post<Snapshot>('/shop/list', {});
       // Changes made while this was in flight stay queued and are re-applied on the new state.
       const rest = queueRef.current.slice(sending.length);
-      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [] };
+      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [], pantry: r.pantry ?? [] };
       write(SNAP_KEY, fresh);
       setQueue(rest);
-      setSnap({ ...fresh, items: rest.reduce((items, op) => applyLocal(items, op, person), fresh.items) });
+      setSnap(rest.reduce((acc, op) => applyAll(acc, op, person), fresh));
       setSync('idle');
       setLastSync(Date.now());
     } catch (e) {
@@ -74,7 +81,7 @@ export function useShop(person: string) {
 
   /** Make a change: at once on the phone, to the server as soon as it can. */
   const apply = useCallback((op: Op) => {
-    setSnap(s => ({ ...s, items: applyLocal(s.items, op, person) }));
+    setSnap(s => applyAll(s, op, person));
     setQueue(q => [...q, op]);
     window.setTimeout(() => void flush(), 50);
   }, [person, flush]);

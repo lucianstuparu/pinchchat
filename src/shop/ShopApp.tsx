@@ -5,7 +5,7 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, Package, RefreshCw, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
@@ -14,6 +14,8 @@ import { clearShareParam, pendingShareId, takeSharedContent } from '../share/sha
 import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
+import { PantrySheet } from './PantrySheet';
+import { addDays, daysUntil, newPantryId, whereIcon } from './pantry';
 import { useShop } from './useShop';
 
 const STORE_KEY = 'shop:store';
@@ -45,6 +47,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [settings, setSettings] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
+  const [showPantry, setShowPantry] = useState(false);
+  // After ticking something that keeps a few days: offer to note it in the pantry (8 s).
+  const [offer, setOffer] = useState<{ item: Item; days: number } | null>(null);
   const [showBought, setShowBought] = useState(false);
   const storeName = (tag: string) => stores.find(s => s.tag === tag)?.name ?? tag;
 
@@ -64,7 +69,17 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const products = snap.products ?? [];
   const productOf = (id?: string) => (id ? products.find(p => p.id === id) : undefined);
   const foundProducts = q.length >= 1 ? products.filter(p => fold([p.name, p.brand, ...(p.aliases ?? [])].join(' ')).includes(q)) : [];
-  const tick = (i: Item) => apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
+  const pantry = snap.pantry ?? [];
+  const soon = pantry.filter(e => e.status === 'open' && e.due_date && daysUntil(e.due_date, snap.today || new Date().toISOString().slice(0, 10)) <= 2).length;
+  const tick = (i: Item) => {
+    apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
+    if (i.status === 'open' && i.kind === 'buy' && i.shelf) setOffer({ item: i, days: i.shelf });
+  };
+  useEffect(() => {
+    if (!offer) return;
+    const t = window.setTimeout(() => setOffer(null), 9000);
+    return () => window.clearTimeout(t);
+  }, [offer]);
 
   // ---- shared from another app (share sheet): the text becomes the new item
   const [prefill, setPrefill] = useState<string | null>(null);
@@ -106,6 +121,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               {sync === 'offline' || sync === 'signed-out'
                 ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
                 : null}
+              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `At home: ${soon} expiring soon` : 'At home'}>
+                <Refrigerator size={21} />
+                {soon > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{soon}</span>}
+              </button>
               <button type="button" onClick={() => setShowProducts(true)} className={iconBtn} aria-label="Products"><Package size={21} /></button>
               <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
               <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
@@ -177,6 +196,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         )}
       </main>
 
+      {offer && search === null && (
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-2xl bg-pc-text px-3 py-2 text-[14px] text-pc-base shadow-lg" role="status">
+          <span className="text-[18px]" aria-hidden>{whereIcon('fridge')}</span>
+          <span className="min-w-0 flex-1 leading-snug">At home until {new Date(`${addDays(snap.today || new Date().toISOString().slice(0, 10), offer.days)}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}? <span className="opacity-70">{offer.item.title}</span></span>
+          <button type="button" onClick={() => { apply({ op: 'pantry-add', id: newPantryId(), title: offer.item.title, product: offer.item.product, qty: offer.item.qty, in_days: offer.days }); setOffer(null); }}
+            className="h-8 shrink-0 rounded-full bg-pc-accent px-3 text-[13px] font-semibold text-[var(--pc-on-accent)]">Add</button>
+          <button type="button" onClick={() => setOffer(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full opacity-70" aria-label="No"><X size={15} /></button>
+        </div>
+      )}
       {search === null && (
         <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
           asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
@@ -188,6 +216,11 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         const item = snap.items.find(i => i.id === editing);
         return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={apply} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
       })()}
+      {showPantry && (
+        <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onOp={op => apply(op)} onClose={() => setShowPantry(false)}
+          onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}
+          lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
+      )}
       {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName} />}
       {productId && (() => {
         const p = productOf(productId);
