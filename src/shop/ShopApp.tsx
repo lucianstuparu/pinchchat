@@ -506,7 +506,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
             readOnly={mic === 'writing'}
-            placeholder={mic === 'live' ? 'Listening… tap the mic when done' : mic === 'recording' ? (secs >= 3 && !heard ? 'The mic hears nothing… Bluetooth headset or watch connected?' : `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done`) : mic === 'writing' ? 'Writing what you said…' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
+            placeholder={mic === 'live' ? 'Listening… tap the mic when done' : mic === 'recording' ? (secs >= 3 && !heard ? 'The mic hears nothing… Bluetooth headset or watch connected?' : `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done`) : mic === 'writing' ? 'Writing what you said…' : `Say or type: add, change, remove… (mic: ${getSpeechMode() === 'whisper' ? 'Whisper' : 'Live'})`} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">

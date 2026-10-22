@@ -253,7 +253,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey && !isTouch()) { e.preventDefault(); send(); }
               }}
-              placeholder={mode === 'dictating' ? 'Listening…' : placeholder}
+              placeholder={mode === 'dictating' ? 'Listening…' : voice ? `${placeholder} (mic: ${serverStt ? 'Whisper' : 'Live'})` : placeholder}
               enterKeyHint={isTouch() ? 'enter' : 'send'}
               className="min-w-0 flex-1 resize-none bg-transparent py-[9px] text-[16px] leading-[22px] text-pc-text placeholder:text-pc-text-muted outline-none focus:outline-none focus-visible:outline-none"
               aria-label="Message"
