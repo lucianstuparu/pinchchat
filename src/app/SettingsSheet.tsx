@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from 'react';
-import { Bell, Check, ChevronRight, Languages, LogOut, MessageCircle, Monitor, Moon, Palette, Sun, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Bell, Check, ChevronRight, LogOut, MessageCircle, Monitor, Moon, Palette, Sun, X } from 'lucide-react';
 import { ACCENTS, type Accent, type Appearance, type Look } from './themes';
-import { DICTATION_LANGS, getDictationLang, setDictationLang } from './voice';
 import type { PushState } from '../mobile/pushNotifications';
 
 /** Settings, iOS style: grouped rows, switches and segmented controls. Opened from the avatar. */
@@ -17,7 +16,7 @@ interface Props {
   onView?: (v: 'mobile' | 'full') => void;
   /** Hide the colour choice (an app with a fixed colour, e.g. Shopping in Keep yellow). */
   fixedAccent?: boolean;
-  /** Extra groups between Speak to type and Sign out. */
+  /** Extra groups between Appearance and Sign out. */
   children?: ReactNode;
   onLogout: () => void;
   onClose: () => void;
@@ -47,7 +46,6 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
 }
 
 export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children, fixedAccent }: Props) {
-  const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
   const pushOn = push === 'on';
   return (
@@ -100,16 +98,6 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
               ))}
             </div>
           </div>}
-        </Group>
-
-        <Group title="Speak to type" foot="The language the mic listens for. While listening you can also tap the language next to the mic.">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <Icon bg="#007aff"><Languages size={16} /></Icon>
-            <div className="flex-1">
-              <Segmented value={lang} onChange={c => { setLang(c); setDictationLang(c); }}
-                options={DICTATION_LANGS.map(l => [l.code, l.name] as [string, string])} />
-            </div>
-          </div>
         </Group>
 
         {children}

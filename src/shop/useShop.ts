@@ -38,6 +38,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Speech to text through Whisper on the server: the recorded audio in, the text out. */
+export async function transcribeShop(audio: { content: string; mimeType: string }): Promise<string> {
+  const r = await post<{ text: string }>('/shop/transcribe', { audio: audio.content, mimeType: audio.mimeType });
+  return r.text ?? '';
+}
+
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'signed-out';
 
 export function useShop(person: string) {

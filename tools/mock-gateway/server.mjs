@@ -269,6 +269,11 @@ const server = http.createServer((req, res) => {
     if (!buf) { res.statusCode = 404; res.end(); return; }
     res.setHeader('content-type', 'image/jpeg'); res.end(buf); return;
   }
+  if (url.pathname === '/shop/transcribe' || url.pathname === '/reg/transcribe') {   // stands in for Whisper
+    let n = 0; req.on('data', (c) => { n += c.length; });
+    req.on('end', () => setTimeout(() => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ text: `iau creme fraiche de la Carrefour (${n} bytes)`, lang: 'ro' })); }, 1200));
+    return;
+  }
   if (url.pathname === '/shop/list' || url.pathname === '/shop/ops') {
     if (shopOffline) { req.socket.destroy(); return; }
     let body = '';

@@ -51,7 +51,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   // ---- voice
   const [mode, setMode] = useState<'idle' | 'dictating' | 'starting' | 'recording' | 'transcribing'>('idle');
   const forText = useRef(false);   // the recording is for speech to text (server), not a voice message
-  const serverStt = !!transcribe && !canDictate() && canRecord();
+  // Whisper (any language, mixed too) whenever the app gives a transcriber; the phone's own
+  // recogniser (one language at a time) only without one.
+  const serverStt = !!transcribe && canRecord();
   const [lang, setLang] = useState(getDictationLang);
   const dict = useRef<Dictation | null>(null);
   const rec = useRef<Recorder | null>(null);
@@ -277,7 +279,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
                 <Mic size={21} />
               </button>
             )}
-            {voice && canDictate() && (
+            {voice && canDictate() && !serverStt && (
               <button type="button" onClick={toggleDictation}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${mode === 'dictating' ? 'text-red-500' : 'text-pc-text-muted active:text-pc-text'}`}
                 aria-label={mode === 'dictating' ? 'Stop dictation' : 'Speak to type'} title={mode === 'dictating' ? 'Stop' : 'Speak to type'}>

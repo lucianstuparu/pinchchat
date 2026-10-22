@@ -5,10 +5,11 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Loader2, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
-import { DICTATION_LANGS, canDictate, dictate, getDictationLang, setDictationLang, type Dictation } from '../app/voice';
+import { canRecord, record, type Recorder } from '../app/voice';
+import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
@@ -334,11 +335,14 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-3);
   const [text, setText] = useState(prefill ?? '');
-  const [listening, setListening] = useState(false);
-  const [lang, setLang] = useState(getDictationLang);
-  const dict = useRef<Dictation | null>(null);
-  // Each dictation run has a number; sending bumps it, so words the recogniser delivers late (after
-  // the text was sent) are dropped instead of refilling the box.
+  // The mic records; Whisper (CT 104) writes the text, in whatever language or mix was spoken, and it
+  // lands in the box to edit or add to. Nothing is sent until Send.
+  const [mic, setMic] = useState<'idle' | 'starting' | 'recording' | 'writing'>('idle');
+  const listening = mic === 'recording' || mic === 'starting';
+  const rec = useRef<Recorder | null>(null);
+  const [secs, setSecs] = useState(0);
+  const [micError, setMicError] = useState<string | null>(null);
+  // Sending bumps the round, so a transcription that comes back after the text was sent is dropped.
   const round = useRef(0);
   const input = useRef<HTMLTextAreaElement>(null);
   // Two pickers: Android offers the camera only for a single image with `capture`, and only the
@@ -368,7 +372,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   /** A suggestion is added as it is; anything typed or said is an instruction for the assistant. */
   const add = (picked?: Known) => {
     round.current++;
-    if (dict.current) { dict.current.abort(); dict.current = null; setListening(false); }
+    if (rec.current) { const r = rec.current; rec.current = null; void r.stop(); setMic('idle'); }
     if (picked) {
       onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
     } else {
@@ -377,25 +381,34 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     }
     setText('');
   };
-  /** The mic only writes: tap to listen, tap to stop (the text stays, to edit or add to), send yourself. */
-  const listen = (code: string, from: string) => {
-    const mine = ++round.current;
-    const base = from ? from.replace(/\s*$/, ' ') : '';
-    const d = dictate(code, (t) => { if (round.current === mine) setText(base + t); },
-      () => { if (round.current === mine) { dict.current = null; setListening(false); } });
-    if (d) { dict.current = d; setListening(true); }
+  const toggleMic = async () => {
+    setMicError(null);
+    if (mic === 'idle') {
+      setMic('starting');
+      try { rec.current = await record(); setSecs(0); setMic('recording'); }
+      catch { setMic('idle'); setMicError('Microphone not available: allow it for this app in Chrome’s site settings.'); }
+      return;
+    }
+    if (mic !== 'recording' || !rec.current) return;
+    const r = rec.current; rec.current = null;
+    const mine = round.current;
+    setMic('writing');
+    const audio = await r.stop();
+    if (!audio) { setMic('idle'); return; }
+    try {
+      const t = (await transcribeShop(audio)).trim();
+      if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
+      else if (!t) setMicError('Nothing was understood. Try again a bit closer.');
+    } catch (e) {
+      setMicError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.' : 'Could not turn it into text. Try again.');
+    } finally { setMic('idle'); }
   };
-  const toggleMic = () => {
-    if (listening) { dict.current?.stop(); setListening(false); return; }   // late final words still land
-    const code = getDictationLang(); setLang(code); listen(code, text);
-  };
-  const nextLang = () => {
-    const i = DICTATION_LANGS.findIndex(l => l.code === lang);
-    const code = DICTATION_LANGS[(i + 1) % DICTATION_LANGS.length].code;
-    setLang(code); setDictationLang(code);
-    if (listening) { round.current++; dict.current?.abort(); listen(code, text); }
-  };
-  useEffect(() => () => dict.current?.abort(), []);
+  useEffect(() => {
+    if (mic !== 'recording') return;
+    const t = window.setInterval(() => setSecs(n => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [mic]);
+  useEffect(() => () => { void rec.current?.stop(); }, []);
   // The box grows with the text, from two lines up to six.
   useEffect(() => {
     const ta = input.current; if (!ta) return;
@@ -435,6 +448,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       )}
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void sendPhotos(e.target.files)} />
       <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
+      {micError && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{micError}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
@@ -461,7 +475,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
         <div className={`relative flex min-w-0 flex-1 items-end rounded-[22px] border bg-pc-surface pl-4 pr-1.5 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
-            placeholder={listening ? 'Listening… tap the mic to stop' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
+            readOnly={mic === 'writing'}
+            placeholder={mic === 'recording' ? `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done` : mic === 'writing' ? 'Writing what you said…' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
@@ -474,18 +489,13 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </button>
           )}
         </div>
-        {canDictate() && (
+        {canRecord() && (
           <div className="relative shrink-0">
-            {listening && (
-              <button type="button" onClick={nextLang} className="absolute -top-9 left-1/2 h-7 -translate-x-1/2 rounded-full border border-pc-border bg-pc-elevated px-2.5 text-[12px] font-semibold shadow-sm"
-                aria-label={`Language ${DICTATION_LANGS.find(l => l.code === lang)?.short}, tap to change`}>
-                {DICTATION_LANGS.find(l => l.code === lang)?.short ?? 'RO'}
-              </button>
-            )}
-            <button type="button" onClick={toggleMic} aria-label={listening ? 'Stop listening' : 'Speak'} aria-pressed={listening}
+            <button type="button" onClick={() => void toggleMic()} disabled={mic === 'writing' || mic === 'starting'}
+              aria-label={listening ? 'Done speaking' : mic === 'writing' ? 'Writing what you said' : 'Speak'} aria-pressed={listening}
               className={`relative flex h-[60px] w-[60px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95 ${listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
-              {listening && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
-              {listening ? <Square size={20} fill="currentColor" /> : <Mic size={28} strokeWidth={2.2} />}
+              {mic === 'recording' && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
+              {mic === 'recording' ? <Square size={20} fill="currentColor" /> : mic === 'writing' ? <Loader2 size={26} className="animate-spin" /> : <Mic size={28} strokeWidth={2.2} />}
             </button>
           </div>
         )}
