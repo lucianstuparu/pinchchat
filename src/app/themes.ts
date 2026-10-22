@@ -9,15 +9,18 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 
 export type Appearance = 'auto' | 'light' | 'dark';
-export type Accent = 'terracotta' | 'green' | 'blue' | 'graphite';
+export type Accent = 'terracotta' | 'green' | 'blue' | 'graphite' | 'keep';
 export interface Look { appearance: Appearance; accent: Accent }
 
 /** Accent per mode (dark needs lighter tones), and the agent's colour that goes with it. */
-export const ACCENTS: Record<Accent, { name: string; light: string; dark: string; pairLight: string; pairDark: string }> = {
+export const ACCENTS: Record<Accent, { name: string; light: string; dark: string; pairLight: string; pairDark: string; ink?: [string, string]; on?: string }> = {
   terracotta: { name: 'Terracotta', light: '#c2593a', dark: '#e07a58', pairLight: '#2f6b55', pairDark: '#5aa889' },
   green:      { name: 'Green',      light: '#2e7d5b', dark: '#4fb487', pairLight: '#c2593a', pairDark: '#e07a58' },
   blue:       { name: 'Blue',       light: '#1f6fd6', dark: '#4c9bff', pairLight: '#7a4fc2', pairDark: '#a983ff' },
   graphite:   { name: 'Graphite',   light: '#3d3d42', dark: '#c7c7cc', pairLight: '#c2593a', pairDark: '#e07a58' },
+  // Google Keep's yellow (the Shopping app, so the move from the Keep list feels familiar). Yellow is a
+  // fill colour: text in it is a dark amber (ink), text on it is near-black (on).
+  keep:       { name: 'Keep yellow', light: '#fbbc04', dark: '#fdd663', pairLight: '#5f6368', pairDark: '#9aa0a6', ink: ['#a05a00', '#fdd663'], on: '#202124' },
 };
 
 const hexRgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
@@ -45,6 +48,8 @@ function vars(mode: 'light' | 'dark', accent: Accent): Record<string, string> {
     '--pc-accent': acc, '--pc-accent-light': acc, '--pc-accent-dim': `rgba(${accRgb},0.3)`,
     '--pc-accent-glow': `rgba(${accRgb},0.1)`, '--pc-accent-rgb': accRgb,
     '--pc-pair': pair, '--pc-pair-rgb': hexRgb(pair),
+    '--pc-accent-ink': a.ink ? (mode === 'dark' ? a.ink[1] : a.ink[0]) : acc,   // text in the accent colour
+    '--pc-on-accent': a.on ?? '#ffffff',                                          // text on an accent fill
     '--pc-mine': `rgba(${accRgb},${mode === 'dark' ? 0.32 : 0.14})`,   // the person's own bubbles
     '--pc-scrim': mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)',
   };

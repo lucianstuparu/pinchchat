@@ -25,7 +25,7 @@ export default function ShopApp() {
   useThemeChrome(mode);
   useEffect(() => { document.title = 'Shopping'; }, []);
   return (
-    <div style={lookVars(mode, look.accent)} className="h-dvh bg-pc-base text-pc-text antialiased">
+    <div style={lookVars(mode, 'keep')} className="h-dvh bg-pc-base text-pc-text antialiased">
       <Shop look={look} mode={mode} onLook={l => { setLook(l); setLookState(l); }} />
     </div>
   );
@@ -84,7 +84,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
                 <input autoFocus type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" aria-label="Search" enterKeyHint="search"
                   className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted [&::-webkit-search-cancel-button]:hidden" />
               </div>
-              <button type="button" onClick={() => setSearch(null)} className="px-2 text-[16px] text-pc-accent">Cancel</button>
+              <button type="button" onClick={() => setSearch(null)} className="px-2 text-[16px] text-[var(--pc-accent-ink)]">Cancel</button>
             </>
           ) : (
             <>
@@ -100,7 +100,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
                 ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
                 : null}
               <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
-              <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-white active:opacity-80" aria-label="Settings">
+              <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
                 {person ? person[0].toUpperCase() : '⋯'}
               </button>
             </>
@@ -124,15 +124,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         ) : (
           <>
             {returns.length > 0 && (
-              <section className="mx-3 mt-3 overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/10">
-                <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-amber-700 dark:text-amber-400"><Undo2 size={14} /> To return · {returns.length}</h2>
+              <section className="mx-3 mt-3 overflow-hidden rounded-2xl bg-pc-surface">
+                <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><Undo2 size={14} /> To return · {returns.length}</h2>
                 <Rows items={returns} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} tinted />
               </section>
             )}
 
             {toBuy.length === 0 && returns.length === 0 && (
               <div className="flex flex-col items-center px-10 py-16 text-center">
-                <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-accent"><ShoppingBasket size={26} /></span>
+                <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]"><ShoppingBasket size={26} /></span>
                 <p className="text-[17px] font-semibold">{store ? `Nothing to get at ${storeName(store)}` : 'The list is empty'}</p>
                 <p className="mt-1 text-[15px] text-pc-text-muted">Tell the assistant below, by voice or typing: “we need oat milk and two kefirs from Lidl”, “no more kefir”, “bought everything at Carrefour”.</p>
               </div>
@@ -175,7 +175,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={apply} /> : null;
       })()}
       {settings && (
-        <SettingsSheet person={person || null} mode={mode} look={look} onLook={onLook} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
+        <SettingsSheet fixedAccent person={person || null} mode={mode} look={look} onLook={onLook} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
       )}
     </div>
   );
@@ -184,8 +184,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 function Chip({ on, onClick, label, n }: { on: boolean; onClick: () => void; label: string; n: number }) {
   return (
     <button type="button" role="tab" aria-selected={on} onClick={onClick}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors ${on ? 'bg-pc-accent text-white' : 'bg-pc-surface text-pc-text-secondary active:bg-[var(--pc-hover-strong)]'}`}>
-      {label}{n > 0 && <span className={on ? 'text-white/80' : 'text-pc-text-muted'}>{n}</span>}
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors ${on ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary active:bg-[var(--pc-hover-strong)]'}`}>
+      {label}{n > 0 && <span className={on ? 'opacity-70' : 'text-pc-text-muted'}>{n}</span>}
     </button>
   );
 }
@@ -223,7 +223,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
     <div className={`flex items-center gap-1 pr-2 ${tinted ? '' : 'bg-pc-base'}`}>
       <button type="button" onClick={tap} className="flex h-12 w-12 shrink-0 items-center justify-center" aria-label={done ? `Put “${item.title}” back on the list` : `Mark “${item.title}” ${item.kind === 'return' ? 'returned' : 'bought'}`}>
         <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full border-[1.75px] transition-colors ${
-          done || flash ? 'border-pc-accent bg-pc-accent text-white' : 'border-pc-text-faint'}`}>
+          done || flash ? 'border-pc-accent bg-pc-accent text-[var(--pc-on-accent)]' : 'border-pc-text-faint'}`}>
           {(done || flash) && <Check size={15} strokeWidth={3} />}
         </span>
       </button>
@@ -284,7 +284,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
         <div className="mb-2 space-y-1.5 px-1" aria-live="polite" aria-label="Assistant">
           {recent.map(a => (
             <div key={a.id} className="flex items-start gap-2 rounded-2xl bg-pc-surface px-3 py-2">
-              <Sparkles size={15} className={`mt-0.5 shrink-0 text-pc-accent ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
+              <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
               <div className="min-w-0 flex-1 text-[14px] leading-snug">
                 <p className="truncate text-pc-text-muted">“{a.text}”</p>
                 <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
@@ -324,7 +324,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </button>
           )}
         </div>
-        <button type="submit" disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-white transition-transform active:scale-95 disabled:opacity-40" aria-label="Add">
+        <button type="submit" disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95 disabled:opacity-40" aria-label="Add">
           <ArrowUp size={21} strokeWidth={2.5} />
         </button>
       </form>
@@ -364,7 +364,7 @@ function ItemSheet({ item, stores, today, onClose, apply }: {
         <div className="mb-3 flex items-center justify-between">
           <button type="button" onClick={onClose} className="text-[16px] text-pc-text-muted">Cancel</button>
           <span className="text-[15px] font-semibold">{isReturn ? 'To return' : 'To buy'}</span>
-          <button type="button" onClick={save} className="text-[16px] font-semibold text-pc-accent">Done</button>
+          <button type="button" onClick={save} className="text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
         </div>
 
         <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[18px] font-semibold`} aria-label="Name" />
@@ -379,7 +379,7 @@ function ItemSheet({ item, stores, today, onClose, apply }: {
         <div className="flex flex-wrap gap-2">
           {stores.map(s => (
             <button key={s.tag} type="button" onClick={() => toggle(s.tag)} aria-pressed={tags.includes(s.tag)}
-              className={`h-8 rounded-full px-3.5 text-[14px] ${tags.includes(s.tag) ? 'bg-pc-accent text-white' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
+              className={`h-8 rounded-full px-3.5 text-[14px] ${tags.includes(s.tag) ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
           ))}
           {others.map(t => (
             <button key={t} type="button" onClick={() => toggle(t)} className="h-8 rounded-full bg-pc-surface px-3.5 text-[14px] text-pc-text-secondary">#{t} ×</button>
@@ -398,14 +398,14 @@ function ItemSheet({ item, stores, today, onClose, apply }: {
         </div>
 
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (brand, size…)" rows={2} className={`${field} mt-3 resize-none`} aria-label="Notes" />
-        {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[14px] text-pc-accent">{item.link}</a>}
+        {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[14px] text-[var(--pc-accent-ink)]">{item.link}</a>}
 
         {item.status === 'open' ? (
           <button type="button" onClick={() => { apply({ op: 'drop', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-2xl bg-pc-surface text-[16px] font-medium text-red-500">
             Remove from the list
           </button>
         ) : (
-          <button type="button" onClick={() => { apply({ op: 'untick', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-2xl bg-pc-surface text-[16px] font-medium text-pc-accent">
+          <button type="button" onClick={() => { apply({ op: 'untick', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-2xl bg-pc-surface text-[16px] font-medium text-[var(--pc-accent-ink)]">
             Put back on the list
           </button>
         )}

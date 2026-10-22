@@ -15,6 +15,8 @@ interface Props {
   onTogglePush?: () => void;
   /** Omit to hide "Other views" (an app without them). */
   onView?: (v: 'mobile' | 'full') => void;
+  /** Hide the colour choice (an app with a fixed colour, e.g. Shopping in Keep yellow). */
+  fixedAccent?: boolean;
   /** Extra groups between Speak to type and Sign out. */
   children?: ReactNode;
   onLogout: () => void;
@@ -44,7 +46,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   );
 }
 
-export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children }: Props) {
+export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children, fixedAccent }: Props) {
   const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
   const pushOn = push === 'on';
@@ -60,7 +62,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
 
         <Group>
           <div className="flex items-center gap-3 px-4 py-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-pc-accent text-[20px] font-semibold text-white">{name[0]}</span>
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-pc-accent text-[20px] font-semibold text-[var(--pc-on-accent,#fff)]">{name[0]}</span>
             <div className="min-w-0">
               <p className="text-[17px] font-semibold">{name}</p>
               <p className="text-[13px] text-pc-text-muted">{person ? 'Signed in' : 'Not signed in'}</p>
@@ -85,11 +87,11 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             <Segmented<Appearance> value={look.appearance} onChange={a => onLook({ ...look, appearance: a })}
               options={[['auto', 'Auto', <Monitor key="a" size={14} />], ['light', 'Light', <Sun key="l" size={14} />], ['dark', 'Dark', <Moon key="d" size={14} />]]} />
           </div>
-          <div className="flex items-center gap-3 px-4 py-3">
+          {!fixedAccent && <div className="flex items-center gap-3 px-4 py-3">
             <Icon bg="#af52de"><Palette size={16} /></Icon>
             <span className="flex-1 text-[16px]">Colour</span>
             <div className="flex gap-2.5" role="radiogroup" aria-label="Accent colour">
-              {(Object.keys(ACCENTS) as Accent[]).map(a => (
+              {(Object.keys(ACCENTS) as Accent[]).filter(a => a !== 'keep').map(a => (
                 <button key={a} type="button" role="radio" aria-checked={look.accent === a} aria-label={ACCENTS[a].name} onClick={() => onLook({ ...look, accent: a })}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-white ring-offset-2 ring-offset-[var(--pc-bg-elevated)] transition"
                   style={{ background: mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light, boxShadow: look.accent === a ? `0 0 0 2px var(--pc-bg-elevated), 0 0 0 4px ${mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light}` : undefined }}>
@@ -97,7 +99,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </Group>
 
         <Group title="Speak to type" foot="The language the mic listens for. While listening you can also tap the language next to the mic.">
