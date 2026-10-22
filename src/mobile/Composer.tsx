@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, AudioLines, Check, Loader2, Mic, Paperclip, Plus, Square, Trash2, X } from 'lucide-react';
-import { DICTATION_LANGS, canDictate, canRecord, dictate, getDictationLang, record, setDictationLang, type Dictation, type Recorder } from '../app/voice';
+import { DICTATION_LANGS, SILENT, canDictate, canRecord, dictate, getDictationLang, record, setDictationLang, type Dictation, type Recorder } from '../app/voice';
 import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
 import { encodeAttachment, AttachmentTooLargeError, type OutgoingAttachment } from './attachments';
@@ -96,8 +96,10 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   };
   const stopRecording = async (keep: boolean) => {
     const r = rec.current; rec.current = null; setMode('idle');
+    const silent = !!r && r.peak() < SILENT;
     const note = await r?.stop();
     if (!keep) return;
+    if (silent) { setError(`The microphone recorded only silence${r?.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`); return; }
     if (forText.current) {
       if (!note || !transcribe) { setError('Nothing was recorded'); return; }
       setMode('transcribing');

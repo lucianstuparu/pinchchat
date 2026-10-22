@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Loader2, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
-import { canRecord, record, type Recorder } from '../app/voice';
+import { SILENT, canRecord, record, type Recorder } from '../app/voice';
 import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
@@ -342,6 +342,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const rec = useRef<Recorder | null>(null);
   const [secs, setSecs] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
+  const [level, setLevel] = useState(0);
+  const [heard, setHeard] = useState(true);   // false after 2.5 s of silence: say so while recording
   // Sending bumps the round, so a transcription that comes back after the text was sent is dropped.
   const round = useRef(0);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -392,9 +394,15 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     if (mic !== 'recording' || !rec.current) return;
     const r = rec.current; rec.current = null;
     const mine = round.current;
+    const silent = r.peak() < SILENT;
     setMic('writing');
     const audio = await r.stop();
     if (!audio) { setMic('idle'); return; }
+    if (silent) {
+      setMic('idle');
+      setMicError(`The microphone recorded only silence${r.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`);
+      return;
+    }
     try {
       const t = (await transcribeShop(audio)).trim();
       if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
@@ -406,7 +414,12 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   useEffect(() => {
     if (mic !== 'recording') return;
     const t = window.setInterval(() => setSecs(n => n + 1), 1000);
-    return () => window.clearInterval(t);
+    const m = window.setInterval(() => {
+      const r = rec.current; if (!r) return;
+      setLevel(r.level());
+      setHeard(r.peak() >= SILENT);
+    }, 120);
+    return () => { window.clearInterval(t); window.clearInterval(m); setLevel(0); setHeard(true); };
   }, [mic]);
   useEffect(() => () => { void rec.current?.stop(); }, []);
   // The box grows with the text, from two lines up to six.
@@ -476,7 +489,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
             readOnly={mic === 'writing'}
-            placeholder={mic === 'recording' ? `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done` : mic === 'writing' ? 'Writing what you said…' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
+            placeholder={mic === 'recording' ? (secs >= 3 && !heard ? 'The mic hears nothing… Bluetooth headset or watch connected?' : `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done`) : mic === 'writing' ? 'Writing what you said…' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
@@ -494,7 +507,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             <button type="button" onClick={() => void toggleMic()} disabled={mic === 'writing' || mic === 'starting'}
               aria-label={listening ? 'Done speaking' : mic === 'writing' ? 'Writing what you said' : 'Speak'} aria-pressed={listening}
               className={`relative flex h-[60px] w-[60px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95 ${listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
-              {mic === 'recording' && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
+              {mic === 'recording' && <span className="absolute inset-0 rounded-full bg-red-500/35 transition-transform duration-100" style={{ transform: `scale(${1 + Math.min(level * 1.6, 0.6)})` }} />}
               {mic === 'recording' ? <Square size={20} fill="currentColor" /> : mic === 'writing' ? <Loader2 size={26} className="animate-spin" /> : <Mic size={28} strokeWidth={2.2} />}
             </button>
           </div>

@@ -82,26 +82,74 @@ export function dictate(lang: string, onText: (text: string, interim: boolean) =
   return { stop: () => r.stop(), abort: () => r.abort() };
 }
 
-export interface Recorder { stop: () => Promise<OutgoingAttachment | null> }
+/**
+ * stop(): the recording as an attachment, or null when it was a slip of the finger.
+ * level(): the input level right now, 0..1 (for a live meter); peak(): the loudest so far.
+ * device: the microphone's name, when the browser tells it.
+ */
+export interface Recorder { stop: () => Promise<OutgoingAttachment | null>; level: () => number; peak: () => number; device: string }
+
+/** Below this peak level the recording is silence (a muted or wrong microphone). */
+export const SILENT = 0.02;
+
+const isRemote = (label: string) => /bluetooth|headset|hands-?free|watch|airpods|buds/i.test(label);
+
+/**
+ * The phone's own microphone if it has one: with a Bluetooth headset or watch connected, Chrome may
+ * take theirs, which often records silence (2026-10-22: a 2 KB "recording" of several seconds).
+ */
+async function openMic(): Promise<MediaStream> {
+  const want: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  let stream = await navigator.mediaDevices.getUserMedia({ audio: want });
+  const label = stream.getAudioTracks()[0]?.label ?? '';
+  if (isRemote(label)) {
+    const builtIn = (await navigator.mediaDevices.enumerateDevices())
+      .find(d => d.kind === 'audioinput' && d.label && !isRemote(d.label) && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    if (builtIn) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { ...want, deviceId: { exact: builtIn.deviceId } } });
+    }
+  }
+  return stream;
+}
 
 /** Record a voice note; `stop()` returns it as an attachment (webm/opus or whatever the browser gives). */
 export async function record(): Promise<Recorder> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stream = await openMic();
   const type = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
   const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
   const chunks: Blob[] = [];
   rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  // A level meter on the same stream: shows the person the mic hears them, and tells silence apart.
+  let ctx: AudioContext | null = null, analyser: AnalyserNode | null = null, peakLevel = 0;
+  try {
+    ctx = new AudioContext();
+    analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+  } catch { /* no meter: recording still works */ }
+  const buf = new Uint8Array(512);
+  const level = () => {
+    if (!analyser) return 0;
+    analyser.getByteTimeDomainData(buf);
+    let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128));
+    const l = Math.min(1, m / 100);
+    if (l > peakLevel) peakLevel = l;
+    return l;
+  };
   const started = Date.now();
   rec.start(250);
   return {
+    level, peak: () => { level(); return peakLevel; }, device: stream.getAudioTracks()[0]?.label ?? '',
     stop: () => new Promise(resolve => {
       rec.onstop = async () => {
+        level();
         stream.getTracks().forEach(t => t.stop());
+        void ctx?.close();
         const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
         if (Date.now() - started < 400 || blob.size === 0) return resolve(null);   // a slip of the finger
         const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
-        const buf = new Uint8Array(await blob.arrayBuffer());
-        let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
         resolve({ fileName: `voice-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`, mimeType: blob.type, content: btoa(bin), size: blob.size });
       };
       rec.stop();
