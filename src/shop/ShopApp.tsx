@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
-import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
+import { DICTATION_LANGS, canDictate, dictate, getDictationLang, setDictationLang, type Dictation } from '../app/voice';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
@@ -335,8 +335,12 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-3);
   const [text, setText] = useState(prefill ?? '');
   const [listening, setListening] = useState(false);
+  const [lang, setLang] = useState(getDictationLang);
   const dict = useRef<Dictation | null>(null);
-  const input = useRef<HTMLInputElement>(null);
+  // Each dictation run has a number; sending bumps it, so words the recogniser delivers late (after
+  // the text was sent) are dropped instead of refilling the box.
+  const round = useRef(0);
+  const input = useRef<HTMLTextAreaElement>(null);
   // Two pickers: Android offers the camera only for a single image with `capture`, and only the
   // gallery when several images may be chosen, so "Take a photo" and "From the gallery" are separate.
   const camera = useRef<HTMLInputElement>(null);
@@ -363,7 +367,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
 
   /** A suggestion is added as it is; anything typed or said is an instruction for the assistant. */
   const add = (picked?: Known) => {
-    if (listening) { dict.current?.stop(); setListening(false); }
+    round.current++;
+    if (dict.current) { dict.current.abort(); dict.current = null; setListening(false); }
     if (picked) {
       onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
     } else {
@@ -371,15 +376,32 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined });
     }
     setText('');
-    input.current?.focus();
   };
-  const toggleMic = () => {
-    if (listening) { dict.current?.stop(); dict.current = null; setListening(false); return; }
-    const base = text ? text.replace(/\s*$/, ' ') : '';
-    const d = dictate(getDictationLang(), (t) => setText(base + t), () => { dict.current = null; setListening(false); });
+  /** The mic only writes: tap to listen, tap to stop (the text stays, to edit or add to), send yourself. */
+  const listen = (code: string, from: string) => {
+    const mine = ++round.current;
+    const base = from ? from.replace(/\s*$/, ' ') : '';
+    const d = dictate(code, (t) => { if (round.current === mine) setText(base + t); },
+      () => { if (round.current === mine) { dict.current = null; setListening(false); } });
     if (d) { dict.current = d; setListening(true); }
   };
-  useEffect(() => () => dict.current?.stop(), []);
+  const toggleMic = () => {
+    if (listening) { dict.current?.stop(); setListening(false); return; }   // late final words still land
+    const code = getDictationLang(); setLang(code); listen(code, text);
+  };
+  const nextLang = () => {
+    const i = DICTATION_LANGS.findIndex(l => l.code === lang);
+    const code = DICTATION_LANGS[(i + 1) % DICTATION_LANGS.length].code;
+    setLang(code); setDictationLang(code);
+    if (listening) { round.current++; dict.current?.abort(); listen(code, text); }
+  };
+  useEffect(() => () => dict.current?.abort(), []);
+  // The box grows with the text, from two lines up to six.
+  useEffect(() => {
+    const ta = input.current; if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 56), 6 * 22 + 20)}px`;
+  }, [text]);
 
   return (
     <div className="shrink-0 border-t border-pc-border bg-pc-base px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
@@ -413,10 +435,10 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       )}
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void sendPhotos(e.target.files)} />
       <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
-      <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
+      <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+            className="mb-[6px] flex h-11 w-11 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
             <Camera size={21} />
           </button>
           {photoMenu && (
@@ -436,24 +458,37 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </>
           )}
         </div>
-        <div className={`flex h-11 min-w-0 flex-1 items-center rounded-[22px] border bg-pc-surface pl-4 pr-1 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.6)]' : 'border-transparent'}`}>
-          <input ref={input} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" autoComplete="off"
-            placeholder={listening ? 'Listening…' : 'Tell the assistant: add, change, remove…'} aria-label="Instruction for the assistant"
-            className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
+        <div className={`relative flex min-w-0 flex-1 items-end rounded-[22px] border bg-pc-surface pl-4 pr-1.5 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
+          <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
+            placeholder={listening ? 'Listening… tap the mic to stop' : 'Say or type: add, change, remove…'} aria-label="Instruction for the assistant"
+            className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !listening && (
-            <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="flex h-9 w-8 items-center justify-center" aria-label="Clear">
+            <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
               <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
             </button>
           )}
-          {canDictate() && (
-            <button type="button" onClick={toggleMic} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${listening ? 'text-red-500' : 'text-pc-text-muted'}`} aria-label={listening ? 'Stop dictation' : 'Speak to type'}>
-              {listening ? <Square size={14} fill="currentColor" /> : <Mic size={20} />}
+          {text.trim() && (
+            <button type="submit" className="mb-[6px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95" aria-label="Send">
+              <ArrowUp size={19} strokeWidth={2.5} />
             </button>
           )}
         </div>
-        <button type="submit" disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95 disabled:opacity-40" aria-label="Add">
-          <ArrowUp size={21} strokeWidth={2.5} />
-        </button>
+        {canDictate() && (
+          <div className="relative shrink-0">
+            {listening && (
+              <button type="button" onClick={nextLang} className="absolute -top-9 left-1/2 h-7 -translate-x-1/2 rounded-full border border-pc-border bg-pc-elevated px-2.5 text-[12px] font-semibold shadow-sm"
+                aria-label={`Language ${DICTATION_LANGS.find(l => l.code === lang)?.short}, tap to change`}>
+                {DICTATION_LANGS.find(l => l.code === lang)?.short ?? 'RO'}
+              </button>
+            )}
+            <button type="button" onClick={toggleMic} aria-label={listening ? 'Stop listening' : 'Speak'} aria-pressed={listening}
+              className={`relative flex h-[60px] w-[60px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95 ${listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
+              {listening && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
+              {listening ? <Square size={20} fill="currentColor" /> : <Mic size={28} strokeWidth={2.2} />}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

@@ -58,10 +58,13 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const base = useRef('');
   const [secs, setSecs] = useState(0);
 
-  const stopDictation = () => { const d = dict.current; dict.current = null; d?.stop(); };
+  // stop(): the last words still land (the ref is cleared when it ends); dropDictation(): the text was
+  // sent or cleared, so anything the recogniser still delivers is ignored.
+  const stopDictation = () => { dict.current?.stop(); };
+  const dropDictation = () => { const d = dict.current; dict.current = null; d?.abort(); };
   const startDictation = (code: string, from: string) => {
     base.current = from ? from.replace(/\s*$/, ' ') : '';
-    const d = dictate(code, (t) => setText(base.current + t), (err) => {
+    const d = dictate(code, (t) => { if (dict.current === d) setText(base.current + t); }, (err) => {
       if (dict.current !== d) return;   // a language switch restarted it
       dict.current = null; setMode('idle');
       if (err === 'not-allowed') setError('Microphone blocked: allow it for this app in Chrome’s site settings');
@@ -78,7 +81,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     const i = DICTATION_LANGS.findIndex(l => l.code === lang);
     const code = DICTATION_LANGS[(i + 1) % DICTATION_LANGS.length].code;
     setLang(code); setDictationLang(code);
-    if (mode === 'dictating') { const keep = text; stopDictation(); startDictation(code, keep); }
+    if (mode === 'dictating') { const keep = text; dropDictation(); startDictation(code, keep); }
   };
 
   const startRecording = async (text = false) => {
@@ -137,7 +140,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
 
   const send = () => {
     if (!canSend) return;
-    if (mode === 'dictating') { stopDictation(); setMode('idle'); }
+    if (mode === 'dictating') { dropDictation(); setMode('idle'); }
     const body = text.trim();
     onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${body}` : body, attachments);
     setText('');
@@ -147,7 +150,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     onReplyCancel?.();
   };
   const clear = () => {
-    if (mode === 'dictating') { stopDictation(); setMode('idle'); }
+    if (mode === 'dictating') { dropDictation(); setMode('idle'); }
     setText(''); setError(null); taRef.current?.focus();
   };
 

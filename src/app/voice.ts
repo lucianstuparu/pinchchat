@@ -22,7 +22,8 @@ const Ctor = (): (new () => Recognition) | null => {
 export const canDictate = () => typeof window !== 'undefined' && Ctor() !== null;
 export const canRecord = () => typeof window !== 'undefined' && 'MediaRecorder' in window && !!navigator.mediaDevices?.getUserMedia;
 
-export interface Dictation { stop: () => void }
+/** stop(): finish and deliver the last words; abort(): stop and drop them (the text was sent). */
+export interface Dictation { stop: () => void; abort: () => void }
 
 /** Dictation languages offered in the app; the choice is kept per device. */
 export const DICTATION_LANGS = [
@@ -78,7 +79,7 @@ export function dictate(lang: string, onText: (text: string, interim: boolean) =
   r.onerror = (e) => onEnd(e.error === 'no-speech' || e.error === 'aborted' ? undefined : e.error);
   r.onend = () => onEnd();
   r.start();
-  return { stop: () => r.stop() };
+  return { stop: () => r.stop(), abort: () => r.abort() };
 }
 
 export interface Recorder { stop: () => Promise<OutgoingAttachment | null> }
