@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, AudioLines, Check, Loader2, Mic, Paperclip, Plus, Square, Trash2, X } from 'lucide-react';
-import { DICTATION_LANGS, SILENT, canDictate, canRecord, dictate, getDictationLang, record, setDictationLang, type Dictation, type Recorder } from '../app/voice';
+import { SILENT, getSpeechMode, canDictate, canRecord, dictate, getDictationLang, record, type Dictation, type Recorder } from '../app/voice';
 import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
 import { encodeAttachment, AttachmentTooLargeError, type OutgoingAttachment } from './attachments';
@@ -53,8 +53,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const forText = useRef(false);   // the recording is for speech to text (server), not a voice message
   // Whisper (any language, mixed too) whenever the app gives a transcriber; the phone's own
   // recogniser (one language at a time) only without one.
-  const serverStt = !!transcribe && canRecord();
-  const [lang, setLang] = useState(getDictationLang);
+  const serverStt = !!transcribe && canRecord() && getSpeechMode() === 'whisper';
   const dict = useRef<Dictation | null>(null);
   const rec = useRef<Recorder | null>(null);
   const base = useRef('');
@@ -77,13 +76,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   };
   const toggleDictation = () => {
     if (mode === 'dictating') { stopDictation(); setMode('idle'); taRef.current?.focus(); return; }
-    if (mode === 'idle') { const code = getDictationLang(); setLang(code); startDictation(code, text); }   // Settings may have changed it
-  };
-  const nextLang = () => {
-    const i = DICTATION_LANGS.findIndex(l => l.code === lang);
-    const code = DICTATION_LANGS[(i + 1) % DICTATION_LANGS.length].code;
-    setLang(code); setDictationLang(code);
-    if (mode === 'dictating') { const keep = text; dropDictation(); startDictation(code, keep); }
+    if (mode === 'idle') startDictation(getDictationLang(), text);   // the language set in Settings
   };
 
   const startRecording = async (text = false) => {
@@ -177,7 +170,6 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
 
   const recording = mode === 'recording' || mode === 'starting' || mode === 'transcribing';
   const round = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full';
-  const langShort = DICTATION_LANGS.find(l => l.code === lang)?.short ?? 'RO';
 
   return (
     <div className="shrink-0 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -269,11 +261,6 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
             {text.length > 0 && mode !== 'dictating' && (
               <button type="button" onClick={clear} className="flex h-10 w-8 shrink-0 items-center justify-center text-pc-text-faint active:text-pc-text-muted" aria-label="Clear">
                 <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
-              </button>
-            )}
-            {voice && canDictate() && mode === 'dictating' && (
-              <button type="button" onClick={nextLang} className="mb-[7px] mr-0.5 h-[26px] shrink-0 rounded-full border border-pc-border px-2 text-[12px] font-semibold text-pc-text-secondary" aria-label={`Dictation language ${langShort}, tap to change`}>
-                {langShort}
               </button>
             )}
             {voice && serverStt && mode === 'idle' && (

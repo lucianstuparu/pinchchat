@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { Bell, Check, ChevronRight, LogOut, MessageCircle, Monitor, Moon, Palette, Sun, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Bell, Check, ChevronRight, Languages, LogOut, MessageCircle, Monitor, Moon, Palette, Sun, X } from 'lucide-react';
+import { DICTATION_LANGS, getDictationLang, getSpeechMode, setDictationLang, setSpeechMode, type SpeechMode } from './voice';
 import { ACCENTS, type Accent, type Appearance, type Look } from './themes';
 import type { PushState } from '../mobile/pushNotifications';
 
@@ -46,6 +47,8 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
 }
 
 export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children, fixedAccent }: Props) {
+  const [speech, setSpeech] = useState<SpeechMode>(getSpeechMode);
+  const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
   const pushOn = push === 'on';
   return (
@@ -98,6 +101,24 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
               ))}
             </div>
           </div>}
+        </Group>
+
+        <Group title="The mic" foot={speech === 'live'
+          ? 'Live: the text appears while you speak, in one language (below). Mixed languages come out wrong.'
+          : 'Whisper (home server): any language, mixed too. The text comes when you stop, after 10–20 s.'}>
+          <div className="space-y-3 px-4 py-3">
+            <Segmented<SpeechMode> value={speech} onChange={m => { setSpeech(m); setSpeechMode(m); }}
+              options={[['live', 'Live'], ['whisper', 'Whisper']]} />
+            {speech === 'live' && (
+              <div className="flex items-center gap-3">
+                <Icon bg="#007aff"><Languages size={16} /></Icon>
+                <div className="flex-1">
+                  <Segmented value={lang} onChange={c => { setLang(c); setDictationLang(c); }}
+                    options={DICTATION_LANGS.map(l => [l.code, l.name] as [string, string])} />
+                </div>
+              </div>
+            )}
+          </div>
         </Group>
 
         {children}

@@ -25,6 +25,20 @@ export const canRecord = () => typeof window !== 'undefined' && 'MediaRecorder' 
 /** stop(): finish and deliver the last words; abort(): stop and drop them (the text was sent). */
 export interface Dictation { stop: () => void; abort: () => void }
 
+/**
+ * How the mic turns speech into text, chosen in Settings and kept per device:
+ *  - live: the phone's recogniser (Google speech in Chrome), text appears while speaking; one
+ *    language at a time (the one set in Settings);
+ *  - whisper: the recording goes to Whisper on the home server: any language, mixed too, the text
+ *    comes after a wait (~12-20 s on that CPU).
+ */
+export type SpeechMode = 'live' | 'whisper';
+const MODE_KEY = 'openclaw-pwa:speech-mode';
+export function getSpeechMode(): SpeechMode {
+  try { return localStorage.getItem(MODE_KEY) === 'whisper' ? 'whisper' : 'live'; } catch { return 'live'; }
+}
+export function setSpeechMode(m: SpeechMode) { try { localStorage.setItem(MODE_KEY, m); } catch { /* not kept */ } }
+
 /** Dictation languages offered in the app; the choice is kept per device. */
 export const DICTATION_LANGS = [
   { code: 'ro-RO', short: 'RO', name: 'Română' },
