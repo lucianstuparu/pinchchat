@@ -5,7 +5,7 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { canDictate, dictate, getDictationLang, type Dictation } from '../app/voice';
@@ -337,7 +337,11 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const [listening, setListening] = useState(false);
   const dict = useRef<Dictation | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // Two pickers: Android offers the camera only for a single image with `capture`, and only the
+  // gallery when several images may be chosen, so "Take a photo" and "From the gallery" are separate.
   const camera = useRef<HTMLInputElement>(null);
+  const gallery = useRef<HTMLInputElement>(null);
+  const [photoMenu, setPhotoMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const hints = suggest(text, known, items);
   /** Photos (a label, a shelf, a receipt) go to the assistant with whatever is in the field. */
@@ -350,6 +354,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     }
     setBusy(false);
     if (camera.current) camera.current.value = '';
+    if (gallery.current) gallery.current.value = '';
     if (refs.length === 0) return;
     onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined, photos: refs });
     setText('');
@@ -406,11 +411,31 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
-      <input ref={camera} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
+      <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void sendPhotos(e.target.files)} />
+      <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
-        <button type="button" disabled={busy} onClick={() => camera.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
-          <Camera size={21} />
-        </button>
+        <div className="relative shrink-0">
+          <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+            <Camera size={21} />
+          </button>
+          {photoMenu && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
+              <div className="absolute bottom-12 left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                  <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
+                </button>
+                <div className="mx-4 h-px bg-[var(--pc-separator)]" />
+                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); gallery.current?.click(); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                  <Images size={19} className="text-[var(--pc-accent-ink)]" /> From the gallery
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         <div className={`flex h-11 min-w-0 flex-1 items-center rounded-[22px] border bg-pc-surface pl-4 pr-1 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.6)]' : 'border-transparent'}`}>
           <input ref={input} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" autoComplete="off"
             placeholder={listening ? 'Listening…' : 'Tell the assistant: add, change, remove…'} aria-label="Instruction for the assistant"
