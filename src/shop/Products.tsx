@@ -3,8 +3,10 @@
  * health note on the /health evidence base, nutrition per 100 g, ingredients as printed, and when,
  * where and at what price they were last bought. Shared by the household.
  */
+import { Segmented } from '../ui/Controls';
+import { CloseButton, Sheet } from '../ui/Sheet';
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Heart, MessageSquare, Package, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Euro, Heart, MessageSquare, Package, Plus, Search, X } from 'lucide-react';
 import { fold, novaBadge, type Nutrition, type Product, type Purchase, type Store } from './logic';
 import { photoUrl } from './photos';
 
@@ -18,27 +20,21 @@ const money = (v?: number, c?: string) => (v == null ? '' : `${v.toLocaleString(
 export function NovaBadge({ nova, small }: { nova?: number; small?: boolean }) {
   const b = novaBadge(nova);
   if (!b) return null;
-  return <span className={`inline-flex shrink-0 items-center rounded-md font-semibold text-white ${b.cls} ${small ? 'h-[18px] px-1.5 text-[10px]' : 'h-6 px-2 text-[12px]'}`}>{b.label}</span>;
+  return <span className={`inline-flex shrink-0 items-center rounded-[8px] font-semibold text-white ${b.cls} ${small ? 'h-[18px] px-1.5 text-[10px]' : 'h-6 px-2 text-[12px]'}`}>{b.label}</span>;
 }
 
 function Thumb({ p, size = 48 }: { p: Product; size?: number }) {
   return p.photos[0]
-    ? <img src={photoUrl(p.photos[0])} alt="" loading="lazy" className="shrink-0 rounded-xl bg-pc-surface object-cover" style={{ width: size, height: size }} />
-    : <span className="flex shrink-0 items-center justify-center rounded-xl bg-pc-surface text-pc-text-faint" style={{ width: size, height: size }}><Package size={size / 2.4} /></span>;
+    ? <img src={photoUrl(p.photos[0])} alt="" loading="lazy" className="shrink-0 rounded-[12px] bg-pc-surface object-cover" style={{ width: size, height: size }} />
+    : <span className="flex shrink-0 items-center justify-center rounded-[12px] bg-pc-surface text-pc-text-faint" style={{ width: size, height: size }}><Package size={size / 2.4} /></span>;
 }
 
 
 /** One screen, two tabs (2026-10-23): what is at home, and the catalogue of products. */
 export function HomeTabs({ tab, onTab, homeCount, productCount }: { tab: 'home' | 'products'; onTab: (t: 'home' | 'products') => void; homeCount: number; productCount: number }) {
   return (
-    <div className="grid flex-1 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
-      {([['home', 'At home', homeCount], ['products', 'Products', productCount]] as const).map(([k, label, n]) => (
-        <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => onTab(k)}
-          className={`h-9 rounded-[8px] text-[15px] font-medium ${tab === k ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
-          {label}{n > 0 ? <span className="ml-1 text-pc-text-muted">{n}</span> : null}
-        </button>
-      ))}
-    </div>
+    <Segmented<'home' | 'products'> value={tab} onChange={onTab} label="At home and products"
+      options={[{ value: 'home', label: 'At home', count: homeCount }, { value: 'products', label: 'Products', count: productCount }]} />
   );
 }
 
@@ -51,7 +47,7 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd, atHome }: { p: 
         <span className="flex items-center gap-1.5"><span className="truncate text-[16px] leading-snug">{p.name}</span>{liked && <Heart size={13} className="shrink-0 fill-red-500 text-red-500" aria-label="favourite" />}</span>
         <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-pc-text-muted">
           <NovaBadge nova={p.health?.nova} small />
-          {atHome && <span className="shrink-0 rounded-[6px] bg-[rgba(var(--pc-accent-rgb),0.16)] px-1.5 text-[12px] font-semibold text-[var(--pc-accent-ink)]">{atHome} at home</span>}
+          {atHome && <span className="shrink-0 rounded-[8px] bg-[rgba(var(--pc-accent-rgb),0.16)] px-1.5 text-[12px] font-semibold text-[var(--pc-accent-ink)]">{atHome} at home</span>}
           <span className="truncate">{[p.brand, p.size, p.stats ? `${money(p.stats.last_price, p.stats.currency)}${p.stats.last_store ? ` at ${storeName(p.stats.last_store)}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
         </span>
       </span>
@@ -81,27 +77,22 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
     .filter(p => { const hay = fold([p.name, p.brand, ...(p.aliases ?? []), ...(p.tags ?? [])].join(' ')); return words.every(w => hay.includes(w)); })
     .sort((a, b) => (b.stats?.last_date ?? b.updated ?? '').localeCompare(a.stats?.last_date ?? a.updated ?? ''));
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Products">
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
-      <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
-        <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
+    <Sheet label="Products" onClose={onClose} className="flex h-[88dvh] flex-col md:h-[80dvh] md:max-w-lg">
         <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
           <HomeTabs tab="products" onTab={t => { if (t === 'home') onInventory(); }} homeCount={homeCount} productCount={products.length} />
-          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+          <CloseButton onClick={onClose} />
         </div>
         <p className="shrink-0 px-4 pb-2 text-[13px] text-pc-text-muted">What each product is: label, health note, prices, when you last bought it.</p>
-        <div className="mx-4 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
-          {([['fav', `Favourites${favs.length ? ` ${favs.length}` : ''}`], ['all', `All ${products.length}`]] as const).map(([k, label]) => (
-            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-              className={`h-8 rounded-[8px] text-[14px] font-medium ${tab === k ? 'bg-pc-elevated shadow-sm' : 'text-pc-text-muted'}`}>{label}</button>
-          ))}
+        <div className="mx-4 mb-2 flex shrink-0">
+          <Segmented<'fav' | 'all'> size="s" value={tab} onChange={setTab} label="Which products"
+            options={[{ value: 'fav', label: 'Favourites', count: favs.length }, { value: 'all', label: 'All', count: products.length }]} />
         </div>
-        <div className="mx-4 mb-2 flex h-9 shrink-0 items-center gap-2 rounded-[10px] bg-pc-surface px-2.5">
+        <div className="mx-4 mb-2 flex h-9 shrink-0 items-center gap-2 rounded-[12px] bg-pc-surface px-2.5">
           <Search size={16} className="shrink-0 text-pc-text-muted" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search products" aria-label="Search products" type="search"
             className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none placeholder:text-pc-text-muted [&::-webkit-search-cancel-button]:hidden" />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {products.length === 0 ? (
             <div className="px-10 py-14 text-center">
               <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.18)] text-[var(--pc-accent-ink)]"><Package size={26} /></span>
@@ -117,8 +108,7 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
               onAdd={tab === 'fav' && !onList(p.id) ? () => onAdd(p) : undefined} />)}</div>
           )}
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -133,21 +123,19 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
   const mine = purchases.filter(x => x.product === p.id).slice(0, 6);
   const n = p.nutrition;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={p.name}>
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
-      <div className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[22px] bg-pc-elevated pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl md:max-w-lg md:rounded-[22px]">
+    <Sheet label={p.name} onClose={onClose} z={50} className="max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))] md:max-w-lg">
         {p.photos.length > 0 ? (
           <div className="relative">
-            <img src={photoUrl(p.photos[photo] ?? p.photos[0])} alt={p.name} className="h-64 w-full rounded-t-[22px] bg-pc-surface object-contain md:rounded-t-[22px]" />
+            <img src={photoUrl(p.photos[photo] ?? p.photos[0])} alt={p.name} className="h-64 w-full rounded-t-[20px] bg-pc-surface object-contain md:rounded-t-[20px]" />
             {p.photos.length > 1 && (
               <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
                 {p.photos.map((_, i) => <button key={i} type="button" onClick={() => setPhoto(i)} aria-label={`Photo ${i + 1}`} className={`h-2 w-2 rounded-full ${i === photo ? 'bg-white' : 'bg-white/50'}`} />)}
               </div>
             )}
-            <button type="button" onClick={onClose} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+            <button type="button" onClick={onClose} className="press absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
           </div>
         ) : (
-          <div className="flex justify-end px-4 pt-3"><button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button></div>
+          <div className="flex justify-end px-4 pt-3"><CloseButton onClick={onClose} /></div>
         )}
 
         <div className="px-4 pt-3">
@@ -157,31 +145,31 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
               <h2 className="text-[22px] font-bold leading-tight">{p.name}</h2>
             </div>
             <button type="button" onClick={() => onLike(!liked)} aria-pressed={liked} aria-label={liked ? 'Remove from favourites' : 'Add to favourites'}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-surface active:scale-95">
+              className="press flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-pc-surface">
               <Heart size={21} className={liked ? 'fill-red-500 text-red-500' : 'text-pc-text-muted'} />
             </button>
           </div>
 
           {p.health && (p.health.nova || p.health.note) && (
-            <div className="mt-3 rounded-2xl bg-pc-surface px-4 py-3">
+            <div className="mt-3 rounded-[12px] bg-pc-surface px-4 py-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 <NovaBadge nova={p.health.nova} />
-                {(p.health.flags ?? []).map(f => <span key={f} className="rounded-md bg-pc-elevated px-2 py-0.5 text-[12px] text-pc-text-secondary">{f}</span>)}
+                {(p.health.flags ?? []).map(f => <span key={f} className="rounded-[8px] bg-pc-elevated px-2 py-0.5 text-[12px] text-pc-text-secondary">{f}</span>)}
               </div>
               {p.health.note && <p className="mt-2 text-[14px] leading-snug text-pc-text-secondary">{p.health.note}</p>}
             </div>
           )}
 
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {!onList && <button type="button" onClick={onAdd} className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-pc-accent py-3 text-[13px] font-semibold text-[var(--pc-on-accent)]"><Plus size={19} /> Add to list</button>}
-            <button type="button" onClick={() => onAsk(`Despre ${p.name}: `)} className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-pc-surface py-3 text-[13px]"><MessageSquare size={19} className="text-[var(--pc-accent-ink)]" /> Ask about it</button>
-            <button type="button" onClick={() => onAsk(`Am cumpărat ${p.name} cu `)} className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-pc-surface py-3 text-[13px]"><span className="text-[17px] leading-none text-[var(--pc-accent-ink)]">€</span> Log a price</button>
+            {!onList && <button type="button" onClick={onAdd} className="flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-accent py-3 text-[13px] font-semibold text-[var(--pc-on-accent)]"><Plus size={19} /> Add to list</button>}
+            <button type="button" onClick={() => onAsk(`Despre ${p.name}: `)} className="flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-surface py-3 text-[13px]"><MessageSquare size={19} className="text-[var(--pc-accent-ink)]" /> Ask about it</button>
+            <button type="button" onClick={() => onAsk(`Am cumpărat ${p.name} cu `)} className="flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-surface py-3 text-[13px]"><Euro size={19} className="text-[var(--pc-accent-ink)]" /> Log a price</button>
           </div>
 
           {n && Object.keys(n).length > 0 && (
             <>
               <p className="mb-1 mt-4 px-1 text-[13px] text-pc-text-muted">Per 100 g</p>
-              <dl className="divide-y divide-[var(--pc-separator)] rounded-2xl bg-pc-surface px-4">
+              <dl className="divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface px-4">
                 {NUTRIENTS.filter(([k]) => n[k] != null).map(([k, label, unit]) => (
                   <div key={k} className="flex justify-between py-2 text-[14px]">
                     <dt className={label.startsWith('  ') ? 'pl-3 text-pc-text-muted' : ''}>{label.trim()}</dt>
@@ -193,7 +181,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
           )}
 
           {p.ingredients && (
-            <div className="mt-3 rounded-2xl bg-pc-surface px-4 py-3">
+            <div className="mt-3 rounded-[12px] bg-pc-surface px-4 py-3">
               <button type="button" onClick={() => setShowIngredients(s => !s)} className="flex w-full items-center justify-between text-[15px] font-medium" aria-expanded={showIngredients}>
                 Ingredients {showIngredients ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
               </button>
@@ -204,7 +192,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
           {(p.stats || mine.length > 0) && (
             <>
               <p className="mb-1 mt-4 px-1 text-[13px] text-pc-text-muted">Bought {p.stats ? `${p.stats.times} time${p.stats.times === 1 ? '' : 's'} this year` : ''}</p>
-              <div className="divide-y divide-[var(--pc-separator)] rounded-2xl bg-pc-surface px-4">
+              <div className="divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface px-4">
                 {mine.map(x => (
                   <div key={x.id} className="flex justify-between py-2 text-[14px]">
                     <span>{fmtDay(x.date)}{x.store ? ` · ${storeName(x.store)}` : ''}{x.by ? ` · ${x.by}` : ''}</span>
@@ -216,7 +204,6 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
           )}
           {p.health?.date && <p className="mt-3 text-center text-[12px] text-pc-text-faint">Health note from {fmtDay(p.health.date)} · added by {p.added_by ?? 'someone'}</p>}
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }

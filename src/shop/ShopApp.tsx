@@ -4,6 +4,10 @@
  * marked "just me"; returns pinned on top while there are any. Works offline (see useShop).
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
+import { useBusy, useDraft } from '../ui/draft';
+import { Sheet } from '../ui/Sheet';
+import { useExactSizes } from '../ui/useBackLayer';
+import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
@@ -18,7 +22,8 @@ import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsO
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
-import { addDays, daysUntil, newPantryId, whereIcon } from './pantry';
+import { addDays, daysUntil, newPantryId } from './pantry';
+import { WhereIcon } from './WhereIcon';
 import { useShop } from './useShop';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
@@ -40,6 +45,7 @@ const daysTo = (d: string, today: string) => Math.round((Date.parse(d) - Date.pa
 
 export default function ShopApp() {
   const [look, setLookState] = useState<Look>(getLook);
+  useExactSizes();
   const mode = useMode(look.appearance);
   useThemeChrome(mode);
   useEffect(() => { document.title = 'Shopping'; }, []);
@@ -95,7 +101,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const soon = pantry.filter(e => e.status === 'open' && e.due_date && daysUntil(e.due_date, snap.today || new Date().toISOString().slice(0, 10)) <= 2).length;
   // Undo (the bar at the bottom): a tick or a removal is reopened with untick, offline too.
   const [undo, setUndo] = useState<UndoInfo | null>(null);
-  const closeUndo = useCallback(() => setUndo(null), []);
+  const closeUndo = useCallback(() => setUndo(null), [setUndo]);
   const offerUndo = (i: Item, label: string) => setUndo({ key: Date.now(), label: `${label}: ${i.title}`, undo: () => apply({ op: 'untick', id: i.id }) });
   const tick = (i: Item) => {
     apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
@@ -120,45 +126,26 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 
   const syncLabel = sync === 'offline' ? (queue.length ? `Offline · ${queue.length} to send` : 'Offline')
     : sync === 'signed-out' ? 'Signed out' : queue.length ? `Sending ${queue.length}…` : null;
-  const iconBtn = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:bg-[var(--pc-hover-strong)]';
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border bg-[color-mix(in_srgb,var(--pc-bg-base)_88%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="flex h-[52px] items-center gap-1 px-2">
-          {search !== null ? (
-            <>
-              <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] bg-pc-surface px-2.5">
-                <Search size={16} className="shrink-0 text-pc-text-muted" />
-                <input autoFocus type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" aria-label="Search" enterKeyHint="search"
-                  className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted [&::-webkit-search-cancel-button]:hidden" />
-              </div>
-              <button type="button" onClick={() => setSearch(null)} className="px-2 text-[16px] text-[var(--pc-accent-ink)]">Cancel</button>
-            </>
-          ) : (
-            <>
-              <div className="min-w-0 flex-1 px-2">
-                <h1 className="truncate text-[17px] font-semibold leading-tight">{store ? storeName(store) : 'Shopping'}</h1>
-                <p className="flex items-center gap-1 truncate text-[12px] leading-tight text-pc-text-muted">
-                  {syncLabel
-                    ? <>{sync === 'offline' && <CloudOff size={12} />}{syncLabel}</>
-                    : store ? `${countAt(store)} to get here` : `${open.length} on the list`}
-                </p>
-              </div>
-              {sync === 'offline' || sync === 'signed-out'
-                ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
-                : null}
-              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `At home and products: ${soon} expiring soon` : 'At home and products'}>
-                <Refrigerator size={21} />
+        {search !== null ? (
+          <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Search the list and products" />
+        ) : (
+          <AppHeader title={store ? storeName(store) : 'Shopping'} initial={person ? person[0].toUpperCase() : '…'} onSettings={() => setSettings(true)}
+            subtitle={syncLabel ? <>{sync === 'offline' && <CloudOff size={12} />}{syncLabel}</> : store ? `${countAt(store)} to get here` : `${open.length} on the list`}
+            actions={<>
+              {(sync === 'offline' || sync === 'signed-out') && (
+                <IconButton label="Try again" onClick={() => (sync === 'signed-out' ? window.location.reload() : void refresh())}><RefreshCw size={20} /></IconButton>
+              )}
+              <IconButton label={soon ? `At home and products: ${soon} expiring soon` : 'At home and products'} onClick={() => setShowPantry(true)}>
+                <Refrigerator size={22} />
                 {soon > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{soon}</span>}
-              </button>
-              <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
-              <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
-                {person ? person[0].toUpperCase() : '⋯'}
-              </button>
-            </>
-          )}
-        </div>
+              </IconButton>
+              <IconButton label="Search" onClick={() => setSearch('')}><Search size={22} /></IconButton>
+            </>} />
+        )}
         {search === null && (
           <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 pt-0.5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Shops">
             <Chip on={store === null} onClick={() => setStore(null)} label="All shops" n={open.length} />
@@ -183,7 +170,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         ) : (
           <>
             {returns.length > 0 && (
-              <section className="mx-3 mt-3 overflow-hidden rounded-2xl bg-pc-surface">
+              <section className="mx-3 mt-3 overflow-hidden rounded-[12px] bg-pc-surface">
                 <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><Undo2 size={14} /> To return · {returns.length}</h2>
                 <Rows items={returns} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} tinted />
               </section>
@@ -212,7 +199,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 
             {bought.length > 0 && (
               <section className="mt-3">
-                <button type="button" onClick={() => setShowBought(b => !b)} className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showBought}>
+                <button type="button" onClick={() => setShowBought(b => !b)} className="flex h-10 w-full items-center gap-1.5 px-4 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showBought}>
                   {showBought ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Bought lately · {bought.length}
                 </button>
                 {showBought && <Rows items={bought} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />}
@@ -223,14 +210,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       </main>
 
       {offer && search === null && (
-        <div className="mx-3 mb-1 flex items-center gap-2 rounded-2xl bg-pc-text px-3 py-2 text-[14px] text-pc-base shadow-lg" role="status">
-          <span className="text-[18px]" aria-hidden>{whereIcon('fridge')}</span>
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-[12px] bg-pc-text px-3 py-2 text-[14px] text-pc-base shadow-lg" role="status">
+          <WhereIcon where="fridge" size={20} className="shrink-0 opacity-80" />
           <span className="min-w-0 flex-1 leading-snug">At home until {new Date(`${addDays(snap.today || new Date().toISOString().slice(0, 10), offer.days)}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}? <span className="opacity-70">{offer.item.title}</span></span>
           <button type="button" onClick={() => { apply({ op: 'pantry-add', id: newPantryId(), title: offer.item.title, product: offer.item.product, qty: offer.item.qty, in_days: offer.days }); setOffer(null); }}
             className="h-8 shrink-0 rounded-full bg-pc-accent px-3 text-[13px] font-semibold text-[var(--pc-on-accent)]">Add</button>
-          <button type="button" onClick={() => setOffer(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full opacity-70" aria-label="No"><X size={15} /></button>
+          <button type="button" onClick={() => setOffer(null)} className="-m-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full opacity-70" aria-label="No"><X size={15} /></button>
         </div>
       )}
+      {search === null && !showPantry && <UndoBar info={undo} onClose={closeUndo} />}
       {search === null && (
         <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
           asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
@@ -242,9 +230,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         const item = snap.items.find(i => i.id === editing);
         return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={op => { apply(op); if (op.op === 'drop') offerUndo(item, 'Removed'); }} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
       })()}
-      <UndoBar info={undo} onClose={closeUndo} bottom={editing ? 'calc(env(safe-area-inset-bottom) + 20px)' : 'calc(env(safe-area-inset-bottom) + 120px)'} />
       {showPantry && (
-        <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onOp={op => apply(op)} onClose={() => setShowPantry(false)}
+        <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onClose={() => setShowPantry(false)} footer={<UndoBar info={undo} onClose={closeUndo} />}
+          onOp={op => {
+            apply(op);
+            if (op.op === 'pantry-close') {
+              const e = pantry.find(x => x.id === op.id);
+              setUndo({ key: Date.now(), label: `${op.how === 'used' ? 'Used' : 'Thrown away'}: ${e?.title ?? ''}`, undo: () => apply({ op: 'pantry-reopen', id: op.id }) });
+            }
+          }}
           onProducts={() => { setShowPantry(false); setShowProducts(true); }} productCount={products.length}
           onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}
           lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
@@ -330,7 +324,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
             </span>
           )}
         </span>
-        {product?.photos[0] && <img src={photoUrl(product.photos[0])} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg bg-pc-surface object-cover" />}
+        {product?.photos[0] && <img src={photoUrl(product.photos[0])} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-[8px] bg-pc-surface object-cover" />}
       </button>
     </div>
   );
@@ -344,7 +338,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // The last few instructions (within half an hour of the newest), newest last, until dismissed.
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-2);   // the last two answers, so repeated adding does not pile up
-  const [text, setText] = useState(prefill ?? '');
+  const [text, setText] = useDraft('shop', prefill ?? undefined);
   // The mic, the same as oc's (app/speech.tsx): it writes into the box, Live or Whisper; nothing is
   // sent until Send.
   const speech = useSpeech(text, setText, transcribeShop);
@@ -355,10 +349,12 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const gallery = useRef<HTMLInputElement>(null);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  useBusy('shop-photos', busy);   // photos being prepared
   const hints = suggest(text, known, items);
   // Photos (a label, a shelf, a receipt) wait above the box until Send, so a note can go with them:
   // typed or said, "is this one healthy?", "add this, 2 of them", "the receipt from Lidl".
   const [staged, setStaged] = useState<Array<{ ref: string; data: string }>>([]);
+  useBusy('shop', !!text.trim() || staged.length > 0 || speech.listening || speech.state === 'writing');
   const stagePhotos = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setBusy(true);
@@ -401,16 +397,16 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       {recent.length > 0 && (
         <div className="mb-2 space-y-1.5 px-1" aria-live="polite" aria-label="Assistant">
           {recent.map(a => (
-            <div key={a.id} className="flex items-start gap-2 rounded-2xl bg-pc-surface px-3 py-2">
+            <div key={a.id} className="flex items-start gap-2 rounded-[12px] bg-pc-surface px-3 py-2">
               <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
               <div className="min-w-0 flex-1 text-[14px] leading-snug">
-                <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}📷 ${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
+                <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
                 <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
                   {a.status === 'queued' ? 'Waiting for a connection…' : a.status === 'working' ? 'Working on it…' : plainReply(a.reply) || 'Done.'}
                 </p>
               </div>
               {(a.status === 'done' || a.status === 'failed') && (
-                <button type="button" onClick={() => setHidden(h => new Set(h).add(a.id))} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>
+                <button type="button" onClick={() => setHidden(h => new Set(h).add(a.id))} className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>
               )}
             </div>
           ))}
@@ -434,8 +430,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             <div key={ph.ref} className="relative shrink-0">
               <img src={`data:image/jpeg;base64,${ph.data}`} alt="Photo to send" className="h-16 w-16 rounded-[12px] object-cover" />
               <button type="button" onClick={() => setStaged(prev => prev.filter(x => x.ref !== ph.ref))}
-                className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-pc-text text-pc-base shadow" aria-label="Remove photo">
-                <X size={13} strokeWidth={3} />
+                className="absolute -right-3.5 -top-3.5 flex h-10 w-10 items-center justify-center" aria-label="Remove photo">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-pc-text text-pc-base shadow"><X size={13} strokeWidth={3} /></span>
               </button>
             </div>
           ))}
@@ -446,13 +442,13 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
-            className="mb-[4px] flex h-[48px] w-[48px] items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+            className="press mb-[4px] flex h-12 w-12 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
             <Camera size={24} />
           </button>
           {photoMenu && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
-              <div className="absolute bottom-[58px] left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+              <div className="absolute bottom-[58px] left-0 z-30 w-56 overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated shadow-xl" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                   <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
@@ -466,7 +462,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </>
           )}
         </div>
-        <div className={`relative flex min-w-0 flex-1 items-end rounded-[22px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
+        <div className={`relative flex min-w-0 flex-1 items-end rounded-[20px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
             readOnly={speech.state === 'writing'}
@@ -484,6 +480,7 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
   item: Item; stores: Store[]; today: string; onClose: () => void; apply: ReturnType<typeof useShop>['apply'];
   product?: Product; onProduct: (id: string) => void;
 }) {
+  useBusy('item-edit', true);   // an update never reloads over unsaved edits
   const [title, setTitle] = useState(item.title);
   const [qty, setQty] = useState(item.qty ?? '');
   const [tags, setTags] = useState<string[]>(item.tags);
@@ -503,17 +500,14 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
     if (priv !== (item.scope === 'private')) apply({ op: 'scope', id: item.id, scope: priv ? 'private' : 'shared' });
     onClose();
   };
-  const field = 'w-full rounded-xl border-0 bg-pc-surface px-3.5 py-2.5 text-[16px] outline-none focus:outline-none focus-visible:outline-none';
+  const field = 'w-full rounded-[12px] border-0 bg-pc-surface px-3.5 py-2.5 text-[16px] outline-none focus:outline-none focus-visible:outline-none';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={item.title}>
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={save} />
-      <div className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-[22px] bg-pc-elevated px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl md:max-w-lg md:rounded-[22px]">
-        <div className="mx-auto mb-2 h-[5px] w-9 rounded-full bg-pc-text-faint/50 md:hidden" />
+    <Sheet label={item.title} onClose={save} className="max-h-[90dvh] overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
         <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={onClose} className="text-[16px] text-pc-text-muted">Cancel</button>
+          <button type="button" onClick={onClose} className="press h-10 px-1 text-[16px] text-pc-text-muted">Cancel</button>
           <span className="text-[15px] font-semibold">{isReturn ? 'To return' : 'To buy'}</span>
-          <button type="button" onClick={save} className="text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
+          <button type="button" onClick={save} className="press h-10 px-1 text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
         </div>
 
         <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[18px] font-semibold`} aria-label="Name" />
@@ -531,25 +525,25 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
               className={`h-8 rounded-full px-3.5 text-[14px] ${tags.includes(s.tag) ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
           ))}
           {others.map(t => (
-            <button key={t} type="button" onClick={() => toggle(t)} className="h-8 rounded-full bg-pc-surface px-3.5 text-[14px] text-pc-text-secondary">#{t} ×</button>
+            <button key={t} type="button" onClick={() => toggle(t)} aria-label={`Remove tag ${t}`} className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-surface pl-3.5 pr-2.5 text-[14px] text-pc-text-secondary">#{t}<X size={14} aria-hidden /></button>
           ))}
         </div>
 
-        <div className="mt-4 divide-y divide-[var(--pc-separator)] rounded-2xl bg-pc-surface">
+        <div className="mt-4 divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface">
           <Toggle label="Just me" hint="Only you will see it" on={priv} onChange={setPriv} />
           <Toggle label="To return" hint="Something to take back to a shop" on={isReturn} onChange={setIsReturn} />
           {isReturn && (
             <label className="flex items-center justify-between gap-3 px-4 py-2.5 text-[16px]">
               Last day
-              <input type="date" value={due} min={today || undefined} onChange={e => setDue(e.target.value)} className="rounded-lg bg-pc-elevated px-2 py-1 text-[15px] outline-none" />
+              <input type="date" value={due} min={today || undefined} onChange={e => setDue(e.target.value)} className="rounded-[8px] bg-pc-elevated px-2 py-1 text-[15px] outline-none" />
             </label>
           )}
         </div>
 
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (brand, size…)" rows={2} className={`${field} mt-3 resize-none`} aria-label="Notes" />
         {product && (
-          <button type="button" onClick={() => onProduct(product.id)} className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-pc-surface px-3 py-2.5 text-left">
-            {product.photos[0] ? <img src={photoUrl(product.photos[0])} alt="" className="h-11 w-11 rounded-lg object-cover" /> : <Package size={22} className="text-pc-text-faint" />}
+          <button type="button" onClick={() => onProduct(product.id)} className="mt-3 flex w-full items-center gap-3 rounded-[12px] bg-pc-surface px-3 py-2.5 text-left">
+            {product.photos[0] ? <img src={photoUrl(product.photos[0])} alt="" className="h-11 w-11 rounded-[8px] object-cover" /> : <Package size={22} className="text-pc-text-faint" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{product.name}</span>
               <span className="flex items-center gap-1.5 text-[13px] text-pc-text-muted"><NovaBadge nova={product.health?.nova} small />{product.brand}</span>
@@ -560,17 +554,16 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
         {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[14px] text-[var(--pc-accent-ink)]">{item.link}</a>}
 
         {item.status === 'open' ? (
-          <button type="button" onClick={() => { apply({ op: 'drop', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-2xl bg-pc-surface text-[16px] font-medium text-red-500">
+          <button type="button" onClick={() => { apply({ op: 'drop', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-[12px] bg-pc-surface text-[16px] font-medium text-red-500">
             Remove from the list
           </button>
         ) : (
-          <button type="button" onClick={() => { apply({ op: 'untick', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-2xl bg-pc-surface text-[16px] font-medium text-[var(--pc-accent-ink)]">
+          <button type="button" onClick={() => { apply({ op: 'untick', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-[12px] bg-pc-surface text-[16px] font-medium text-[var(--pc-accent-ink)]">
             Put back on the list
           </button>
         )}
         <p className="mt-3 text-center text-[12px] text-pc-text-faint">Added by {item.added_by ?? 'someone'}{item.created ? ` · ${fmtDay(item.created.slice(0, 10))}` : ''}</p>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 

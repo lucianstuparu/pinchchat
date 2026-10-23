@@ -3,41 +3,51 @@
  * "Thrown away" close an entry; a tap changes the date, the place or the quantity. The field at the
  * bottom tells the assistant ("the chicken expires Friday", "finished the kefir"), offline queued.
  */
-import { useState } from 'react';
-import { ArrowUp, Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2, X } from 'lucide-react';
-import { WHERE, expiryLabel, groupOf, whereIcon, type PantryEntry, type PantryGroup, type PantryOp, type Where } from './pantry';
+import { useBusy, useDraft } from '../ui/draft';
+import { useState, type ReactNode } from 'react';
+import { Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2 } from 'lucide-react';
+import { WHERE, expiryLabel, groupOf, type PantryEntry, type PantryGroup, type PantryOp, type Where } from './pantry';
 import { plainReply, type Ask } from './logic';
 import { HomeTabs } from './Products';
+import { WhereIcon } from './WhereIcon';
+import { transcribeShop } from './useShop';
+import { CloseButton, Sheet } from '../ui/Sheet';
+import { FieldControls, PrimaryButton } from '../app/MicButton';
+import { speechPlaceholder, useSpeech } from '../app/speech';
 
 const GROUPS: Array<[PantryGroup, string, string]> = [
   ['expired', 'Expired', 'text-red-500'], ['week', 'This week', 'text-[var(--pc-accent-ink)]'],
   ['later', 'Later', 'text-pc-text-muted'], ['nodate', 'No date', 'text-pc-text-muted'],
 ];
 
-export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onProducts, productCount }: {
+export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onProducts, productCount, footer }: {
   pantry: PantryEntry[]; today: string; onOp: (op: PantryOp) => void; onAsk: (text: string) => void; onClose: () => void; lastAsk?: Ask;
   /** The other tab of the same screen: the catalogue. */
   onProducts: () => void; productCount: number;
+  /** The undo bar, at the foot of the sheet. */
+  footer?: ReactNode;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
-  const [text, setText] = useState('');
+  const [text, setText] = useDraft('home');
+  // The same input bar as the list: type or say it; the mic writes, Send sends.
+  const speech = useSpeech(text, setText, transcribeShop);
+  useBusy('home', !!text.trim() || speech.listening || speech.state === 'writing');
+  const ask = () => { if (!text.trim()) return; speech.cancel(); onAsk(text.trim()); setText(''); };
   const open = pantry.filter(e => e.status === 'open').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
   const closed = pantry.filter(e => e.status !== 'open').sort((a, b) => (b.closed_on || '').localeCompare(a.closed_on || ''));
   const entry = editing ? pantry.find(e => e.id === editing) : undefined;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="At home and products">
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
-      <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
-        <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
+    <>
+      <Sheet label="At home and products" onClose={onClose} className="flex h-[88dvh] flex-col md:h-[80dvh]">
         <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
           <HomeTabs tab="home" onTab={t => { if (t === 'products') onProducts(); }} homeCount={open.length} productCount={productCount} />
-          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+          <CloseButton onClick={onClose} />
         </div>
         <p className="shrink-0 px-4 pb-1 text-[13px] text-pc-text-muted">What is at home{open.length === 0 ? '' : ', soonest to expire first'}</p>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {open.length === 0 && (
             <div className="px-10 py-12 text-center">
               <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.18)] text-[var(--pc-accent-ink)]"><Refrigerator size={26} /></span>
@@ -54,15 +64,15 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
                 <div className="divide-y divide-[var(--pc-separator)]">
                   {rows.map(e => (
                     <div key={e.id} className="flex items-center gap-2 py-2 pl-4 pr-2">
-                      <span className="text-[20px]" aria-hidden>{whereIcon(e.where)}</span>
+                      <WhereIcon where={e.where} size={20} className="shrink-0 text-pc-text-muted" />
                       <button type="button" onClick={() => setEditing(e.id)} className="min-w-0 flex-1 text-left">
                         <span className="block truncate text-[16px]">{e.title}{e.qty ? <span className="text-pc-text-muted"> ×{e.qty}</span> : null}</span>
                         <span className={`text-[13px] ${g === 'expired' ? 'text-red-500' : g === 'week' ? 'text-[var(--pc-accent-ink)]' : 'text-pc-text-muted'}`}>{expiryLabel(e, today)}</span>
                       </button>
-                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'used' })} className="inline-flex h-9 items-center gap-1 rounded-full bg-pc-surface px-3 text-[13px] font-medium" aria-label={`${e.title} used`}>
+                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'used' })} className="press inline-flex h-10 items-center gap-1 rounded-full bg-pc-surface px-3 text-[14px] font-medium" aria-label={`${e.title} used`}>
                         <Check size={15} className="text-emerald-600" /> Used
                       </button>
-                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'wasted' })} className="flex h-9 w-9 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label={`${e.title} thrown away`}>
+                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'wasted' })} className="press flex h-10 w-10 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label={`${e.title} thrown away`}>
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -73,14 +83,14 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
           })}
           {closed.length > 0 && (
             <section className="mt-2">
-              <button type="button" onClick={() => setShowClosed(s => !s)} className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showClosed}>
+              <button type="button" onClick={() => setShowClosed(s => !s)} className="flex h-10 w-full items-center gap-1.5 px-4 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showClosed}>
                 {showClosed ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Finished lately · {closed.length}
               </button>
               {showClosed && closed.map(e => (
                 <div key={e.id} className="flex items-center gap-2 py-1.5 pl-4 pr-2 text-pc-text-muted">
                   <span className="min-w-0 flex-1 truncate text-[15px] line-through">{e.title}</span>
                   <span className="text-[12px]">{e.status === 'wasted' ? 'thrown away' : 'used'}{e.closed_by ? ` · ${e.closed_by}` : ''}</span>
-                  <button type="button" onClick={() => onOp({ op: 'pantry-reopen', id: e.id })} className="flex h-8 w-8 items-center justify-center rounded-full" aria-label={`Put ${e.title} back`}><Undo2 size={15} /></button>
+                  <button type="button" onClick={() => onOp({ op: 'pantry-reopen', id: e.id })} className="press flex h-10 w-10 items-center justify-center rounded-full" aria-label={`Put ${e.title} back`}><Undo2 size={15} /></button>
                 </div>
               ))}
             </section>
@@ -88,22 +98,30 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
         </div>
 
         {lastAsk && (
-          <p className="mx-3 mb-1 shrink-0 rounded-xl bg-pc-surface px-3 py-2 text-[13px] leading-snug">
+          <p className="mx-3 mb-1 shrink-0 rounded-[12px] bg-pc-surface px-3 py-2 text-[13px] leading-snug">
             {lastAsk.status === 'working' || lastAsk.status === 'queued' ? <span className="animate-pulse text-pc-text-muted">Working on “{lastAsk.text.replace('[Pantry] ', '')}”…</span> : plainReply(lastAsk.reply)}
           </p>
         )}
-        <form onSubmit={ev => { ev.preventDefault(); if (text.trim()) { onAsk(text.trim()); setText(''); } }} className="flex shrink-0 items-center gap-1.5 border-t border-pc-border px-2 pb-2 pt-2">
-          <input value={text} onChange={ev => setText(ev.target.value)} placeholder="“The chicken expires Friday”" aria-label="Tell the assistant about the pantry"
-            className="h-11 min-w-0 flex-1 rounded-[22px] border-0 bg-pc-surface px-4 text-[16px] shadow-none outline-none placeholder:text-pc-text-muted" />
-          <button type="submit" disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] disabled:opacity-40" aria-label="Send"><ArrowUp size={21} strokeWidth={2.5} /></button>
+        {footer}
+        {speech.error && <p className="mx-4 mb-1 shrink-0 text-[13px] text-red-500" role="alert">{speech.error}</p>}
+        <form onSubmit={ev => { ev.preventDefault(); ask(); }} className="flex shrink-0 items-end gap-2 border-t border-pc-border px-2 pb-2 pt-2">
+          <div className={`flex min-w-0 flex-1 items-end rounded-[20px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
+            <textarea value={text} rows={1} onChange={ev => setText(ev.target.value)} enterKeyHint="send" readOnly={speech.state === 'writing'}
+              onKeyDown={ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); ask(); } }}
+              placeholder={speechPlaceholder(speech, '“The chicken expires Friday”')} aria-label="Tell the assistant about what is at home"
+              className="min-h-[48px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[13px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
+            <FieldControls speech={speech} hasText={!!text.trim()} onClear={() => { speech.cancel(); setText(''); }} />
+          </div>
+          <PrimaryButton speech={speech} canSend={!!text.trim()} onSend={ask} size={56} />
         </form>
-      </div>
+      </Sheet>
       {entry && <PantryEdit entry={entry} onOp={onOp} onClose={() => setEditing(null)} />}
-    </div>
+    </>
   );
 }
 
 function PantryEdit({ entry, onOp, onClose }: { entry: PantryEntry; onOp: (op: PantryOp) => void; onClose: () => void }) {
+  useBusy('home-edit', true);   // an update never reloads over unsaved edits
   const [title, setTitle] = useState(entry.title);
   const [qty, setQty] = useState(entry.qty ?? '');
   const [where, setWhere] = useState<Where>(entry.where ?? 'fridge');
@@ -114,34 +132,31 @@ function PantryEdit({ entry, onOp, onClose }: { entry: PantryEntry; onOp: (op: P
     }
     onClose();
   };
-  const field = 'w-full rounded-xl border-0 bg-pc-surface px-3.5 py-2.5 text-[16px] outline-none';
+  const field = 'w-full rounded-[12px] border-0 bg-pc-surface px-3.5 py-2.5 text-[16px] outline-none';
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={entry.title}>
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={save} />
-      <div className="relative w-full rounded-t-[22px] bg-pc-elevated px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl md:max-w-md md:rounded-[22px]">
+    <Sheet label={entry.title} onClose={save} z={50} className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 md:max-w-md">
         <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={onClose} className="text-[16px] text-pc-text-muted">Cancel</button>
+          <button type="button" onClick={onClose} className="press h-10 px-1 text-[16px] text-pc-text-muted">Cancel</button>
           <span className="text-[15px] font-semibold">At home</span>
-          <button type="button" onClick={save} className="text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
+          <button type="button" onClick={save} className="press h-10 px-1 text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
         </div>
         <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[18px] font-semibold`} aria-label="Name" />
         <div className="mt-2 flex gap-2">
           <input value={qty} onChange={e => setQty(e.target.value)} placeholder="Quantity" className={`${field} w-32`} aria-label="Quantity" />
-          <label className="flex flex-1 items-center justify-between gap-2 rounded-xl bg-pc-surface px-3.5 text-[15px]">
+          <label className="flex flex-1 items-center justify-between gap-2 rounded-[12px] bg-pc-surface px-3.5 text-[15px]">
             Expires
             <input type="date" value={due} onChange={e => setDue(e.target.value)} className="bg-transparent text-[15px] outline-none" />
           </label>
         </div>
-        <div className="mt-3 grid grid-cols-5 gap-1 rounded-xl bg-pc-surface p-1" role="radiogroup" aria-label="Where">
+        <div className="mt-3 grid grid-cols-5 gap-1 rounded-[12px] bg-pc-surface p-[3px]" role="radiogroup" aria-label="Where">
           {WHERE.map(w => (
             <button key={w.key} type="button" role="radio" aria-checked={where === w.key} onClick={() => setWhere(w.key)}
-              className={`flex flex-col items-center rounded-lg py-1.5 text-[11px] ${where === w.key ? 'bg-pc-elevated shadow-sm' : 'text-pc-text-muted'}`}>
-              <span className="text-[18px]">{w.icon}</span>{w.label}
+              className={`flex flex-col items-center gap-1 rounded-[8px] py-2 text-[12px] ${where === w.key ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
+              <WhereIcon where={w.key} size={20} />{w.label}
             </button>
           ))}
         </div>
         {entry.guessed && <p className="mt-2 px-1 text-[12px] text-pc-text-muted">The date was guessed from the usual shelf life; set the real one if the package says otherwise.</p>}
-      </div>
-    </div>
+    </Sheet>
   );
 }

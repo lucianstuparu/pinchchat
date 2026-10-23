@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Receipt, Repeat, ShoppingCart, Undo2, X } from 'lucide-react';
-import { act, domainEmoji, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet } from './api';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useBusy } from '../ui/draft';
+import { CloseButton, Sheet } from '../ui/Sheet';
+import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
+import { act, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet as ItemData } from './api';
 import { Title } from './Todo';
 import { TOPIC_COLORS, railOf } from './todoRules';
 
@@ -16,6 +18,8 @@ interface Props {
   onAsk: (text: string, send?: boolean) => void;
   /** After a change: the parent offers Undo. */
   onActed?: (id: string, action: ItemAction, title: string) => void;
+  /** The undo bar, shown at the foot of the sheet while it is open. */
+  footer?: ReactNode;
 }
 
 const CLOSED = ['paid', 'done', 'cancelled', 'closed'];
@@ -27,12 +31,13 @@ const KIND: Record<string, { icon: typeof Receipt; label: string }> = {
 const STATUS: Record<string, string> = { todo: 'To do', open: 'Open', next: 'Next', waiting: 'Waiting', paid: 'Paid', done: 'Done', cancelled: 'Not needed', closed: 'Finished' };
 const PRIORITY = [['P1', 'Urgent'], ['P2', 'High'], ['P3', 'Normal'], ['P4', 'Low']] as const;
 
-export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
-  const [sheet, setSheet] = useState<Sheet | null>(null);
+export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Props) {
+  const [sheet, setSheet] = useState<ItemData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Editing (oc-app-design.md §4): the title, the due date and the topics.
   const [edit, setEdit] = useState<{ title: string; due: string; topics: string[] } | null>(null);
+  useBusy('item-edit', edit !== null);   // an update never reloads over unsaved edits
 
   const load = () => fetchSheet(id).then(s => { setSheet(s); setError(null); }).catch(e => setError(e.message));
   useEffect(() => { void load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,15 +80,12 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
     ['Outcome', str('outcome') ?? ''],
   ] as Array<[string, string]>).filter(([, v]) => v) : [];
 
-  const secondary = 'flex flex-col items-center justify-center gap-1 rounded-2xl bg-pc-surface py-3 text-[13px] text-pc-text active:bg-[var(--pc-hover-strong)] disabled:opacity-50';
+  const secondary = 'flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-surface py-3 text-[13px] text-pc-text active:bg-[var(--pc-hover-strong)] disabled:opacity-50';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={it?.title ?? 'Item'}>
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
-      <div className="relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[22px] bg-pc-elevated px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl md:max-w-lg md:rounded-[22px]">
-        <div className="mx-auto mb-2 h-[5px] w-9 rounded-full bg-pc-text-faint/50 md:hidden" />
+    <Sheet label={it?.title ?? 'Item'} onClose={onClose} className="max-h-[88dvh] overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
         <div className="flex justify-end">
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+          <CloseButton onClick={onClose} />
         </div>
         {!it && !error && <p className="py-10 text-center text-sm text-pc-text-muted">Loading…</p>}
         {error && <p className="py-2 text-sm text-red-500">{error}</p>}
@@ -91,7 +93,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
           <>
             <div className="-mt-2 mb-4">
               <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-pc-accent">
-                <K.icon size={14} /> {K.label}{domainEmoji(str('domain')) ? ` · ${domainEmoji(str('domain'))} ${str('domain')}` : ''}{it.scope === 'shared' ? ' · shared' : ''}
+                <K.icon size={14} /> {K.label}{str('domain') ? ` · ${str('domain')}` : ''}{it.scope === 'shared' ? ' · shared' : ''}
               </p>
               {edit ? (
                 <div className="space-y-3">
@@ -121,8 +123,8 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
                     </>
                   )}
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setEdit(null)} className="h-11 flex-1 rounded-[12px] bg-pc-surface text-[15px] font-medium">Cancel</button>
-                    <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void saveEdit()} className="h-11 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">Save</button>
+                    <button type="button" onClick={() => setEdit(null)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px] font-medium">Cancel</button>
+                    <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void saveEdit()} className="press h-12 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">Save</button>
                   </div>
                 </div>
               ) : (
@@ -135,7 +137,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
             </div>
 
             {rows.length > 0 && (
-              <dl className="mb-3 divide-y divide-[var(--pc-separator)] rounded-2xl bg-pc-surface px-4">
+              <dl className="mb-3 divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface px-4">
                 {rows.map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between gap-4 py-2.5 text-[15px]">
                     <dt className="shrink-0 text-pc-text-muted">{k}</dt>
@@ -144,10 +146,10 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
                 ))}
               </dl>
             )}
-            {str('notes') && <p className="mb-3 whitespace-pre-wrap rounded-2xl bg-pc-surface px-4 py-3 text-[14px] text-pc-text-secondary">{str('notes')}</p>}
+            {str('notes') && <p className="mb-3 whitespace-pre-wrap rounded-[12px] bg-pc-surface px-4 py-3 text-[14px] text-pc-text-secondary">{str('notes')}</p>}
 
             {sheet?.origin && (
-              <div className="mb-3 rounded-2xl bg-pc-surface px-4 py-3 text-[14px]">
+              <div className="mb-3 rounded-[12px] bg-pc-surface px-4 py-3 text-[14px]">
                 <p className="mb-1 text-[12px] font-medium text-pc-text-muted">Came from</p>
                 {sheet.origin.kind === 'message'
                   ? <p className="whitespace-pre-wrap">“{sheet.origin.text}”<span className="mt-1 block text-[12px] text-pc-text-faint">{sheet.origin.ts?.slice(0, 10)}</span></p>
@@ -156,13 +158,13 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
             )}
 
             {closed ? (
-              <button type="button" disabled={busy} onClick={() => void run('reopen')} className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
+              <button type="button" disabled={busy} onClick={() => void run('reopen')} className="press mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
                 <Undo2 size={18} /> Reopen
               </button>
             ) : (
               <>
                 <button type="button" disabled={busy} onClick={() => void run('done')}
-                  className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-pc-accent text-[16px] font-semibold text-white active:opacity-80 disabled:opacity-60">
+                  className="press mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-60">
                   <Check size={19} strokeWidth={2.5} /> {kind === 'bill' ? 'Mark as paid' : isTopic ? 'It’s settled' : 'Done'}
                 </button>
                 <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
@@ -182,12 +184,12 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
                 {!isTopic && (
                   <div className="mt-4">
                     <p className="mb-1.5 px-1 text-[13px] text-pc-text-muted">Priority</p>
-                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-pc-surface p-1">
+                    <div className="grid grid-cols-4 gap-1 rounded-[12px] bg-pc-surface p-1">
                       {PRIORITY.map(([p, label]) => {
                         const on = str('priority') === p || (!str('priority') && p === 'P3');
                         return (
                           <button key={p} type="button" disabled={busy} onClick={() => void run('priority', { priority: p })}
-                            className={`h-8 rounded-lg text-[13px] font-medium ${on ? `bg-pc-elevated shadow-sm ${p === 'P1' ? 'text-red-500' : 'text-pc-text'}` : 'text-pc-text-muted'}`}>{label}</button>
+                            className={`h-8 rounded-[8px] text-[13px] font-medium ${on ? `bg-pc-elevated shadow-sm ${p === 'P1' ? 'text-red-500' : 'text-pc-text'}` : 'text-pc-text-muted'}`}>{label}</button>
                         );
                       })}
                     </div>
@@ -197,7 +199,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
             )}
           </>
         )}
-      </div>
-    </div>
+      {footer && <div className="sticky bottom-0 -mx-4 bg-pc-elevated pt-1">{footer}</div>}
+    </Sheet>
   );
 }

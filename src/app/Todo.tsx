@@ -7,8 +7,10 @@
  * On the phone it slides in from the left over the chat (swipe right on the chat); a swipe left,
  * Chat or the phone's Back closes it. On a laptop the same panel is the side column.
  */
+import { useBusy, useDraft } from '../ui/draft';
+import { Segmented } from '../ui/Controls';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronRight, RefreshCw, Search, Sparkles, X } from 'lucide-react';
+import { Check, ChevronRight, Flag, RefreshCw, Search, Sparkles, Star, X } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
 import { LoopsList } from './LoopsList';
 import { FieldControls, PrimaryButton } from './MicButton';
@@ -43,8 +45,8 @@ export function DueChip({ item, today, mode }: { item: Pick<NowItem, 'due_date' 
   const d = dueChip(item, today);
   if (!d) return null;
   return (
-    <span className={`inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-[6px] px-2 text-[12px] tabular-nums ${d.kind === 'overdue' ? 'font-bold' : 'font-semibold'}`} style={DUE_STYLE[mode][d.kind]}>
-      {d.kind === 'overdue' && <span aria-hidden className="mr-1">⚑</span>}{d.text}
+    <span className={`inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-[8px] px-2 text-[12px] tabular-nums ${d.kind === 'overdue' ? 'font-bold' : 'font-semibold'}`} style={DUE_STYLE[mode][d.kind]}>
+      {d.kind === 'overdue' && <Flag size={11} strokeWidth={2.75} fill="currentColor" className="mr-1 shrink-0" aria-hidden />}{d.text}
     </span>
   );
 }
@@ -53,7 +55,7 @@ export function TopicPill({ topic, mode }: { topic: string; mode: Mode }) {
   const c = TOPIC_COLORS[topic];
   if (!c) return null;
   return (
-    <span className="inline-flex h-[22px] items-center rounded-[6px] px-2 text-[12px] font-semibold"
+    <span className="inline-flex h-[22px] items-center rounded-[8px] px-2 text-[12px] font-semibold"
       style={mode === 'dark' ? { background: `${c.rail}33`, color: c.inkDark } : { background: c.bg, color: c.ink }}>{topic}</span>
   );
 }
@@ -92,18 +94,18 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
       )}
       <div className={`flex items-start gap-1 py-1.5 pr-2 ${dx ? '' : 'transition-transform'} ${ticked ? 'opacity-50' : ''}`}
         style={dx ? { transform: `translateX(${dx}px)` } : undefined}>
-        <button type="button" onClick={tick} className="flex h-11 w-10 shrink-0 items-center justify-center"
+        <button type="button" onClick={tick} className="press flex h-10 w-10 shrink-0 items-center justify-center"
           aria-label={`Done: ${item.title.replace(/\*\*/g, '')}`}>
-          <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-[6px] border-2 transition-colors ${
+          <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-[8px] border-2 transition-colors ${
             ticked ? 'border-[#1d9e75] bg-[#1d9e75] text-white' : 'border-pc-border-strong bg-pc-elevated'}`}>
             {ticked && <Check size={14} strokeWidth={3.5} />}
           </span>
         </button>
-        <button type="button" onClick={() => onStar(item)} className={`flex h-11 w-7 shrink-0 items-center justify-center text-[20px] leading-none ${starred ? 'text-[#f5a623]' : 'text-pc-text-faint/60'}`}
+        <button type="button" onClick={() => onStar(item)} className={`press flex h-10 w-10 shrink-0 items-center justify-center ${starred ? 'text-[#f5a623]' : 'text-pc-text-faint/60'}`}
           aria-label={starred ? 'Remove from priority' : 'Make it a priority'} aria-pressed={starred}>
-          {starred ? '★' : '☆'}
+          <Star size={20} strokeWidth={2} fill={starred ? 'currentColor' : 'none'} />
         </button>
-        <span className="w-[34px] shrink-0 pr-1.5 pt-[10px] text-right text-[17px] font-bold leading-[22px] tracking-tight tabular-nums"
+        <span className="w-[30px] shrink-0 pr-1 pt-[9px] text-right text-[17px] font-bold leading-[22px] tracking-tight tabular-nums"
           style={{ color: ticked ? undefined : railOf(item) }} aria-label={item.n ? `number ${item.n}` : undefined}>
           {item.n ?? ''}
         </span>
@@ -155,14 +157,14 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen }: {
   return (
     <div className="space-y-5">
       {g.due.length > 0 && (
-        <section className="rounded-[16px] px-1.5 pb-1.5 pt-2.5" style={GLOW[red ? 'red' : 'amber'][mode]}>
-          <GroupHead mark={<span aria-hidden className="text-[14px] leading-none">⚑</span>} label="Due & overdue" count={g.due.length} color={red ? '#dc4c4c' : '#d48a12'} />
+        <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW[red ? 'red' : 'amber'][mode]}>
+          <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Due & overdue" count={g.due.length} color={red ? '#dc4c4c' : '#d48a12'} />
           {rows(g.due)}
         </section>
       )}
       {g.priority.length > 0 && (
-        <section className="rounded-[16px] px-1.5 pb-1.5 pt-2.5" style={GLOW.amber[mode]}>
-          <GroupHead mark={<span aria-hidden className="text-[14px] leading-none">★</span>} label="Priority" count={g.priority.length} color="#d48a12" />
+        <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW.amber[mode]}>
+          <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Priority" count={g.priority.length} color="#d48a12" />
           {rows(g.priority)}
         </section>
       )}
@@ -179,7 +181,7 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen }: {
         </section>
       )}
       {shown.length === 0 && (
-        <p className="px-4 py-10 text-center text-[15px] text-pc-text-muted">{filter === 'priority' ? 'No priorities. Tap ☆ on a task to make it one.' : 'Nothing with a date.'}</p>
+        <p className="px-4 py-10 text-center text-[15px] text-pc-text-muted">{filter === 'priority' ? 'No priorities. Tap the star on a task to make it one.' : 'Nothing with a date.'}</p>
       )}
     </div>
   );
@@ -190,8 +192,9 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
   onAdd: (text: string) => void; transcribe: (a: OutgoingAttachment) => Promise<string>;
   reply: { text: string | null; asked: string } | null; onDismissReply: () => void;
 }) {
-  const [text, setText] = useState('');
+  const [text, setText] = useDraft('task');
   const speech = useSpeech(text, setText, transcribe);
+  useBusy('task', !!text.trim() || speech.listening || speech.state === 'writing');
   const add = () => {
     if (!text.trim()) return;
     speech.cancel(); onAdd(text.trim()); setText('');
@@ -200,7 +203,7 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
     <div>
       <p className="mb-1.5 ml-1 text-[12px] font-bold uppercase tracking-[0.07em] text-[var(--pc-accent-ink)]">New task</p>
       <div className="flex items-end gap-2">
-        <div className="relative flex min-w-0 flex-1 items-end overflow-hidden rounded-[14px] border border-[rgba(var(--pc-accent-rgb),0.32)] bg-[rgba(var(--pc-accent-rgb),0.04)] pl-4 pr-1.5 focus-within:border-pc-accent focus-within:bg-pc-elevated">
+        <div className="relative flex min-w-0 flex-1 items-end overflow-hidden rounded-[12px] border border-[rgba(var(--pc-accent-rgb),0.32)] bg-[rgba(var(--pc-accent-rgb),0.04)] pl-4 pr-1.5 focus-within:border-pc-accent focus-within:bg-pc-elevated">
           <span className="absolute inset-y-0 left-0 w-1 bg-pc-accent" aria-hidden />
           <textarea value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
@@ -209,7 +212,7 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           <FieldControls speech={speech} hasText={!!text.trim()} onClear={() => { speech.cancel(); setText(''); }} />
         </div>
-        <PrimaryButton speech={speech} canSend={!!text.trim()} onSend={add} size={52} />
+        <PrimaryButton speech={speech} canSend={!!text.trim()} onSend={add} size={56} />
       </div>
       {speech.error && <p className="mt-1.5 px-1 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       {reply && (
@@ -219,7 +222,7 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
             <p className="truncate text-pc-text-muted">“{reply.asked}”</p>
             <p className="whitespace-pre-wrap text-pc-text">{reply.text ? <Title text={reply.text.replace(/\s*⟨[^⟩]+⟩/g, '')} /> : 'Adding it…'}</p>
           </div>
-          {reply.text && <button type="button" onClick={onDismissReply} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>}
+          {reply.text && <button type="button" onClick={onDismissReply} className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>}
         </div>
       )}
     </div>
@@ -238,6 +241,8 @@ export interface TodoPanelProps {
   reply: { text: string | null; asked: string } | null; onDismissReply: () => void;
   /** Phone: close back to the chat. Absent on a laptop (the panel is a column). */
   onClose?: () => void;
+  /** The undo bar, when this panel is the surface on top. */
+  footer?: ReactNode;
 }
 
 export function TodoPanel(p: TodoPanelProps) {
@@ -260,16 +265,10 @@ export function TodoPanel(p: TodoPanelProps) {
           </div>
         )}
         <div className="flex items-center gap-2 px-4 pb-2 pt-1">
-          <div className="grid flex-1 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
-            {([['todo', 'To do', p.items.length], ['progress', 'In progress', p.loops.length]] as const).map(([v, label, n]) => (
-              <button key={v} type="button" role="tab" aria-selected={p.tab === v} onClick={() => p.onTab(v)}
-                className={`h-8 rounded-[8px] text-[14px] font-medium transition-colors ${p.tab === v ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
-                {label}{n > 0 ? <span className="ml-1 text-pc-text-muted">{n}</span> : null}
-              </button>
-            ))}
-          </div>
+          <Segmented<TodoTab> value={p.tab} onChange={p.onTab} label="Lists"
+            options={[{ value: 'todo', label: 'To do', count: p.items.length }, { value: 'progress', label: 'In progress', count: p.loops.length }]} />
           {!p.onClose && (
-            <button type="button" onClick={p.onRefresh} className="flex h-9 w-9 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
+            <button type="button" onClick={p.onRefresh} className="press flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
               <RefreshCw size={16} className={p.refreshing ? 'animate-spin' : ''} />
             </button>
           )}
@@ -283,7 +282,7 @@ export function TodoPanel(p: TodoPanelProps) {
           <LoopsList loops={p.loops} today={p.today} onContinue={p.onContinue} onOpen={l => p.onOpen(l.id)} />
         ) : (
           <div className="space-y-4 pt-1">
-            <label className="flex h-10 items-center gap-2 rounded-[10px] bg-pc-surface px-3">
+            <label className="flex h-10 items-center gap-2 rounded-[12px] bg-pc-surface px-3">
               <Search size={17} className="shrink-0 text-pc-text-muted" />
               <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search tasks, people, numbers" enterKeyHint="search"
                 className="min-w-0 flex-1 border-0 bg-transparent text-[16px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted [&::-webkit-search-cancel-button]:hidden" />
@@ -293,7 +292,7 @@ export function TodoPanel(p: TodoPanelProps) {
             {p.items.length > 0 && (
               <div className="flex items-center gap-2 px-1">
                 <span className="mr-0.5 text-[12px] font-bold uppercase tracking-[0.06em] text-pc-text-faint">Show</span>
-                <button type="button" className={chip(filter === 'priority')} aria-pressed={filter === 'priority'} onClick={() => setFilter(f => (f === 'priority' ? null : 'priority'))}>★ Priority</button>
+                <button type="button" className={chip(filter === 'priority')} aria-pressed={filter === 'priority'} onClick={() => setFilter(f => (f === 'priority' ? null : 'priority'))}><Star size={13} strokeWidth={2.5} fill="currentColor" className="mr-1" aria-hidden />Priority</button>
                 <button type="button" className={chip(filter === 'deadlines')} aria-pressed={filter === 'deadlines'} onClick={() => setFilter(f => (f === 'deadlines' ? null : 'deadlines'))}>Deadlines</button>
               </div>
             )}
@@ -310,6 +309,7 @@ export function TodoPanel(p: TodoPanelProps) {
           </div>
         )}
       </div>
+      {p.footer && <div className="shrink-0 pb-[env(safe-area-inset-bottom)]">{p.footer}</div>}
     </div>
   );
 }

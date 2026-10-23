@@ -35,6 +35,8 @@ import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { SettingsSheet } from './SettingsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
+import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
+import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useNotice } from './notice';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
@@ -65,6 +67,7 @@ const QUICK = [
 
 export default function DeskApp() {
   const [look, setLookState] = useState<Look>(getLook);
+  useExactSizes();
   const mode = useMode(look.appearance);
   useThemeChrome(mode);
   const gw = useGateway();
@@ -102,7 +105,16 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [loops, setLoops] = useState<Loop[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);          // To do, full screen (phone)
+  const [todoOpen, setTodoOpen] = useState(false);
+  // Laptop: To do is a column beside the chat; phone: a full-screen panel. Only one is mounted, so
+  // the New task box (its draft, its busy state) exists once.
+  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 768px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const on = () => setWide(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);          // To do, full screen (phone)
   const [tab, setTab] = useState<TodoTab>('todo');
   const [selected, setSelected] = useState<Set<string> | null>(null);   // multi-select for copying
   const [sheet, setSheet] = useState<string | null>(null);
@@ -134,6 +146,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     key: Date.now(), label,
     undo: () => { void act(id, 'undo').catch(e => setHint(e instanceof Error ? e.message : 'Could not undo')).finally(() => void refresh()); },
   });
+  const undoBar = <UndoBar info={undo} onClose={closeUndo} />;
   const short = (i: { n?: number; title: string }) => `${i.n != null ? `${i.n} · ` : ''}${plainTitle(i.title)}`;
   const doAct = async (item: NowItem, action: 'done' | 'snooze') => {
     setNow(n => ({ ...n, items: n.items.filter(i => i.id !== item.id) }));   // optimistic
@@ -202,7 +215,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     void sendMessage(text, attachments);
   }, [ready, sendMessage]);
   const retry = useCallback((msg: ChatMessage) => { send(msg.content, sentAttachments.current.get(msg.content) ?? []); }, [send]);
-  const onReply = useCallback((msg: ChatMessage) => { setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || '📷 Photo', mine: msg.role === 'user' }); }, []);
+  const onReply = useCallback((msg: ChatMessage) => { setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || 'Photo', mine: msg.role === 'user' }); }, []);
   const putInComposer = (text: string, sendNow = false) => {
     setTodoOpen(false);
     if (sendNow) { send(text, []); return; }
@@ -300,34 +313,24 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     }
     setDrag(null);
   };
-  // The phone's Back (the edge swipes: the system owns both edges) closes To do, as in any Android app.
-  // Opening To do adds one history step; it is opened by a tap or a swipe, so Chrome counts the step.
-  // On the chat, Back leaves the app: Chrome deliberately does not let a page keep Back for itself
-  // (steps added without a fresh tap are skipped), so Back cannot reliably open To do.
-  useEffect(() => {
-    if (!todoOpen) return;
-    if ((history.state as { oc?: string } | null)?.oc !== 'todo') history.pushState({ oc: 'todo' }, '');
-    const onPop = () => setTodoOpen(false);
-    window.addEventListener('popstate', onPop);
-    return () => {
-      window.removeEventListener('popstate', onPop);
-      if ((history.state as { oc?: string } | null)?.oc === 'todo') history.back();
-    };
-  }, [todoOpen]);
+  // The phone's Back (the edge swipes, which the system owns) closes To do, as any top layer
+  // (ui/useBackLayer.ts); on the chat Back leaves the app.
+  useBackLayer(todoOpen, () => setTodoOpen(false));
 
   const panel = (onClose?: () => void) => (
     <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} loops={loops} today={now.today}
       loaded={loaded} expired={expired} refreshing={refreshing} onRefresh={() => void refresh()}
       onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet}
       onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}
-      onAdd={addTask} transcribe={transcribeAudio} reply={taskReply} onDismissReply={() => setAsked(null)} onClose={onClose} />
+      onAdd={addTask} transcribe={transcribeAudio} reply={taskReply} onDismissReply={() => setAsked(null)} onClose={onClose}
+      footer={onClose && todoOpen && !sheet && undo ? undoBar : null} />
   );
 
   // The pinned bar over the chat (phone): the most pressing thing, and how much else is waiting.
   const pinnedBar = (
     <button type="button" onClick={() => { setTab('todo'); setTodoOpen(true); }} aria-label="Open To do"
-      className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-[14px] border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
-      <span className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[10px] px-1.5 text-[15px] font-bold tabular-nums ${
+      className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-[12px] border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
+      <span className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[12px] px-1.5 text-[15px] font-bold tabular-nums ${
         now.items.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]' : urgentCount > 0 ? 'bg-[#dc4c4c] text-white' : 'bg-pc-surface text-pc-text'}`}>
         {now.items.length === 0 ? <ListChecks size={18} /> : now.items.length}
       </span>
@@ -342,7 +345,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
               <span className="mt-1 flex items-center gap-1.5 text-[12px] leading-tight text-pc-text-muted">
                 <DueChip item={top} today={now.today} mode={mode} />
                 <span className="truncate">
-                  {overdue > 1 ? `${overdue} overdue · ` : ''}{now.items.length > 1 ? `${now.items.length - 1} more` : ''}{loops.length > 0 ? `${now.items.length > 1 ? ' · ' : ''}${loops.length} in progress` : ''}
+                  {[overdue - (top?.section === 'overdue' ? 1 : 0) > 0 ? `${overdue - (top?.section === 'overdue' ? 1 : 0)} more overdue` : '', loops.length > 0 ? `${loops.length} in progress` : ''].filter(Boolean).join(' · ')}
                 </span>
               </span>
             </>
@@ -364,7 +367,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {found.todo.length > 0 && (
         <section className="mb-4">
           <h3 className="px-2 pb-1 text-[13px] font-semibold text-pc-text-muted">To do</h3>
-          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-2xl bg-pc-surface">
+          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-surface">
             {found.todo.map(i => (
               <button key={i.id} type="button" onClick={() => setSheet(i.id)} className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
                 <span className="w-6 shrink-0 text-right text-[15px] font-bold tabular-nums" style={{ color: railOf(i) }}>{i.n ?? ''}</span>
@@ -379,7 +382,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {found.progress.length > 0 && (
         <section className="mb-4">
           <h3 className="px-2 pb-1 text-[13px] font-semibold text-pc-text-muted">In progress</h3>
-          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-2xl bg-pc-surface">
+          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-surface">
             {found.progress.map(l => (
               <button key={l.id} type="button" onClick={() => setSheet(l.id)} className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
                 <span className="block truncate text-[15px]">{l.title}</span>
@@ -392,7 +395,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {found.msgs.length > 0 && (
         <section>
           <h3 className="px-2 pb-1 text-[13px] font-semibold text-pc-text-muted">Conversation</h3>
-          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-2xl bg-pc-surface">
+          <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-surface">
             {found.msgs.map(m => { const sn = snippet(visibleText(m), search ?? ''); return (
               <button key={m.id} type="button" onClick={() => jumpTo(m.id)} className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
                 <span className="mb-0.5 block text-[12px] text-pc-text-muted">{m.role === 'user' ? 'You' : 'Assistant'} · {dayLabel(m.timestamp)}</span>
@@ -418,7 +421,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
         const firstOfRun = newDay || prev.role !== msg.role;
         return (
-          <div key={msg.id} id={`d-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-2' : ''} ${flash === msg.id ? 'rounded-2xl bg-[rgba(var(--pc-accent-rgb),0.12)]' : ''}`}>
+          <div key={msg.id} id={`d-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-2' : ''} ${flash === msg.id ? 'rounded-[12px] bg-[rgba(var(--pc-accent-rgb),0.12)]' : ''}`}>
             {newDay && <div className="flex justify-center pb-2 pt-3"><span className="text-[12px] font-medium text-pc-text-muted">{dayLabel(msg.timestamp)}</span></div>}
             <MessageBubble msg={msg} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips}
               selecting={selected !== null} selected={!!selected?.has(msg.id)} onSelect={toggleSelect} />
@@ -427,56 +430,37 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       })}
       {outbox.map((item, i) => (
         <MessageBubble key={item.id} showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
-          msg={{ id: item.id, role: 'user', content: item.text, timestamp: item.queuedAt, blocks: [{ type: 'text', text: item.text || `📎 ${item.attachments.length} attachment(s)` }], sendStatus: 'sending' }} />
+          msg={{ id: item.id, role: 'user', content: item.text, timestamp: item.queuedAt, blocks: [{ type: 'text', text: item.text || `${item.attachments.length} attachment${item.attachments.length === 1 ? '' : 's'}` }], sendStatus: 'sending' }} />
       ))}
       {questions.map(qq => <QuestionCard key={qq.id} record={qq} onAnswer={answer} onSkip={skip} />)}
     </>
   );
 
-  const iconBtn = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:bg-[var(--pc-hover-strong)]';
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border bg-[color-mix(in_srgb,var(--pc-bg-base)_88%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="flex h-[52px] items-center gap-1 px-2">
-          {selected !== null ? (
-            <>
-              <button type="button" onClick={() => setSelected(null)} className={iconBtn} aria-label="Cancel selection"><X size={21} /></button>
-              <span className="min-w-0 flex-1 px-1 text-[16px] font-medium">{selected.size} selected</span>
-              <button type="button" disabled={selected.size === 0} onClick={() => void copySelected()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-pc-accent px-4 text-[15px] font-semibold text-white disabled:opacity-50"><Copy size={15} /> Copy</button>
-            </>
-          ) : search !== null ? (
-            <>
-              <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] bg-pc-surface px-2.5">
-                <Search size={16} className="shrink-0 text-pc-text-muted" />
-                <input autoFocus type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" aria-label="Search" enterKeyHint="search"
-                  className="min-w-0 flex-1 bg-transparent text-[16px] outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 shadow-none placeholder:text-pc-text-muted [&::-webkit-search-cancel-button]:hidden" />
-                {search && <button type="button" onClick={() => setSearch('')} className="flex h-5 w-5 items-center justify-center rounded-full bg-pc-text-faint text-pc-surface" aria-label="Clear search"><X size={11} strokeWidth={3} /></button>}
-              </div>
-              <button type="button" onClick={() => setSearch(null)} className="px-2 text-[16px] text-pc-accent">Cancel</button>
-            </>
-          ) : (
-            <>
-              <div className="min-w-0 flex-1 px-2">
-                <h1 className="truncate text-[17px] font-semibold leading-tight">{name ? `Hi, ${name}` : 'OpenClaw'}</h1>
-                <p className="truncate text-[12px] leading-tight text-pc-text-muted">{dateTitle}</p>
-              </div>
-              <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
-              <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-white active:opacity-80" aria-label="Settings">
-                {name ? name[0] : '⋯'}
-              </button>
-            </>
-          )}
-        </div>
+        {selected !== null ? (
+          <div className="flex h-[52px] items-center gap-1 px-2">
+            <IconButton label="Cancel selection" onClick={() => setSelected(null)}><X size={22} /></IconButton>
+            <span className="min-w-0 flex-1 px-1 text-[16px] font-medium">{selected.size} selected</span>
+            <button type="button" disabled={selected.size === 0} onClick={() => void copySelected()} className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-pc-accent px-4 text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50"><Copy size={16} /> Copy</button>
+          </div>
+        ) : search !== null ? (
+          <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Search to-dos and messages" />
+        ) : (
+          <AppHeader title={name ? `Hi, ${name}` : 'OpenClaw'} subtitle={dateTitle} initial={name ? name[0] : '…'} onSettings={() => setSettings(true)}
+            actions={<IconButton label="Search" onClick={() => setSearch('')}><Search size={22} /></IconButton>} />
+        )}
         {statusLine && search === null && <div className="flex h-6 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
         {person === '' && !isLocal() && <div className="flex h-6 items-center justify-center bg-red-500/15 text-[12px] text-red-600" role="status">Not signed in · <a href="/" className="ml-1 underline">sign in</a></div>}
       </header>
 
       <div className="flex min-h-0 flex-1 md:flex-row">
-        <aside className="hidden w-[420px] shrink-0 flex-col border-r border-pc-border md:flex">{panel()}</aside>
+        {wide && <aside className="flex w-[420px] shrink-0 flex-col border-r border-pc-border">{panel()}</aside>}
         <div className="relative flex min-w-0 flex-1 flex-col">
           {search === null && notice && (
-            <div className="mx-3 mt-2 flex items-start gap-3 rounded-2xl border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
+            <div className="mx-3 mt-2 flex items-start gap-3 rounded-[12px] border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
               <Bell size={18} className="mt-0.5 shrink-0 text-pc-accent" />
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold leading-snug">{notice.title}</p>
@@ -486,7 +470,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
                   {notice.item && <> · <button type="button" onClick={() => { setSheet(notice.item!); dismissNotice(); }} className="font-medium text-pc-accent">Open it</button></>}
                 </p>
               </div>
-              <button type="button" onClick={dismissNotice} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Dismiss"><X size={16} /></button>
+              <button type="button" onClick={dismissNotice} className="-m-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Dismiss"><X size={16} /></button>
             </div>
           )}
           {search === null && pinnedBar}
@@ -501,10 +485,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
       {search === null && (
         <div className="shrink-0 border-t border-pc-border bg-pc-base">
+          {!sheet && !todoOpen && undoBar}
           <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
             {QUICK.map(qq => (
               <button key={qq.label} type="button" onClick={() => putInComposer(qq.text)}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[14px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
+                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[14px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
                 <qq.icon size={15} className="text-pc-accent" /> {qq.label}
               </button>
             ))}
@@ -514,21 +499,22 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       )}
 
       {/* To do, full screen (phone): slides in from the left, follows the finger. */}
-      <div className="fixed inset-0 z-30 shadow-2xl md:hidden" role="dialog" aria-modal="true" aria-label="To do" inert={!todoOpen}
-        onTouchStart={swipeStart('panel')} onTouchMove={swipeMove} onTouchEnd={swipeEnd}
-        style={{
-          transform: todoOpen ? `translateX(${drag !== null && drag < 0 ? drag : 0}px)` : `translateX(calc(-100% - 24px + ${drag !== null && drag > 0 ? drag : 0}px))`,
-          transition: drag !== null ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-        }}>
-        {panel(() => setTodoOpen(false))}
-      </div>
+      {!wide && (
+        <div className="fixed inset-0 z-30 shadow-2xl md:hidden" role="dialog" aria-modal="true" aria-label="To do" inert={!todoOpen}
+          onTouchStart={swipeStart('panel')} onTouchMove={swipeMove} onTouchEnd={swipeEnd}
+          style={{
+            transform: todoOpen ? `translateX(${drag !== null && drag < 0 ? drag : 0}px)` : `translateX(calc(-100% - 24px + ${drag !== null && drag > 0 ? drag : 0}px))`,
+            transition: drag !== null ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+          }}>
+          {panel(() => setTodoOpen(false))}
+        </div>
+      )}
 
-      {sheet && <ItemSheet id={sheet} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
+      {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
         onActed={(id, action, title) => {
           const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
-      <UndoBar info={undo} onClose={closeUndo} bottom={todoOpen || sheet ? 'calc(env(safe-area-inset-bottom) + 20px)' : 'calc(env(safe-area-inset-bottom) + 150px)'} />
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />

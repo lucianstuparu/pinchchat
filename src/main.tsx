@@ -1,4 +1,5 @@
 import React, { Suspense, lazy } from 'react'
+import { reloadWhenIdle } from './ui/draft'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import MobileApp from './mobile/MobileApp'
@@ -26,10 +27,10 @@ if ('serviceWorker' in navigator) {
         if (!newWorker) return;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New version available — reload on next navigation
-            // The new SW called skipWaiting(), so it activates immediately
-            // Reload to pick up cached assets from the new cache version
-            window.location.reload();
+            // New version ready (the new SW called skipWaiting). Reload to use it, but never while
+            // someone is typing, recording or has photos waiting: then at the next idle moment in
+            // the background (ui/draft.ts; my.design principles/09-platform.md).
+            reloadWhenIdle(() => window.location.reload());
           }
         });
       });

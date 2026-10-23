@@ -9,7 +9,7 @@ export function MicButton({ speech, size = 56 }: { speech: Speech; size?: number
     <button type="button" onClick={s.toggle} disabled={s.state === 'writing' || s.state === 'starting'}
       aria-label={s.listening ? 'Done speaking' : s.state === 'writing' ? 'Writing what you said' : `Speak (${s.engine})`} aria-pressed={s.listening}
       style={{ width: size, height: size }}
-      className={`relative flex shrink-0 items-center justify-center rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.18)] transition-transform active:scale-95 ${
+      className={`relative flex shrink-0 items-center justify-center rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.18)] press ${
         s.listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
       {s.state === 'recording' && <span className="absolute inset-0 rounded-full bg-red-500/35 transition-transform duration-100" style={{ transform: `scale(${1 + Math.min(s.level * 1.6, 0.6)})` }} />}
       {s.state === 'live' && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
@@ -29,7 +29,7 @@ export function PrimaryButton({ speech, canSend, onSend, size = 56 }: { speech: 
   if (busy || !canSend) return <MicButton speech={speech} size={size} />;
   return (
     <button type="button" onClick={onSend} aria-label="Send" style={{ width: size, height: size }}
-      className="flex shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow-[0_4px_14px_rgba(0,0,0,0.18)] transition-transform active:scale-95">
+      className="flex shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow-[0_4px_14px_rgba(0,0,0,0.18)] press">
       <ArrowUp size={size * 0.46} strokeWidth={2.6} />
     </button>
   );
@@ -43,11 +43,11 @@ export function FieldControls({ speech, hasText, onClear }: { speech: Speech; ha
   if (!hasText || speech.listening || speech.state === 'writing') return null;
   return (
     <div className="flex shrink-0 flex-col items-center justify-between self-stretch py-1">
-      <button type="button" onClick={onClear} className="flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Clear">
+      <button type="button" onClick={onClear} className="press flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Clear">
         <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={14} strokeWidth={3} /></span>
       </button>
       {speech.available && (
-        <button type="button" onClick={speech.toggle} className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--pc-accent-ink)] active:bg-[var(--pc-hover-strong)]" aria-label={`Say more (${speech.engine})`}>
+        <button type="button" onClick={speech.toggle} className="press flex h-10 w-10 items-center justify-center rounded-full text-[var(--pc-accent-ink)] active:bg-[var(--pc-hover-strong)]" aria-label={`Say more (${speech.engine})`}>
           <Mic size={22} strokeWidth={2.2} />
         </button>
       )}

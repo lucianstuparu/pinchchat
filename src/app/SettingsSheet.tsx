@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { Bell, Check, ChevronRight, Languages, LogOut, MessageCircle, Monitor, Moon, Palette, Sun, X } from 'lucide-react';
+import { CloseButton, Sheet } from '../ui/Sheet';
+import { Segmented as SharedSegmented } from '../ui/Controls';
+import { Bell, Check, ChevronRight, Languages, LogOut, MessageCircle, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { DICTATION_LANGS, getDictationLang, getSpeechMode, setDictationLang, setSpeechMode, type SpeechMode } from './voice';
 import { ACCENTS, type Accent, type Appearance, type Look } from './themes';
 import type { PushState } from '../mobile/pushNotifications';
@@ -26,24 +28,15 @@ interface Props {
 const Group = ({ title, children, foot }: { title?: string; children: ReactNode; foot?: string }) => (
   <section className="mb-6">
     {title && <h3 className="mb-1.5 px-4 text-[13px] text-pc-text-muted">{title}</h3>}
-    <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-2xl bg-pc-elevated">{children}</div>
+    <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-elevated">{children}</div>
     {foot && <p className="mt-1.5 px-4 text-[12px] leading-snug text-pc-text-muted">{foot}</p>}
   </section>
 );
 const Icon = ({ children, bg }: { children: ReactNode; bg: string }) => (
-  <span className="flex h-[29px] w-[29px] shrink-0 items-center justify-center rounded-lg text-white" style={{ background: bg }}>{children}</span>
+  <span className="flex h-[29px] w-[29px] shrink-0 items-center justify-center rounded-[8px] text-white" style={{ background: bg }}>{children}</span>
 );
-function Segmented<T extends string>({ value, options, onChange }: { value: T; options: Array<[T, string, ReactNode?]>; onChange: (v: T) => void }) {
-  return (
-    <div className="grid gap-1 rounded-[10px] bg-pc-surface p-[3px]" style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }} role="radiogroup">
-      {options.map(([v, label, icon]) => (
-        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-          className={`flex h-8 items-center justify-center gap-1.5 rounded-[8px] text-[13px] font-medium transition-colors ${value === v ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
-          {icon}{label}
-        </button>
-      ))}
-    </div>
-  );
+function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: Array<[T, string, ReactNode?]>; onChange: (v: T) => void; label?: string }) {
+  return <SharedSegmented size="s" choice label={label} value={value} onChange={onChange} options={options.map(([v, labelText, icon]) => ({ value: v, label: labelText, icon }))} />;
 }
 
 export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children, fixedAccent }: Props) {
@@ -52,13 +45,10 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
   const pushOn = push === 'on';
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Settings">
-      <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
-      <div className={`relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[22px] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl md:max-w-md md:rounded-[22px] ${mode === 'dark' ? 'bg-[#000]' : 'bg-[#f2f2f7]'}`}>
-        <div className="mx-auto mb-2 h-[5px] w-9 rounded-full bg-pc-text-faint/50 md:hidden" />
+    <Sheet label="Settings" onClose={onClose} className={`max-h-[92dvh] overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 md:max-w-md ${mode === 'dark' ? 'bg-[#000]' : 'bg-[#f2f2f7]'}`}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[22px] font-bold">Settings</h2>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <Group>
@@ -85,7 +75,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
 
         <Group title="Appearance">
           <div className="space-y-3 px-4 py-3">
-            <Segmented<Appearance> value={look.appearance} onChange={a => onLook({ ...look, appearance: a })}
+            <Segmented<Appearance> label="Appearance" value={look.appearance} onChange={a => onLook({ ...look, appearance: a })}
               options={[['auto', 'Auto', <Monitor key="a" size={14} />], ['light', 'Light', <Sun key="l" size={14} />], ['dark', 'Dark', <Moon key="d" size={14} />]]} />
           </div>
           {!fixedAccent && <div className="flex items-center gap-3 px-4 py-3">
@@ -94,7 +84,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             <div className="flex gap-2.5" role="radiogroup" aria-label="Accent colour">
               {(Object.keys(ACCENTS) as Accent[]).filter(a => a !== 'keep').map(a => (
                 <button key={a} type="button" role="radio" aria-checked={look.accent === a} aria-label={ACCENTS[a].name} onClick={() => onLook({ ...look, accent: a })}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-white ring-offset-2 ring-offset-[var(--pc-bg-elevated)] transition"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-white ring-offset-2 ring-offset-[var(--pc-bg-elevated)] transition"
                   style={{ background: mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light, boxShadow: look.accent === a ? `0 0 0 2px var(--pc-bg-elevated), 0 0 0 4px ${mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light}` : undefined }}>
                   {look.accent === a && <Check size={15} strokeWidth={3} />}
                 </button>
@@ -107,13 +97,13 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
           ? 'Live: the text appears while you speak, in one language (below). Mixed languages come out wrong.'
           : 'Whisper (home server): any language, mixed too. The text comes when you stop, after 10–20 s.'}>
           <div className="space-y-3 px-4 py-3">
-            <Segmented<SpeechMode> value={speech} onChange={m => { setSpeech(m); setSpeechMode(m); }}
+            <Segmented<SpeechMode> label="The mic" value={speech} onChange={m => { setSpeech(m); setSpeechMode(m); }}
               options={[['live', 'Live'], ['whisper', 'Whisper']]} />
             {speech === 'live' && (
               <div className="flex items-center gap-3">
                 <Icon bg="#007aff"><Languages size={16} /></Icon>
                 <div className="flex-1">
-                  <Segmented value={lang} onChange={c => { setLang(c); setDictationLang(c); }}
+                  <Segmented label="Live language" value={lang} onChange={c => { setLang(c); setDictationLang(c); }}
                     options={DICTATION_LANGS.map(l => [l.code, l.name] as [string, string])} />
                 </div>
               </div>
@@ -141,7 +131,6 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             <LogOut size={17} /> Sign out
           </button>
         </Group>
-      </div>
-    </div>
+    </Sheet>
   );
 }

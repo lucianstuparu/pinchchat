@@ -1,5 +1,5 @@
 import { ArrowRight, MessagesSquare, Users } from 'lucide-react';
-import { ago, domainEmoji, type Loop } from './api';
+import { ago, type Loop } from './api';
 
 /**
  * "In progress" (app v2 §6, stored as loops): things being thought through, with where they stand
@@ -21,7 +21,6 @@ export function LoopsList({ loops, today, onContinue, onOpen }: { loops: Loop[];
         <div key={l.id} className="flex items-center gap-2 py-3 pl-4 pr-3">
           <button type="button" onClick={() => onOpen(l)} className="min-w-0 flex-1 text-left">
             <span className="flex items-center gap-1.5">
-              {domainEmoji(l.domain) && <span aria-hidden className="text-[13px]">{domainEmoji(l.domain)}</span>}
               <span className="truncate text-[16px] leading-snug text-pc-text-primary">{l.title}</span>
               {l.scope === 'shared' && <Users size={12} className="shrink-0 text-pc-text-faint" aria-label="shared" />}
             </span>

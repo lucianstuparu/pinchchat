@@ -103,7 +103,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   };
 
   return (
-    <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-2xl' : ''}`}
+    <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-[20px]' : ''}`}
       onClick={selecting ? () => onSelect?.(msg) : undefined}>
       {selecting && (
         <span className={`self-center ${selected ? 'text-pc-accent' : 'text-pc-text-faint'}`} aria-label={selected ? 'selected' : 'not selected'}>
@@ -129,7 +129,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
         // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
         style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${-dx}px)` } : {}) }}
-        className={`relative ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-2xl px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
+        className={`relative ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-[20px] px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
           canReply ? 'select-none [-webkit-touch-callout:none]' : ''
         } ${
           mine

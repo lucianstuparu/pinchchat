@@ -13,11 +13,10 @@ export type PantryOp =
   | { op: 'pantry-close'; id: string; how: 'used' | 'wasted' }
   | { op: 'pantry-reopen'; id: string };
 
-export const WHERE: Array<{ key: Where; label: string; icon: string }> = [
-  { key: 'fridge', label: 'Fridge', icon: '🧊' }, { key: 'freezer', label: 'Freezer', icon: '❄️' },
-  { key: 'pantry', label: 'Cupboard', icon: '🗄️' }, { key: 'bathroom', label: 'Bathroom', icon: '🛁' }, { key: 'other', label: 'Other', icon: '📦' },
+export const WHERE: Array<{ key: Where; label: string }> = [
+  { key: 'fridge', label: 'Fridge' }, { key: 'freezer', label: 'Freezer' },
+  { key: 'pantry', label: 'Cupboard' }, { key: 'bathroom', label: 'Bathroom' }, { key: 'other', label: 'Other' },
 ];
-export const whereIcon = (w?: Where) => WHERE.find(x => x.key === (w ?? 'fridge'))?.icon ?? '📦';
 
 export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 export const daysUntil = (d: string, today: string) => Math.round((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000);
