@@ -282,7 +282,7 @@ const server = http.createServer((req, res) => {
       const p = JSON.parse(body || '{}');
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry }));
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL }));
     });
     return;
   }
@@ -344,6 +344,10 @@ const server = http.createServer((req, res) => {
   res.end('mock openclaw gateway');
 });
 
+const SHOP_USUAL = [
+  { key: 't:kefir', title: 'Kefir', tags: ['lidl'], every: 10, last: '2026-10-10', since: 12, reason: 'usual' },
+  { key: 'p:prd-x', title: 'Activia nature', product: 'prd-x', tags: ['carrefour'], every: null, last: '2026-09-01', since: 51, reason: 'favourite' },
+];
 const regLoops = [
   { id: 'lp-2026-10-19-aaaaaa', title: 'Retire the ConBee', domain: 'tech', state: 'Car charger and VINDSTYRKA moved; 2 covers left', next_step: 'pair the 2 covers on Z2M', status: 'open', last_touched: '2026-10-18', scope: 'private', kind: 'loop' },
   { id: 'lp-2026-10-19-bbbbbb', title: 'Car insurance switch', domain: 'finance', state: 'Two quotes requested', next_step: 'compare when the second quote arrives', status: 'open', last_touched: '2026-10-20', scope: 'shared', kind: 'loop' },
@@ -359,6 +363,8 @@ const regItems = {
   'tsk-2026-09-20-dent01': { n: 25, status: 'todo', kind: 'task', title: 'Write to **dental clinic in Moldova** about temp crown falling out', due_date: '2026-09-20', scope: 'private', store: 'tasks', domain: 'health', topics: ['Health', 'Admin'] },
   'tsk-2026-10-10-evgh01': { n: 18, status: 'todo', kind: 'task', title: 'Schedule **Evghenia**’s Lyon visit once her response arrives', scope: 'private', store: 'tasks', domain: 'family', topics: ['People', 'Admin'] },
   'tsk-2026-10-05-insu01': { n: 6, status: 'todo', kind: 'task', title: 'Follow up with **insurance company** to demand reevaluation of flood claim', scope: 'shared', store: 'tasks', domain: 'home', priority: 'P1', topics: ['Admin', 'Money'] },
+  'tsk-2026-10-01-rent01': { n: 31, status: 'todo', kind: 'task', title: 'Pay the **rent**', due_date: '2026-11-05', scope: 'shared', store: 'tasks', domain: 'home', topics: ['Money'], repeat: 'every month' },
+  'tsk-2026-10-18-dent02': { n: 33, status: 'todo', kind: 'task', title: 'Book a **dentist** check-up', due_date: '2026-11-30', scope: 'private', store: 'tasks', domain: 'health', topics: ['Health'], snoozed_until: '2026-10-25', hidden: true },
   'tsk-2026-10-15-ccar01': { n: 15, status: 'todo', kind: 'task', title: 'Book **Casa Artlia** roof inspection', scope: 'shared', store: 'tasks', domain: 'casa-artlia', topics: ['Errands'] },
 };
 

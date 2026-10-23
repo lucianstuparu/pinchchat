@@ -76,7 +76,7 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     const r = rec.current; rec.current = null;
     const mine = round.current;
     const silent = r.peak() < SILENT;
-    setState('writing');
+    setSecs(0); setState('writing');
     const audio = await r.stop();
     if (!audio) { setState('idle'); return; }
     if (silent) {
@@ -104,6 +104,12 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     }, 120);
     return () => { window.clearInterval(t); window.clearInterval(m); setLevel(0); setHeard(true); };
   }, [state]);
+  // While Whisper writes, count the seconds too, so the box can say how long it has been.
+  useEffect(() => {
+    if (state !== 'writing') return;
+    const t = window.setInterval(() => setSecs(n => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [state]);
   useEffect(() => () => { void rec.current?.stop(); dict.current?.abort(); }, []);
 
   return {
@@ -123,6 +129,6 @@ export function speechPlaceholder(s: Speech, idle: string): string {
     return s.secs >= 3 && !s.heard ? 'The mic hears nothing… Bluetooth headset or watch connected?'
       : `Recording for Whisper ${clock(s.secs)}… tap the mic when done`;
   }
-  if (s.state === 'writing') return 'Whisper is writing what you said…';
+  if (s.state === 'writing') return '';   // SpeechStatus above the box says it, with the time
   return idle;
 }

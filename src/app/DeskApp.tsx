@@ -150,7 +150,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const short = (i: { n?: number; title: string }) => `${i.n != null ? `${i.n} · ` : ''}${plainTitle(i.title)}`;
   const doAct = async (item: NowItem, action: 'done' | 'snooze') => {
     setNow(n => ({ ...n, items: n.items.filter(i => i.id !== item.id) }));   // optimistic
-    try { await act(item.id, action); offerUndo(item.id, `${action === 'done' ? (item.kind === 'bill' ? 'Paid' : 'Done') : 'Reminder in 3 days'}: ${short(item)}`); }
+    try {
+      const r = await act(item.id, action);
+      const next = r.next_due ? ` · next ${new Date(`${r.next_due}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : '';
+      offerUndo(item.id, `${action === 'done' ? (item.kind === 'bill' ? 'Paid' : 'Done') : 'Put off 3 days'}: ${short(item)}${next}`);
+    }
     catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
@@ -276,9 +280,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const dateTitle = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
   // The bar leads with what To do leads with: the due box, then priorities, then the rest.
-  const top = useMemo(() => { const g = groupTodo(now.items, now.today); return g.due[0] ?? g.priority[0] ?? g.areas[0]?.items[0] ?? g.waiting[0]; }, [now]);
-  const overdue = now.items.filter(i => i.section === 'overdue').length;
-  const urgentCount = now.items.filter(i => i.section === 'overdue' || i.section === 'today').length;
+  // Put-off tasks wait out of the way: they do not count on the bar until their day.
+  const active = useMemo(() => now.items.filter(i => !i.hidden), [now.items]);
+  const top = useMemo(() => { const g = groupTodo(active, now.today); return g.due[0] ?? g.priority[0] ?? g.areas[0]?.items[0] ?? g.waiting[0]; }, [active, now.today]);
+  const overdue = active.filter(i => i.section === 'overdue').length;
+  const urgentCount = active.filter(i => i.section === 'overdue' || i.section === 'today').length;
 
   // Adding from the To do screen: the text goes to the assistant as a task; its answer shows under the box.
   const [asked, setAsked] = useState<{ text: string; ts: number } | null>(null);
@@ -286,7 +292,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const taskReply = useMemo(() => {
     if (!asked) return null;
     const m = shown.find(x => x.role === 'assistant' && !x.isStreaming && x.timestamp > asked.ts);
-    return { asked: asked.text, text: m ? visibleText(m) : null };
+    return { asked: asked.text, since: asked.ts, text: m ? visibleText(m) : null };
   }, [asked, shown]);
 
   // Swipe right on the chat opens To do; swipe left on To do closes it (phone only). A swipe on a
@@ -331,8 +337,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     <button type="button" onClick={() => { setTab('todo'); setTodoOpen(true); }} aria-label="Open To do"
       className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-[12px] border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
       <span className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[12px] px-1.5 text-[15px] font-bold tabular-nums ${
-        now.items.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]' : urgentCount > 0 ? 'bg-[#dc4c4c] text-white' : 'bg-pc-surface text-pc-text'}`}>
-        {now.items.length === 0 ? <ListChecks size={18} /> : now.items.length}
+        active.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]' : urgentCount > 0 ? 'bg-[#dc4c4c] text-white' : 'bg-pc-surface text-pc-text'}`}>
+        {active.length === 0 ? <ListChecks size={18} /> : active.length}
       </span>
       <span className="min-w-0 flex-1">
         {!loaded ? <span className="block text-[15px] text-pc-text-muted">{expired ? 'Signed out of the lists' : 'To do'}</span>

@@ -7,10 +7,12 @@
  * On the phone it slides in from the left over the chat (swipe right on the chat); a swipe left,
  * Chat or the phone's Back closes it. On a laptop the same panel is the side column.
  */
+import { SpeechStatus } from './SpeechStatus';
+import { useDelayedFlag, useNow } from '../ui/progress';
 import { useBusy, useDraft } from '../ui/draft';
 import { Segmented } from '../ui/Controls';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronRight, Flag, RefreshCw, Search, Sparkles, Star, X } from 'lucide-react';
+import { Check, ChevronRight, Clock, Flag, RefreshCw, Repeat, Search, Sparkles, Star, X } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
 import { LoopsList } from './LoopsList';
 import { FieldControls, PrimaryButton } from './MicButton';
@@ -111,9 +113,10 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
         </span>
         <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 py-[9px] text-left">
           <Title text={item.title} className={`block text-[16px] leading-[22px] ${ticked ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`} />
-          {(dueChip(item, today) || item.topics?.length || amount) && (
+          {(dueChip(item, today) || item.topics?.length || amount || item.repeat) && (
             <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <DueChip item={item} today={today} mode={mode} />
+              {item.repeat && <span className="inline-flex h-[22px] items-center gap-1 text-[12px] font-medium text-pc-text-muted"><Repeat size={12} aria-hidden />{item.repeat}</span>}
               {item.topics?.map(t => <TopicPill key={t} topic={t} mode={mode} />)}
               {amount && <span className="text-[13px] font-medium tabular-nums text-pc-text-secondary">{amount}</span>}
             </span>
@@ -190,8 +193,9 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen }: {
 // ---- adding a task: the same box and mic as the chat
 function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
   onAdd: (text: string) => void; transcribe: (a: OutgoingAttachment) => Promise<string>;
-  reply: { text: string | null; asked: string } | null; onDismissReply: () => void;
+  reply: { text: string | null; asked: string; since: number } | null; onDismissReply: () => void;
 }) {
+  const now = useNow(!!reply && !reply.text);
   const [text, setText] = useDraft('task');
   const speech = useSpeech(text, setText, transcribe);
   useBusy('task', !!text.trim() || speech.listening || speech.state === 'writing');
@@ -214,13 +218,15 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
         </div>
         <PrimaryButton speech={speech} canSend={!!text.trim()} onSend={add} size={56} />
       </div>
+      <div className="mt-1.5"><SpeechStatus speech={speech} /></div>
       {speech.error && <p className="mt-1.5 px-1 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       {reply && (
         <div className="mt-2 flex items-start gap-2 rounded-[12px] bg-pc-surface px-3 py-2" aria-live="polite">
           <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${reply.text ? '' : 'animate-pulse'}`} />
           <div className="min-w-0 flex-1 text-[14px] leading-snug">
             <p className="truncate text-pc-text-muted">“{reply.asked}”</p>
-            <p className="whitespace-pre-wrap text-pc-text">{reply.text ? <Title text={reply.text.replace(/\s*⟨[^⟩]+⟩/g, '')} /> : 'Adding it…'}</p>
+            <p className="whitespace-pre-wrap text-pc-text">{reply.text ? <Title text={reply.text.replace(/\s*⟨[^⟩]+⟩/g, '')} /> : `Adding it · ${Math.max(0, Math.floor((now - reply.since) / 1000))} s`}</p>
+            {!reply.text && <div className="mt-1.5 h-1 overflow-hidden rounded-[2px] bg-[var(--pc-separator)]" aria-hidden><div className="progress-indeterminate h-full w-1/3 rounded-[2px] bg-pc-accent" /></div>}
           </div>
           {reply.text && <button type="button" onClick={onDismissReply} className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>}
         </div>
@@ -238,7 +244,7 @@ export interface TodoPanelProps {
   onDone: (i: NowItem) => void; onStar: (i: NowItem) => void; onOpen: (id: string) => void;
   onContinue: (l: Loop) => void;
   onAdd: (text: string) => void; transcribe: (a: OutgoingAttachment) => Promise<string>;
-  reply: { text: string | null; asked: string } | null; onDismissReply: () => void;
+  reply: { text: string | null; asked: string; since: number } | null; onDismissReply: () => void;
   /** Phone: close back to the chat. Absent on a laptop (the panel is a column). */
   onClose?: () => void;
   /** The undo bar, when this panel is the surface on top. */
@@ -248,7 +254,12 @@ export interface TodoPanelProps {
 export function TodoPanel(p: TodoPanelProps) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'priority' | 'deadlines' | null>(null);
-  const items = q.trim() ? p.items.filter(i => matches(i, q)) : p.items;
+  const [showPutOff, setShowPutOff] = useState(false);
+  const spinning = useDelayedFlag(p.refreshing);
+  // Put off ("Remind in 3 days") stays out of the way until its day; a search still finds it.
+  const putOff = p.items.filter(i => i.hidden);
+  const visible = showPutOff ? p.items : p.items.filter(i => !i.hidden);
+  const items = q.trim() ? p.items.filter(i => matches(i, q)) : visible;
   const chip = (on: boolean) => `inline-flex h-8 items-center rounded-full border px-3 text-[13px] font-medium ${on ? 'border-pc-text bg-pc-text text-pc-base' : 'border-pc-border-strong text-pc-text-secondary'}`;
   return (
     <div className="flex h-full flex-col bg-pc-elevated">
@@ -257,7 +268,7 @@ export function TodoPanel(p: TodoPanelProps) {
           <div className="flex h-[52px] items-center gap-1 pl-4 pr-1">
             <h2 className="min-w-0 flex-1 text-[28px] font-bold tracking-tight">{p.tab === 'todo' ? 'To do' : 'In progress'}</h2>
             <button type="button" onClick={p.onRefresh} className="flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
-              <RefreshCw size={18} className={p.refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={18} className={spinning ? 'animate-spin' : ''} />
             </button>
             <button type="button" onClick={p.onClose} className="flex h-10 items-center gap-0.5 rounded-full px-2 text-[16px] font-medium text-[var(--pc-accent-ink)] active:opacity-60" aria-label="Back to the chat">
               Chat <ChevronRight size={20} />
@@ -266,10 +277,10 @@ export function TodoPanel(p: TodoPanelProps) {
         )}
         <div className="flex items-center gap-2 px-4 pb-2 pt-1">
           <Segmented<TodoTab> value={p.tab} onChange={p.onTab} label="Lists"
-            options={[{ value: 'todo', label: 'To do', count: p.items.length }, { value: 'progress', label: 'In progress', count: p.loops.length }]} />
+            options={[{ value: 'todo', label: 'To do', count: p.items.filter(i => !i.hidden).length }, { value: 'progress', label: 'In progress', count: p.loops.length }]} />
           {!p.onClose && (
             <button type="button" onClick={p.onRefresh} className="press flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
-              <RefreshCw size={16} className={p.refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={spinning ? 'animate-spin' : ''} />
             </button>
           )}
         </div>
@@ -303,8 +314,14 @@ export function TodoPanel(p: TodoPanelProps) {
                   <p className="text-[16px] font-semibold">All clear</p>
                   <p className="mt-1 text-[14px] text-pc-text-muted">Nothing needs you right now.</p>
                 </div>
-              ) : items.length === 0 ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
+              ) : items.length === 0 && q.trim() ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
+              : items.length === 0 ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
               : <TodoList items={items} today={p.today} mode={p.mode} filter={filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} />}
+            {putOff.length > 0 && !q.trim() && (
+              <button type="button" onClick={() => setShowPutOff(v => !v)} className="press flex h-10 w-full items-center gap-2 px-2 text-left text-[14px] text-pc-text-muted" aria-expanded={showPutOff}>
+                <Clock size={16} aria-hidden /> {putOff.length} put off until later · <span className="font-medium text-[var(--pc-accent-ink)]">{showPutOff ? 'Hide' : 'Show'}</span>
+              </button>
+            )}
             {p.items.length > 0 && <p className="px-2 text-[12px] text-pc-text-faint">Swipe a task right to finish it. Say “22 done” in the chat to finish one by number.</p>}
           </div>
         )}

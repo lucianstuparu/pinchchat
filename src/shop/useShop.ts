@@ -39,6 +39,36 @@ async function post<T>(path: string, body: unknown, timeoutMs = 15_000): Promise
   return res.json() as Promise<T>;
 }
 
+/**
+ * The same request with upload progress (XMLHttpRequest reports it, fetch does not), for operations
+ * carrying photos; `ctl.abort` cancels it ("cancelled").
+ */
+function postWithProgress<T>(path: string, body: unknown, onProgress: (sent: number, total: number) => void, ctl: { abort?: () => void }, onSent: () => void, timeoutMs = 120_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', path);
+    x.withCredentials = true;
+    x.timeout = timeoutMs;
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded, e.total); };
+    // Everything is up: the server is already acting on it, so there is nothing left to cancel.
+    x.upload.onload = () => { ctl.abort = undefined; onSent(); };
+    x.onload = () => {
+      if (x.status === 401) { reject(new SignedOut('signed out')); return; }
+      if (x.status < 200 || x.status >= 300) { reject(new Error(`HTTP ${x.status}`)); return; }
+      try { resolve(JSON.parse(x.responseText) as T); } catch { reject(new SignedOut('signed out')); }   // an Access page, not JSON
+    };
+    x.onerror = () => reject(new Error('offline'));
+    x.ontimeout = () => reject(new Error('slow'));
+    x.onabort = () => reject(new Error('cancelled'));
+    ctl.abort = () => x.abort();
+    x.send(JSON.stringify(body));
+  });
+}
+
+/** Photos going up: how many, how far, the first one as a thumbnail. */
+export interface Upload { refs: string[]; thumb: string; sent: number; total: number; done?: boolean }
+
 /** Speech to text through Whisper on the server: the recorded audio in, the text out. */
 export async function transcribeShop(audio: { content: string; mimeType: string }): Promise<string> {
   // Whisper on CT 104 takes ~12 s for a sentence and longer for longer speech (21.7 s seen): wait 3 minutes.
@@ -59,33 +89,53 @@ export function useShop(person: string) {
   const [sync, setSync] = useState<SyncState>('idle');
   const [lastSync, setLastSync] = useState<number | null>(null);
   const busy = useRef(false);
+  const [upload, setUpload] = useState<Upload | null>(null);
+  const uploadCtl = useRef<{ abort?: () => void }>({});
   const queueRef = useRef(queue);
   queueRef.current = queue;
 
   useEffect(() => write(QUEUE_KEY, queue), [queue]);
 
   /** Send what is waiting (or just fetch), then take the server's state. */
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
   const flush = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
     setSync('syncing');
     const sending = queueRef.current;
     try {
-      const r = sending.length > 0
+      const photos = sending.filter((op): op is Extract<Op, { op: 'photo' }> => op.op === 'photo');
+      if (photos.length) setUpload({ refs: photos.map(p => p.ref), thumb: photos[0].data, sent: 0, total: 0 });
+      const r = photos.length
+        ? await postWithProgress<Snapshot & { results: Array<{ error?: string }> }>('/shop/ops', { ops: sending },
+          (sent, total) => setUpload(u => (u ? { ...u, sent, total } : u)), (uploadCtl.current = {}), () => setUpload(u => (u ? { ...u, done: true } : u)))
+        : sending.length > 0
         ? await post<Snapshot & { results: Array<{ error?: string }> }>('/shop/ops', { ops: sending })
         : await post<Snapshot>('/shop/list', {});
       // Changes made while this was in flight stay queued and are re-applied on the new state.
       const rest = queueRef.current.slice(sending.length);
-      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [], pantry: r.pantry ?? [] };
+      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [], pantry: r.pantry ?? [], usual: r.usual ?? [] };
       write(SNAP_KEY, fresh);
       setQueue(rest);
       setSnap(rest.reduce((acc, op) => applyAll(acc, op, person), fresh));
       setSync('idle');
       setLastSync(Date.now());
     } catch (e) {
+      if (e instanceof Error && e.message === 'cancelled') {
+        // Cancelled by the person: the photos and the instruction that carried them are dropped.
+        const refs = new Set(sending.filter(op => op.op === 'photo').map(op => (op as { ref: string }).ref));
+        const keep = (op: Op) => !(op.op === 'photo' && refs.has(op.ref)) && !(op.op === 'ask' && (op.photos ?? []).some(r => refs.has(r)));
+        const rest = queueRef.current.filter(keep);
+        setQueue(rest);
+        setSnap(rest.reduce((acc, op) => applyAll(acc, op, person), read(SNAP_KEY, EMPTY)));
+        setSync('idle');
+        if (rest.length) window.setTimeout(() => void flushRef.current?.(), 50);   // ticks queued with them still go now
+        return;
+      }
       setSync(e instanceof SignedOut ? 'signed-out' : 'offline');
     } finally {
       busy.current = false;
+      setUpload(null);
     }
   }, [person]);
 
@@ -114,5 +164,7 @@ export function useShop(person: string) {
     return () => window.clearTimeout(t);
   }, [working, snap, sync, flush]);
 
-  return { snap, queue, sync, lastSync, apply, refresh: flush };
+  useEffect(() => { flushRef.current = flush; }, [flush]);
+  const cancelUpload = useCallback(() => uploadCtl.current.abort?.(), []);
+  return { snap, queue, sync, lastSync, apply, refresh: flush, upload, cancelUpload };
 }

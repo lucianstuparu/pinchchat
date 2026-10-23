@@ -4,12 +4,15 @@
  * marked "just me"; returns pinned on top while there are any. Works offline (see useShop).
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
+import { SpeechStatus } from '../app/SpeechStatus';
+import { formatBytes, useNow } from '../ui/progress';
+import { ProgressRow } from '../ui/ProgressRow';
 import { useBusy, useDraft } from '../ui/draft';
 import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -59,7 +62,7 @@ export default function ShopApp() {
 function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLook: (l: Look) => void }) {
   const [person, setPerson] = useState<string>(() => { try { return localStorage.getItem('shop:person') || ''; } catch { return ''; } });
   useEffect(() => { void whoami().then(p => { if (p) { setPerson(p); try { localStorage.setItem('shop:person', p); } catch { /* fine */ } } }); }, []);
-  const { snap, queue, sync, apply, refresh } = useShop(person || 'me');
+  const { snap, queue, sync, apply, refresh, upload, cancelUpload } = useShop(person || 'me');
   const stores = snap.stores;
   const [store, setStoreState] = useState<string | null>(readStore);
   const setStore = (s: string | null) => { setStoreState(s); try { if (s) localStorage.setItem(STORE_KEY, s); else localStorage.removeItem(STORE_KEY); } catch { /* fine */ } };
@@ -84,6 +87,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   // ---- what to show
   const open = snap.items.filter(i => i.status === 'open');
   const here = open.filter(i => atStore(i, store, stores));
+  // Phase E: what is usually bought about now; at a shop, that shop's usual things first.
+  const openNow = new Set(snap.items.filter(i => i.status === 'open').flatMap(i => [fold(i.title), i.product ?? '']));
+  const usual = (snap.usual ?? []).filter(u => !openNow.has(fold(u.title)) && !(u.product && openNow.has(u.product))).sort((a, b) => Number(!!store && b.tags.includes(store)) - Number(!!store && a.tags.includes(store)));
   const returns = here.filter(i => i.kind === 'return').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
   const toBuy = here.filter(i => i.kind === 'buy');
   const forThisShop = store ? toBuy.filter(i => storeTagsOf(i, stores).length > 0) : toBuy;
@@ -169,6 +175,30 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           </div>
         ) : (
           <>
+            {usual.length > 0 && (
+              <section className="mx-3 mt-3" aria-label="Usually about now">
+                <h2 className="px-1 pb-1.5 text-[13px] font-semibold text-pc-text-muted">Usually about now</h2>
+                <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+                  {usual.map(u => (
+                    <button key={u.key} type="button" onClick={() => {
+                      const id = newItemId();
+                      apply({ op: 'add', id, title: u.title, product: u.product, tags: store ? [store] : u.tags });
+                      setUndo({ key: Date.now(), label: `Added: ${u.title}`, undo: () => apply({ op: 'drop', id }) });
+                    }}
+                      aria-label={`Add ${u.title} to the list`}
+                      className="press flex h-12 shrink-0 items-center gap-2 rounded-[12px] border border-pc-border bg-pc-elevated pl-3 pr-2 text-left">
+                      <span className="min-w-0">
+                        <span className="block max-w-[160px] truncate text-[14px] font-medium leading-tight">{u.title}</span>
+                        <span className="block text-[12px] leading-tight text-pc-text-muted">
+                          {u.reason === 'favourite' ? (u.since === null ? 'favourite' : `favourite · ${u.since} d ago`) : `every ~${u.every} d · ${u.since} d ago`}
+                        </span>
+                      </span>
+                      <Plus size={18} className="shrink-0 text-[var(--pc-accent-ink)]" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
             {returns.length > 0 && (
               <section className="mx-3 mt-3 overflow-hidden rounded-[12px] bg-pc-surface">
                 <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><Undo2 size={14} /> To return · {returns.length}</h2>
@@ -216,6 +246,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           <button type="button" onClick={() => { apply({ op: 'pantry-add', id: newPantryId(), title: offer.item.title, product: offer.item.product, qty: offer.item.qty, in_days: offer.days }); setOffer(null); }}
             className="h-8 shrink-0 rounded-full bg-pc-accent px-3 text-[13px] font-semibold text-[var(--pc-on-accent)]">Add</button>
           <button type="button" onClick={() => setOffer(null)} className="-m-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full opacity-70" aria-label="No"><X size={15} /></button>
+        </div>
+      )}
+      {search === null && upload && (
+        <div className="shrink-0 px-3 pb-2">
+          <ProgressRow tile={<img src={`data:image/jpeg;base64,${upload.thumb}`} alt="" className="h-full w-full object-cover" />}
+            name={upload.refs.length === 1 ? 'Photo' : `${upload.refs.length} photos`}
+            status={upload.done ? 'Sending…' : upload.total ? `Uploading ${Math.round((upload.sent / upload.total) * 100)}%` : 'Starting upload'}
+            detail={upload.total ? `${formatBytes(upload.sent)} of ${formatBytes(upload.total)}` : undefined}
+            progress={upload.done ? null : upload.total ? upload.sent / upload.total : null} onCancel={upload.done ? undefined : cancelUpload} cancelLabel="Cancel the upload" />
         </div>
       )}
       {search === null && !showPantry && <UndoBar info={undo} onClose={closeUndo} />}
@@ -338,6 +377,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // The last few instructions (within half an hour of the newest), newest last, until dismissed.
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-2);   // the last two answers, so repeated adding does not pile up
+  const now = useNow(recent.some(a => a.status === 'working'));   // ticks once a second while one is working
   const [text, setText] = useDraft('shop', prefill ?? undefined);
   // The mic, the same as oc's (app/speech.tsx): it writes into the box, Live or Whisper; nothing is
   // sent until Send.
@@ -402,8 +442,13 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
               <div className="min-w-0 flex-1 text-[14px] leading-snug">
                 <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
                 <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
-                  {a.status === 'queued' ? 'Waiting for a connection…' : a.status === 'working' ? 'Working on it…' : plainReply(a.reply) || 'Done.'}
+                  {a.status === 'queued' ? 'Waiting for a connection…'
+                    : a.status === 'working' ? `Working on it · ${Math.max(0, Math.floor((now - Date.parse(a.ts)) / 1000))} s`
+                    : plainReply(a.reply) || 'Done.'}
                 </p>
+                {a.status === 'working' && (
+                  <div className="mt-1.5 h-1 overflow-hidden rounded-[2px] bg-[var(--pc-separator)]" aria-hidden><div className="progress-indeterminate h-full w-1/3 rounded-[2px] bg-pc-accent" /></div>
+                )}
               </div>
               {(a.status === 'done' || a.status === 'failed') && (
                 <button type="button" onClick={() => setHidden(h => new Set(h).add(a.id))} className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Dismiss"><X size={14} /></button>
@@ -438,6 +483,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           <p className="self-center pl-1 text-[13px] leading-snug text-pc-text-muted">Add a note if you like, then send.</p>
         </div>
       )}
+      <SpeechStatus speech={speech} />
       {speech.error && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">

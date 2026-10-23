@@ -10,6 +10,11 @@ export interface NowItem {
   n?: number;
   /** What kind of doing it is: Admin, Money, Health, People, Errands (the coloured pills). */
   topics?: string[];
+  /** "every month", when the task comes back after it is done. */
+  repeat?: string;
+  /** Put off until this day ("Remind in 3 days"); hidden from To do until then unless overdue or due today. */
+  snoozed_until?: string;
+  hidden?: boolean;
   title: string;
   kind: string;
   store: 'admin' | 'tasks' | 'loops' | 'shopping' | 'pantry';
@@ -73,7 +78,7 @@ export const fetchLoops = () => post<{ today: string; loops: Loop[] }>('/reg/loo
 export const fetchSheet = (item: string) => post<Sheet>('/reg/item', { item });
 export const fetchStates = (items: string[]) => post<{ items: Record<string, Partial<NowItem>>; today: string }>('/reg/status', { items });
 export const act = (item: string, action: ItemAction, extra: Record<string, unknown> = {}) =>
-  post<{ ok: boolean; status: string; remind_on?: string; priority?: string; title: string; task?: { id: string } }>('/reg/act', { item, action, ...extra });
+  post<{ ok: boolean; status: string; remind_on?: string; priority?: string; title: string; task?: { id: string }; next_due?: string }>('/reg/act', { item, action, ...extra });
 
 /** Who is signed in ('' when unknown: no Access identity, LAN, or local dev). */
 export async function whoami(): Promise<string> {

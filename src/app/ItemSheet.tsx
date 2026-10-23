@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useDelayedFlag } from '../ui/progress';
 import { useBusy } from '../ui/draft';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
@@ -22,6 +23,16 @@ interface Props {
   footer?: ReactNode;
 }
 
+/** The repeat as words, from the stored {n, unit, weekday} or a label. */
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function repeatText(r: unknown): string {
+  if (!r) return '';
+  if (typeof r === 'string') return r;
+  const { n = 1, unit, weekday } = r as { n?: number; unit?: string; weekday?: number };
+  if (weekday != null) return `every ${DAYS[weekday]}`;
+  return n === 1 ? `every ${unit}` : `every ${n} ${unit}s`;
+}
+
 const CLOSED = ['paid', 'done', 'cancelled', 'closed'];
 const KIND: Record<string, { icon: typeof Receipt; label: string }> = {
   bill: { icon: Receipt, label: 'Bill' }, deadline: { icon: CalendarClock, label: 'Deadline' }, subscription: { icon: Repeat, label: 'Subscription' },
@@ -36,8 +47,9 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Editing (oc-app-design.md §4): the title, the due date and the topics.
-  const [edit, setEdit] = useState<{ title: string; due: string; topics: string[] } | null>(null);
-  useBusy('item-edit', edit !== null);   // an update never reloads over unsaved edits
+  const [edit, setEdit] = useState<{ title: string; due: string; topics: string[]; repeat: string } | null>(null);
+  useBusy('item-edit', edit !== null);
+  const saving = useDelayedFlag(busy && edit !== null);   // an update never reloads over unsaved edits
 
   const load = () => fetchSheet(id).then(s => { setSheet(s); setError(null); }).catch(e => setError(e.message));
   useEffect(() => { void load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -57,13 +69,14 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const num = (k: string) => (it && typeof it[k] === 'number' ? (it[k] as number) : undefined);
   const isTopic = kind === 'loop';
   const topics = Array.isArray(it?.topics) ? (it.topics as string[]) : [];
-  const startEdit = () => it && setEdit({ title: it.title, due: str('due_date') ?? '', topics });
+  const startEdit = () => it && setEdit({ title: it.title, due: str('due_date') ?? '', topics, repeat: repeatText(it.repeat) });
   const saveEdit = async () => {
     if (!edit || !it) return;
     const extra: Record<string, unknown> = {};
     if (edit.title.trim() !== it.title) extra.title = edit.title.trim();
     if (edit.due !== (str('due_date') ?? '')) extra.due_date = edit.due;
     if (edit.topics.join(',') !== topics.join(',')) extra.topics = edit.topics;
+    if (edit.repeat !== repeatText(it.repeat)) extra.repeat = edit.repeat;
     if (Object.keys(extra).length) await run('edit', extra);
     setEdit(null);
   };
@@ -71,6 +84,8 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const rows: Array<[string, string]> = it ? ([
     ['Amount', num('amount') != null ? formatAmount(num('amount'), str('currency')) : ''],
     ['Due', str('due_date') ? formatDay(str('due_date')!) : ''],
+    ['Repeats', repeatText(it.repeat)],
+    ['Put off until', str('snoozed_until') && !closed ? formatDay(str('snoozed_until')!) : ''],
     ['Scheduled', str('scheduled')?.replace('T', ' ') ?? ''],
     ['Reminder', str('remind_on') && !closed ? formatDay(str('remind_on')!) : ''],
     ['To', str('payee') ?? ''],
@@ -109,6 +124,16 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                           {edit.due && <button type="button" onClick={() => setEdit({ ...edit, due: '' })} className="text-[13px] text-[var(--pc-accent-ink)]">No date</button>}
                         </span>
                       </label>
+                      {it.store === 'tasks' && (
+                        <label className="flex items-center justify-between gap-3 rounded-[12px] bg-pc-surface px-3 py-1 text-[15px]">
+                          <span className="text-pc-text-muted">Repeats</span>
+                          <select value={edit.repeat} onChange={e => setEdit({ ...edit, repeat: e.target.value })} className="h-10 bg-transparent text-right outline-none">
+                            {[...new Set(['', 'every day', 'every week', 'every 2 weeks', 'every month', 'every 3 months', 'every year', edit.repeat])].map(o => (
+                              <option key={o} value={o}>{o || 'Never'}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Topics">
                         {Object.entries(TOPIC_COLORS).map(([t, c]) => {
                           const on = edit.topics.includes(t);
@@ -124,7 +149,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   )}
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setEdit(null)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px] font-medium">Cancel</button>
-                    <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void saveEdit()} className="press h-12 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">Save</button>
+                    <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void saveEdit()} className="press h-12 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
                   </div>
                 </div>
               ) : (

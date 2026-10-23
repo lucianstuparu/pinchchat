@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
 import { ArrowUp, AudioLines, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
@@ -165,6 +166,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           ))}
         </div>
       )}
+      <SpeechStatus speech={speech} />
       {shownError && <p className="mx-3 mb-1 text-[13px] text-red-500" role="alert">{shownError}</p>}
 
       <input ref={fileRef} type="file" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />

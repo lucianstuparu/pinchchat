@@ -28,7 +28,10 @@ export interface Product {
   stats?: { times: number; last_date: string; last_store?: string; last_price?: number; currency?: string };
 }
 export interface Purchase { id: string; title: string; product?: string; qty?: string; price?: number; currency?: string; store?: string; date: string; by?: string; source?: string; receipt?: string }
-export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[] }
+/** "Usually about now" (Phase E): bought regularly and due again, or a favourite not bought for a month. */
+export interface Usual { key: string; title: string; product?: string; tags: string[]; every: number | null; last: string | null; since: number | null; reason: 'usual' | 'favourite' }
+
+export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[]; usual?: Usual[] }
 
 export type Op =
   | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string }

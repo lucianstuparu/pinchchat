@@ -3,6 +3,7 @@
  * "Thrown away" close an entry; a tap changes the date, the place or the quantity. The field at the
  * bottom tells the assistant ("the chicken expires Friday", "finished the kefir"), offline queued.
  */
+import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2 } from 'lucide-react';
@@ -103,6 +104,7 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
           </p>
         )}
         {footer}
+        <SpeechStatus speech={speech} />
         {speech.error && <p className="mx-4 mb-1 shrink-0 text-[13px] text-red-500" role="alert">{speech.error}</p>}
         <form onSubmit={ev => { ev.preventDefault(); ask(); }} className="flex shrink-0 items-end gap-2 border-t border-pc-border px-2 pb-2 pt-2">
           <div className={`flex min-w-0 flex-1 items-end rounded-[20px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
