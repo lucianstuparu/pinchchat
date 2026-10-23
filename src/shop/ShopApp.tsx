@@ -4,10 +4,11 @@
  * marked "just me"; returns pinned on top while there are any. Works offline (see useShop).
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
+import { UndoBar, type UndoInfo } from '../app/UndoBar';
 import { MicButton } from '../app/MicButton';
 import { speechPlaceholder, useSpeech } from '../app/speech';
 import { transcribeShop } from './useShop';
@@ -92,8 +93,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const foundProducts = q.length >= 1 ? products.filter(p => fold([p.name, p.brand, ...(p.aliases ?? [])].join(' ')).includes(q)) : [];
   const pantry = snap.pantry ?? [];
   const soon = pantry.filter(e => e.status === 'open' && e.due_date && daysUntil(e.due_date, snap.today || new Date().toISOString().slice(0, 10)) <= 2).length;
+  // Undo (the bar at the bottom): a tick or a removal is reopened with untick, offline too.
+  const [undo, setUndo] = useState<UndoInfo | null>(null);
+  const closeUndo = useCallback(() => setUndo(null), []);
+  const offerUndo = (i: Item, label: string) => setUndo({ key: Date.now(), label: `${label}: ${i.title}`, undo: () => apply({ op: 'untick', id: i.id }) });
   const tick = (i: Item) => {
     apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
+    if (i.status === 'open') offerUndo(i, i.kind === 'return' ? 'Returned' : 'Bought');
     if (i.status === 'open' && i.kind === 'buy' && i.shelf) setOffer({ item: i, days: i.shelf });
   };
   useEffect(() => {
@@ -235,8 +241,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 
       {editing && (() => {
         const item = snap.items.find(i => i.id === editing);
-        return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={apply} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
+        return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={op => { apply(op); if (op.op === 'drop') offerUndo(item, 'Removed'); }} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
       })()}
+      <UndoBar info={undo} onClose={closeUndo} bottom={editing ? 'calc(env(safe-area-inset-bottom) + 20px)' : 'calc(env(safe-area-inset-bottom) + 120px)'} />
       {showPantry && (
         <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onOp={op => apply(op)} onClose={() => setShowPantry(false)}
           onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}

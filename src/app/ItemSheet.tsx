@@ -14,6 +14,8 @@ interface Props {
   onChanged: () => void;
   /** Put text into the composer (ask about it, continue, schedule). */
   onAsk: (text: string, send?: boolean) => void;
+  /** After a change: the parent offers Undo. */
+  onActed?: (id: string, action: ItemAction, title: string) => void;
 }
 
 const CLOSED = ['paid', 'done', 'cancelled', 'closed'];
@@ -25,7 +27,7 @@ const KIND: Record<string, { icon: typeof Receipt; label: string }> = {
 const STATUS: Record<string, string> = { todo: 'To do', open: 'Open', next: 'Next', waiting: 'Waiting', paid: 'Paid', done: 'Done', cancelled: 'Not needed', closed: 'Finished' };
 const PRIORITY = [['P1', 'Urgent'], ['P2', 'High'], ['P3', 'Normal'], ['P4', 'Low']] as const;
 
-export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
+export function ItemSheet({ id, onClose, onChanged, onAsk, onActed }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,7 +39,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
 
   const run = async (action: ItemAction, extra?: Record<string, unknown>) => {
     setBusy(true);
-    try { await act(id, action, extra); await load(); onChanged(); }
+    try { await act(id, action, extra); await load(); onChanged(); if (sheet) onActed?.(id, action, sheet.item.title); }
     catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
     finally { setBusy(false); }
   };

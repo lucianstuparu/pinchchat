@@ -48,7 +48,7 @@ export interface Sheet {
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
 }
 
-export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'to-task' | 'loop-close';
+export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close';
 
 export class SessionExpired extends Error {}
 

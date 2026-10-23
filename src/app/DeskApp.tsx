@@ -30,10 +30,11 @@ import { clearShareParam, pendingShareId, takeSharedContent } from '../share/sha
 import { searchMessages, snippet } from '../mobile/searchMessages';
 import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
-import { groupTodo, matches, railOf } from './todoRules';
+import { groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { SettingsSheet } from './SettingsSheet';
+import { UndoBar, type UndoInfo } from './UndoBar';
 import { useNotice } from './notice';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
@@ -126,16 +127,26 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     return () => { document.removeEventListener('visibilitychange', onVisible); window.clearInterval(t); };
   }, [refresh]);
 
+  // Undo (the bar at the bottom): the server keeps each item's previous state and puts it back.
+  const [undo, setUndo] = useState<UndoInfo | null>(null);
+  const closeUndo = useCallback(() => setUndo(null), []);
+  const offerUndo = (id: string, label: string) => setUndo({
+    key: Date.now(), label,
+    undo: () => { void act(id, 'undo').catch(e => setHint(e instanceof Error ? e.message : 'Could not undo')).finally(() => void refresh()); },
+  });
+  const short = (i: { n?: number; title: string }) => `${i.n != null ? `${i.n} · ` : ''}${plainTitle(i.title)}`;
   const doAct = async (item: NowItem, action: 'done' | 'snooze') => {
     setNow(n => ({ ...n, items: n.items.filter(i => i.id !== item.id) }));   // optimistic
-    try { await act(item.id, action); } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    try { await act(item.id, action); offerUndo(item.id, `${action === 'done' ? (item.kind === 'bill' ? 'Paid' : 'Done') : 'Reminder in 3 days'}: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
   // ★ = priority (P1); taking the star off makes it normal (P3).
   const star = async (item: NowItem) => {
     const priority = item.priority === 'P1' ? 'P3' : 'P1';
     setNow(n => ({ ...n, items: n.items.map(i => (i.id === item.id ? { ...i, priority } : i)) }));
-    try { await act(item.id, 'priority', { priority }); } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    try { await act(item.id, 'priority', { priority }); offerUndo(item.id, `${priority === 'P1' ? 'Priority' : 'No longer a priority'}: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
 
@@ -522,7 +533,12 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         {panel(() => setTodoOpen(false))}
       </div>
 
-      {sheet && <ItemSheet id={sheet} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }} />}
+      {sheet && <ItemSheet id={sheet} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
+        onActed={(id, action, title) => {
+          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
+          if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
+        }} />}
+      <UndoBar info={undo} onClose={closeUndo} bottom={todoOpen || sheet ? 'calc(env(safe-area-inset-bottom) + 20px)' : 'calc(env(safe-area-inset-bottom) + 150px)'} />
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />

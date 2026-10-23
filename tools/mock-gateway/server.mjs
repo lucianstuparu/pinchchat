@@ -321,6 +321,8 @@ const server = http.createServer((req, res) => {
       if (url.pathname === '/reg/act') {
         const it = regItems[p.item];
         if (!it) { res.statusCode = 404; res.end(JSON.stringify({ error: 'not in your registers' })); return; }
+        if (p.action === 'undo') { if (!it._prev) { res.statusCode = 400; res.end(JSON.stringify({ error: 'nothing to undo on this item' })); return; } const prev = it._prev; const now = { ...it }; delete now._prev; for (const k of Object.keys(it)) delete it[k]; Object.assign(it, prev, { _prev: now }); res.end(JSON.stringify({ ok: true, action: 'undo', title: it.title, status: it.status })); return; }
+        it._prev = { ...it }; delete it._prev._prev;
         if (p.action === 'done') it.status = it.kind === 'bill' ? 'paid' : 'done';
         if (p.action === 'drop') it.status = 'cancelled';
         if (p.action === 'reopen') it.status = 'open';
