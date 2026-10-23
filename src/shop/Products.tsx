@@ -47,9 +47,11 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd }: { p: Product;
 }
 
 /** All products, searchable. */
-export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd }: {
+export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onInventory }: {
   products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string;
   person: string; onList: (id: string) => boolean; onAdd: (p: Product) => void;
+  /** The catalogue is not what is at home: a way across to the Inventory. */
+  onInventory: () => void;
 }) {
   const [q, setQ] = useState('');
   const likedByMe = (p: Product) => (p.fav_by ?? []).includes(person);
@@ -66,7 +68,11 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
       <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
         <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
         <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-2">
-          <h2 className="text-[22px] font-bold">Products</h2>
+          <div>
+            <h2 className="text-[22px] font-bold leading-tight">Products</h2>
+            <p className="text-[13px] text-pc-text-muted">The catalogue: labels you photographed.{' '}
+              <button type="button" onClick={onInventory} className="font-medium text-[var(--pc-accent-ink)]">What is at home: Inventory ›</button></p>
+          </div>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
         </div>
         <div className="mx-4 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">

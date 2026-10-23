@@ -148,11 +148,11 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               {sync === 'offline' || sync === 'signed-out'
                 ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
                 : null}
-              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `At home: ${soon} expiring soon` : 'At home'}>
+              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `Inventory: ${soon} expiring soon` : 'Inventory (what is at home)'}>
                 <Refrigerator size={21} />
                 {soon > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{soon}</span>}
               </button>
-              <button type="button" onClick={() => setShowProducts(true)} className={iconBtn} aria-label="Products"><Package size={21} /></button>
+              <button type="button" onClick={() => setShowProducts(true)} className={iconBtn} aria-label="Products (the catalogue)"><Package size={21} /></button>
               <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
               <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
                 {person ? person[0].toUpperCase() : '⋯'}
@@ -250,6 +250,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
       )}
       {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName}
+        onInventory={() => { setShowProducts(false); setShowPantry(true); }}
         person={person || 'me'} onList={id => open.some(i => i.product === id)}
         onAdd={p => apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] })} />}
       {productId && (() => {

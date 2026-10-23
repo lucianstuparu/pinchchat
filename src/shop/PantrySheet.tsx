@@ -24,14 +24,14 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk }: {
   const entry = editing ? pantry.find(e => e.id === editing) : undefined;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Pantry">
+    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Inventory">
       <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
       <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
         <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
         <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-2">
           <div>
-            <h2 className="text-[22px] font-bold leading-tight">At home</h2>
-            <p className="text-[13px] text-pc-text-muted">{open.length === 0 ? 'Nothing noted' : `${open.length} thing${open.length === 1 ? '' : 's'}, soonest to expire first`}</p>
+            <h2 className="text-[22px] font-bold leading-tight">Inventory</h2>
+            <p className="text-[13px] text-pc-text-muted">What is at home{open.length === 0 ? '' : ` · ${open.length} thing${open.length === 1 ? '' : 's'}, soonest to expire first`}</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
         </div>
@@ -40,7 +40,7 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk }: {
           {open.length === 0 && (
             <div className="px-10 py-12 text-center">
               <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.18)] text-[var(--pc-accent-ink)]"><Refrigerator size={26} /></span>
-              <p className="text-[17px] font-semibold">Nothing in the pantry yet</p>
+              <p className="text-[17px] font-semibold">Nothing in the inventory yet</p>
               <p className="mt-1 text-[15px] text-pc-text-muted">Tick a fresh item as bought and add it from there, or say “the chicken expires Friday” below. You get a reminder a week and a day before.</p>
             </div>
           )}
