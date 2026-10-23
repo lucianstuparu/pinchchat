@@ -301,29 +301,29 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     setDrag(null);
   };
   // Back on the phone (the edge swipe: the system owns both edges, so the app cannot) toggles To do:
-  // from the chat it opens To do, from To do it goes back to the chat. History: base ← chat ← todo.
-  // The chat step is added on the first tap, because Chrome skips history entries added before the
-  // person has touched the page.
-  const phone = () => window.matchMedia('(max-width: 767px)').matches;
+  // each Back opens it from the chat or closes it. Chrome skips history entries added without a
+  // touch (a Back is not one), so the steps are added only on a tap: every tap tops the stack up to
+  // BACK_STEPS entries above the page, and a Back just toggles, adding nothing.
+  const todoOpenRef = useRef(todoOpen);
+  useEffect(() => { todoOpenRef.current = todoOpen; }, [todoOpen]);
   useEffect(() => {
-    const arm = () => { if (phone() && !(history.state as { oc?: string } | null)?.oc) { history.replaceState({ oc: 'base' }, ''); history.pushState({ oc: 'chat' }, ''); } };
-    window.addEventListener('pointerdown', arm, { once: true });
-    return () => window.removeEventListener('pointerdown', arm);
-  }, []);
-  useEffect(() => {
-    const onPop = () => {
-      const at = (history.state as { oc?: string } | null)?.oc;
-      if (at === 'base' && phone()) { history.pushState({ oc: 'chat' }, ''); setTab('todo'); setTodoOpen(true); }
-      else if (at !== 'todo') setTodoOpen(false);
+    const BACK_STEPS = 20;
+    const phone = () => window.matchMedia('(max-width: 767px)').matches;
+    const topUp = () => {
+      if (!phone()) return;
+      const st = history.state as { oc?: string; i?: number } | null;
+      let i = st?.oc === 'oc' && typeof st.i === 'number' ? st.i : (history.replaceState({ oc: 'oc', i: 0 }, ''), 0);
+      while (i < BACK_STEPS) history.pushState({ oc: 'oc', i: ++i }, '');
     };
+    const onPop = () => {
+      if (!phone()) return;
+      if (!todoOpenRef.current) setTab('todo');
+      setTodoOpen(!todoOpenRef.current);
+    };
+    window.addEventListener('pointerdown', topUp);
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    return () => { window.removeEventListener('pointerdown', topUp); window.removeEventListener('popstate', onPop); };
   }, []);
-  useEffect(() => {
-    if (!todoOpen) return;
-    if ((history.state as { oc?: string } | null)?.oc !== 'todo') history.pushState({ oc: 'todo' }, '');
-    return () => { if ((history.state as { oc?: string } | null)?.oc === 'todo') history.back(); };
-  }, [todoOpen]);
 
   const panel = (onClose?: () => void) => (
     <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} loops={loops} today={now.today}
