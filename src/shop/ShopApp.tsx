@@ -354,20 +354,21 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const [photoMenu, setPhotoMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const hints = suggest(text, known, items);
-  /** Photos (a label, a shelf, a receipt) go to the assistant with whatever is in the field. */
-  const sendPhotos = async (files: FileList | null) => {
+  // Photos (a label, a shelf, a receipt) wait above the box until Send, so a note can go with them:
+  // typed or said, "is this one healthy?", "add this, 2 of them", "the receipt from Lidl".
+  const [staged, setStaged] = useState<Array<{ ref: string; data: string }>>([]);
+  const stagePhotos = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setBusy(true);
-    const refs: string[] = [];
+    const added: Array<{ ref: string; data: string }> = [];
     for (const f of Array.from(files).slice(0, 6)) {
-      try { const ref = newPhotoRef(); onAdd({ op: 'photo', ref, data: await shrinkPhoto(f) }); refs.push(ref); } catch { /* unreadable image: skipped */ }
+      try { added.push({ ref: newPhotoRef(), data: await shrinkPhoto(f) }); } catch { /* unreadable image: skipped */ }
     }
     setBusy(false);
     if (camera.current) camera.current.value = '';
     if (gallery.current) gallery.current.value = '';
-    if (refs.length === 0) return;
-    onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined, photos: refs });
-    setText('');
+    setStaged(prev => [...prev, ...added].slice(0, 6));
+    input.current?.focus();
   };
   const tagsFor = (own: string[]) => (own.some(t => stores.some(s => s.tag === t)) || !store ? own : [...own, store]);
 
@@ -376,6 +377,10 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     speech.cancel();
     if (picked) {
       onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
+    } else if (staged.length > 0) {
+      for (const ph of staged) onAdd({ op: 'photo', ref: ph.ref, data: ph.data });
+      onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined, photos: staged.map(ph => ph.ref) });
+      setStaged([]);
     } else {
       if (!text.trim()) return;
       onAdd({ op: 'ask', id: newAskId(), text: text.trim(), store: store ?? undefined });
@@ -419,19 +424,33 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
-      <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void sendPhotos(e.target.files)} />
-      <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
+      <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void stagePhotos(e.target.files)} />
+      <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
+      {staged.length > 0 && (
+        <div className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1.5" aria-label="Photos to send">
+          {staged.map(ph => (
+            <div key={ph.ref} className="relative shrink-0">
+              <img src={`data:image/jpeg;base64,${ph.data}`} alt="Photo to send" className="h-16 w-16 rounded-[12px] object-cover" />
+              <button type="button" onClick={() => setStaged(prev => prev.filter(x => x.ref !== ph.ref))}
+                className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-pc-text text-pc-base shadow" aria-label="Remove photo">
+                <X size={13} strokeWidth={3} />
+              </button>
+            </div>
+          ))}
+          <p className="self-center pl-1 text-[13px] leading-snug text-pc-text-muted">Add a note if you like, then send.</p>
+        </div>
+      )}
       {speech.error && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
-            className="mb-[6px] flex h-11 w-11 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
-            <Camera size={21} />
+            className="mb-[4px] flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+            <Camera size={26} />
           </button>
           {photoMenu && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
-              <div className="absolute bottom-12 left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+              <div className="absolute bottom-[60px] left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                   <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
@@ -449,14 +468,14 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
             readOnly={speech.state === 'writing'}
-            placeholder={speechPlaceholder(speech, 'Say or type: add, change, remove…')} aria-label="Instruction for the assistant"
+            placeholder={speechPlaceholder(speech, staged.length ? 'What about the photo? (optional)' : 'Say or type: add, change, remove…')} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
           {text && !speech.listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
               <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
             </button>
           )}
-          {text.trim() && (
+          {(text.trim() || staged.length > 0) && (
             <button type="submit" className="mb-[6px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95" aria-label="Send">
               <ArrowUp size={19} strokeWidth={2.5} />
             </button>
