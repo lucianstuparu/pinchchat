@@ -1,4 +1,4 @@
-import { Loader2, Mic, Square } from 'lucide-react';
+import { ArrowUp, Loader2, Mic, Square, X } from 'lucide-react';
 import type { Speech } from './speech';
 
 /** The big round mic of both apps (see speech.ts). */
@@ -17,5 +17,40 @@ export function MicButton({ speech, size = 56 }: { speech: Speech; size?: number
         : s.state === 'writing' || s.state === 'starting' ? <Loader2 size={size * 0.44} className="animate-spin" />
         : <Mic size={size * 0.48} strokeWidth={2.2} />}
     </button>
+  );
+}
+
+/**
+ * The one big button of an input bar (oc and Shopping, after ChatGPT's and WhatsApp's bars): the mic
+ * while the box is empty, Send once there is something to send, Stop while listening.
+ */
+export function PrimaryButton({ speech, canSend, onSend, size = 56 }: { speech: Speech; canSend: boolean; onSend: () => void; size?: number }) {
+  const busy = speech.listening || speech.state === 'writing' || speech.state === 'starting';
+  if (busy || !canSend) return <MicButton speech={speech} size={size} />;
+  return (
+    <button type="button" onClick={onSend} aria-label="Send" style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow-[0_4px_14px_rgba(0,0,0,0.18)] transition-transform active:scale-95">
+      <ArrowUp size={size * 0.46} strokeWidth={2.6} />
+    </button>
+  );
+}
+
+/**
+ * Inside the text box, at its right edge, once there is text: Clear at the top and a mic at the bottom
+ * to say more (the big button is Send by then). Both are full-size touch targets (40 px).
+ */
+export function FieldControls({ speech, hasText, onClear }: { speech: Speech; hasText: boolean; onClear: () => void }) {
+  if (!hasText || speech.listening || speech.state === 'writing') return null;
+  return (
+    <div className="flex shrink-0 flex-col items-center justify-between self-stretch py-1">
+      <button type="button" onClick={onClear} className="flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Clear">
+        <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={14} strokeWidth={3} /></span>
+      </button>
+      {speech.available && (
+        <button type="button" onClick={speech.toggle} className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--pc-accent-ink)] active:bg-[var(--pc-hover-strong)]" aria-label={`Say more (${speech.engine})`}>
+          <Mic size={22} strokeWidth={2.2} />
+        </button>
+      )}
+    </div>
   );
 }

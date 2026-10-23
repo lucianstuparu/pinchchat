@@ -7,14 +7,17 @@ import { useState } from 'react';
 import { ArrowUp, Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2, X } from 'lucide-react';
 import { WHERE, expiryLabel, groupOf, whereIcon, type PantryEntry, type PantryGroup, type PantryOp, type Where } from './pantry';
 import { plainReply, type Ask } from './logic';
+import { HomeTabs } from './Products';
 
 const GROUPS: Array<[PantryGroup, string, string]> = [
   ['expired', 'Expired', 'text-red-500'], ['week', 'This week', 'text-[var(--pc-accent-ink)]'],
   ['later', 'Later', 'text-pc-text-muted'], ['nodate', 'No date', 'text-pc-text-muted'],
 ];
 
-export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk }: {
+export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onProducts, productCount }: {
   pantry: PantryEntry[]; today: string; onOp: (op: PantryOp) => void; onAsk: (text: string) => void; onClose: () => void; lastAsk?: Ask;
+  /** The other tab of the same screen: the catalogue. */
+  onProducts: () => void; productCount: number;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
@@ -24,17 +27,15 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk }: {
   const entry = editing ? pantry.find(e => e.id === editing) : undefined;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Inventory">
+    <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="At home and products">
       <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
       <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
         <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
-        <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-2">
-          <div>
-            <h2 className="text-[22px] font-bold leading-tight">Inventory</h2>
-            <p className="text-[13px] text-pc-text-muted">What is at home{open.length === 0 ? '' : ` · ${open.length} thing${open.length === 1 ? '' : 's'}, soonest to expire first`}</p>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+        <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
+          <HomeTabs tab="home" onTab={t => { if (t === 'products') onProducts(); }} homeCount={open.length} productCount={productCount} />
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
         </div>
+        <p className="shrink-0 px-4 pb-1 text-[13px] text-pc-text-muted">What is at home{open.length === 0 ? '' : ', soonest to expire first'}</p>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {open.length === 0 && (

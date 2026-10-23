@@ -5,11 +5,11 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
-import { MicButton } from '../app/MicButton';
+import { FieldControls, PrimaryButton } from '../app/MicButton';
 import { speechPlaceholder, useSpeech } from '../app/speech';
 import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
@@ -148,11 +148,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               {sync === 'offline' || sync === 'signed-out'
                 ? <button type="button" onClick={() => sync === 'signed-out' ? window.location.reload() : void refresh()} className={iconBtn} aria-label="Try again"><RefreshCw size={19} /></button>
                 : null}
-              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `Inventory: ${soon} expiring soon` : 'Inventory (what is at home)'}>
+              <button type="button" onClick={() => setShowPantry(true)} className={`relative ${iconBtn}`} aria-label={soon ? `At home and products: ${soon} expiring soon` : 'At home and products'}>
                 <Refrigerator size={21} />
                 {soon > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{soon}</span>}
               </button>
-              <button type="button" onClick={() => setShowProducts(true)} className={iconBtn} aria-label="Products (the catalogue)"><Package size={21} /></button>
               <button type="button" onClick={() => setSearch('')} className={iconBtn} aria-label="Search"><Search size={21} /></button>
               <button type="button" onClick={() => setSettings(true)} className="ml-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] active:opacity-80" aria-label="Settings">
                 {person ? person[0].toUpperCase() : '⋯'}
@@ -246,11 +245,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       <UndoBar info={undo} onClose={closeUndo} bottom={editing ? 'calc(env(safe-area-inset-bottom) + 20px)' : 'calc(env(safe-area-inset-bottom) + 120px)'} />
       {showPantry && (
         <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onOp={op => apply(op)} onClose={() => setShowPantry(false)}
+          onProducts={() => { setShowPantry(false); setShowProducts(true); }} productCount={products.length}
           onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}
           lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
       )}
       {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName}
-        onInventory={() => { setShowProducts(false); setShowPantry(true); }}
+        onInventory={() => { setShowProducts(false); setShowPantry(true); }} homeCount={pantry.filter(e => e.status === 'open').length}
+        atHome={id => { const e = pantry.find(x => x.status === 'open' && x.product === id); return e ? (e.qty ? `×${e.qty}` : 'some') : undefined; }}
         person={person || 'me'} onList={id => open.some(i => i.product === id)}
         onAdd={p => apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] })} />}
       {productId && (() => {
@@ -342,7 +343,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   // The last few instructions (within half an hour of the newest), newest last, until dismissed.
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
-  const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-3);
+  const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-2);   // the last two answers, so repeated adding does not pile up
   const [text, setText] = useState(prefill ?? '');
   // The mic, the same as oc's (app/speech.tsx): it writes into the box, Live or Whisper; nothing is
   // sent until Send.
@@ -445,13 +446,13 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
-            className="mb-[4px] flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
-            <Camera size={26} />
+            className="mb-[4px] flex h-[48px] w-[48px] items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary active:scale-95 disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
+            <Camera size={24} />
           </button>
           {photoMenu && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
-              <div className="absolute bottom-[60px] left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+              <div className="absolute bottom-[58px] left-0 z-30 w-56 overflow-hidden rounded-2xl border border-pc-border bg-pc-elevated shadow-xl" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                   <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
@@ -471,18 +472,9 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             readOnly={speech.state === 'writing'}
             placeholder={speechPlaceholder(speech, staged.length ? 'What about the photo? (optional)' : 'Say or type: add, change, remove…')} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
-          {text && !speech.listening && (
-            <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
-              <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
-            </button>
-          )}
-          {(text.trim() || staged.length > 0) && (
-            <button type="submit" className="mb-[6px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95" aria-label="Send">
-              <ArrowUp size={19} strokeWidth={2.5} />
-            </button>
-          )}
+          <FieldControls speech={speech} hasText={!!text.trim()} onClear={() => { speech.cancel(); setText(''); input.current?.focus(); }} />
         </div>
-        <div className="mb-[2px] shrink-0"><MicButton speech={speech} size={60} /></div>
+        <div className="mb-[2px] shrink-0"><PrimaryButton speech={speech} canSend={!!text.trim() || staged.length > 0} onSend={() => add()} size={56} /></div>
       </form>
     </div>
   );

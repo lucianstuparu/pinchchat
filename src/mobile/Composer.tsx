@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, AudioLines, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
-import { MicButton } from '../app/MicButton';
+import { FieldControls, PrimaryButton } from '../app/MicButton';
 import { speechPlaceholder, useSpeech } from '../app/speech';
 import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
@@ -228,20 +228,16 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
               className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] text-pc-text shadow-none placeholder:text-pc-text-muted outline-none focus:outline-none focus-visible:outline-none"
               aria-label="Message"
             />
-            {text.length > 0 && !speech.listening && (
-              <button type="button" onClick={clear} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
-                <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
-              </button>
-            )}
-            {canSend && voice && (
-              <button type="button" onClick={send} className="mb-[6px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] transition-transform active:scale-95" aria-label="Send">
-                <ArrowUp size={19} strokeWidth={2.5} />
-              </button>
-            )}
+            {voice ? <FieldControls speech={speech} hasText={text.length > 0} onClear={clear} />
+              : text.length > 0 && (
+                <button type="button" onClick={clear} className="mb-[8px] flex h-10 w-10 shrink-0 items-center justify-center" aria-label="Clear">
+                  <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={14} strokeWidth={3} /></span>
+                </button>
+              )}
           </div>
         )}
 
-        {voice && vm === 'idle' ? <MicButton speech={speech} size={56} />
+        {voice && vm === 'idle' ? <div className="shrink-0"><PrimaryButton speech={speech} canSend={canSend} onSend={send} size={56} /></div>
           : !voice && (
             <button type="button" onClick={send} disabled={!canSend} className={`${round} mb-[6px] bg-pc-accent text-[var(--pc-on-accent)] disabled:opacity-40`} aria-label="Send">
               <ArrowUp size={21} strokeWidth={2.5} />

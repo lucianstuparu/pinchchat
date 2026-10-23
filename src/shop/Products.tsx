@@ -27,7 +27,22 @@ function Thumb({ p, size = 48 }: { p: Product; size?: number }) {
     : <span className="flex shrink-0 items-center justify-center rounded-xl bg-pc-surface text-pc-text-faint" style={{ width: size, height: size }}><Package size={size / 2.4} /></span>;
 }
 
-export function ProductRow({ p, onOpen, storeName, liked, onAdd }: { p: Product; onOpen: (id: string) => void; storeName: (t: string) => string; liked?: boolean; onAdd?: () => void }) {
+
+/** One screen, two tabs (2026-10-23): what is at home, and the catalogue of products. */
+export function HomeTabs({ tab, onTab, homeCount, productCount }: { tab: 'home' | 'products'; onTab: (t: 'home' | 'products') => void; homeCount: number; productCount: number }) {
+  return (
+    <div className="grid flex-1 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
+      {([['home', 'At home', homeCount], ['products', 'Products', productCount]] as const).map(([k, label, n]) => (
+        <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => onTab(k)}
+          className={`h-9 rounded-[8px] text-[15px] font-medium ${tab === k ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
+          {label}{n > 0 ? <span className="ml-1 text-pc-text-muted">{n}</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function ProductRow({ p, onOpen, storeName, liked, onAdd, atHome }: { p: Product; onOpen: (id: string) => void; storeName: (t: string) => string; liked?: boolean; onAdd?: () => void; atHome?: string }) {
   return (
     <div className="flex items-center pr-3">
     <button type="button" onClick={() => onOpen(p.id)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
@@ -36,6 +51,7 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd }: { p: Product;
         <span className="flex items-center gap-1.5"><span className="truncate text-[16px] leading-snug">{p.name}</span>{liked && <Heart size={13} className="shrink-0 fill-red-500 text-red-500" aria-label="favourite" />}</span>
         <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-pc-text-muted">
           <NovaBadge nova={p.health?.nova} small />
+          {atHome && <span className="shrink-0 rounded-[6px] bg-[rgba(var(--pc-accent-rgb),0.16)] px-1.5 text-[12px] font-semibold text-[var(--pc-accent-ink)]">{atHome} at home</span>}
           <span className="truncate">{[p.brand, p.size, p.stats ? `${money(p.stats.last_price, p.stats.currency)}${p.stats.last_store ? ` at ${storeName(p.stats.last_store)}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
         </span>
       </span>
@@ -47,11 +63,13 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd }: { p: Product;
 }
 
 /** All products, searchable. */
-export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onInventory }: {
+export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onInventory, homeCount, atHome }: {
   products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string;
   person: string; onList: (id: string) => boolean; onAdd: (p: Product) => void;
-  /** The catalogue is not what is at home: a way across to the Inventory. */
-  onInventory: () => void;
+  /** The other tab of the same screen: what is at home. */
+  onInventory: () => void; homeCount: number;
+  /** How many of a product are at home ("x8"), from the inventory. */
+  atHome: (id: string) => string | undefined;
 }) {
   const [q, setQ] = useState('');
   const likedByMe = (p: Product) => (p.fav_by ?? []).includes(person);
@@ -67,14 +85,11 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
       <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={onClose} />
       <div className="relative flex h-[88dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl md:h-[80dvh] md:max-w-lg md:rounded-[22px]">
         <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50 md:hidden" />
-        <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-2">
-          <div>
-            <h2 className="text-[22px] font-bold leading-tight">Products</h2>
-            <p className="text-[13px] text-pc-text-muted">The catalogue: labels you photographed.{' '}
-              <button type="button" onClick={onInventory} className="font-medium text-[var(--pc-accent-ink)]">What is at home: Inventory ›</button></p>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
+        <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
+          <HomeTabs tab="products" onTab={t => { if (t === 'home') onInventory(); }} homeCount={homeCount} productCount={products.length} />
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
         </div>
+        <p className="shrink-0 px-4 pb-2 text-[13px] text-pc-text-muted">What each product is: label, health note, prices, when you last bought it.</p>
         <div className="mx-4 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
           {([['fav', `Favourites${favs.length ? ` ${favs.length}` : ''}`], ['all', `All ${products.length}`]] as const).map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
@@ -98,7 +113,7 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
           ) : shown.length === 0 ? (
             <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
           ) : (
-            <div className="divide-y divide-[var(--pc-separator)]">{shown.map(p => <ProductRow key={p.id} p={p} onOpen={onOpen} storeName={storeName} liked={likedByMe(p)}
+            <div className="divide-y divide-[var(--pc-separator)]">{shown.map(p => <ProductRow key={p.id} p={p} onOpen={onOpen} storeName={storeName} liked={likedByMe(p)} atHome={atHome(p.id)}
               onAdd={tab === 'fav' && !onList(p.id) ? () => onAdd(p) : undefined} />)}</div>
           )}
         </div>

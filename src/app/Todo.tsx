@@ -8,10 +8,10 @@
  * Chat or the phone's Back closes it. On a laptop the same panel is the side column.
  */
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowUp, Check, ChevronRight, RefreshCw, Search, Sparkles, X } from 'lucide-react';
+import { Check, ChevronRight, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
 import { LoopsList } from './LoopsList';
-import { MicButton } from './MicButton';
+import { FieldControls, PrimaryButton } from './MicButton';
 import { speechPlaceholder, useSpeech } from './speech';
 import { TOPIC_COLORS, dueChip, groupTodo, matches, railOf, titleRuns, type DueKind } from './todoRules';
 import type { OutgoingAttachment } from '../mobile/attachments';
@@ -207,13 +207,9 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
             readOnly={speech.state === 'writing'} aria-label="New task"
             placeholder={speechPlaceholder(speech, 'Say or type it, in any words')}
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
-          {text.trim() && (
-            <button type="button" onClick={add} className="mb-[6px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] active:scale-95" aria-label="Add">
-              <ArrowUp size={19} strokeWidth={2.5} />
-            </button>
-          )}
+          <FieldControls speech={speech} hasText={!!text.trim()} onClear={() => { speech.cancel(); setText(''); }} />
         </div>
-        <MicButton speech={speech} size={52} />
+        <PrimaryButton speech={speech} canSend={!!text.trim()} onSend={add} size={52} />
       </div>
       {speech.error && <p className="mt-1.5 px-1 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       {reply && (
