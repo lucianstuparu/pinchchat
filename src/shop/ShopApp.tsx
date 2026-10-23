@@ -5,10 +5,11 @@
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Loader2, Lock, Mic, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
-import { SILENT, canDictate, canRecord, dictate, getDictationLang, getSpeechMode, record, type Dictation, type Recorder } from '../app/voice';
+import { MicButton } from '../app/MicButton';
+import { speechPlaceholder, useSpeech } from '../app/speech';
 import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
@@ -335,19 +336,9 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-3);
   const [text, setText] = useState(prefill ?? '');
-  // The mic records; Whisper (CT 104) writes the text, in whatever language or mix was spoken, and it
-  // lands in the box to edit or add to. Nothing is sent until Send.
-  // 'live' = the phone's recogniser writing while you speak (Settings > The mic > Live).
-  const [mic, setMic] = useState<'idle' | 'starting' | 'recording' | 'writing' | 'live'>('idle');
-  const listening = mic === 'recording' || mic === 'starting' || mic === 'live';
-  const rec = useRef<Recorder | null>(null);
-  const dict = useRef<Dictation | null>(null);
-  const [secs, setSecs] = useState(0);
-  const [micError, setMicError] = useState<string | null>(null);
-  const [level, setLevel] = useState(0);
-  const [heard, setHeard] = useState(true);   // false after 2.5 s of silence: say so while recording
-  // Sending bumps the round, so a transcription that comes back after the text was sent is dropped.
-  const round = useRef(0);
+  // The mic, the same as oc's (app/speech.tsx): it writes into the box, Live or Whisper; nothing is
+  // sent until Send.
+  const speech = useSpeech(text, setText, transcribeShop);
   const input = useRef<HTMLTextAreaElement>(null);
   // Two pickers: Android offers the camera only for a single image with `capture`, and only the
   // gallery when several images may be chosen, so "Take a photo" and "From the gallery" are separate.
@@ -375,9 +366,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
 
   /** A suggestion is added as it is; anything typed or said is an instruction for the assistant. */
   const add = (picked?: Known) => {
-    round.current++;
-    if (rec.current) { const r = rec.current; rec.current = null; void r.stop(); setMic('idle'); }
-    if (dict.current) { const d = dict.current; dict.current = null; d.abort(); setMic('idle'); }
+    speech.cancel();
     if (picked) {
       onAdd({ op: 'add', id: newItemId(), title: picked.title, tags: tagsFor(picked.tags.filter(t => stores.some(s => s.tag === t))) });
     } else {
@@ -386,59 +375,6 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     }
     setText('');
   };
-  const toggleMic = async () => {
-    setMicError(null);
-    // Live: the phone's recogniser writes as you speak; stopping lets its last words land.
-    if (mic === 'live') { dict.current?.stop(); return; }
-    if (mic === 'idle' && getSpeechMode() === 'live' && canDictate()) {
-      const mine = ++round.current;
-      const base = text.trim() ? text.replace(/\s*$/, ' ') : '';
-      const d = dictate(getDictationLang(), (t) => { if (round.current === mine) setText(base + t); }, (err) => {
-        if (round.current !== mine) return;
-        dict.current = null; setMic('idle');
-        if (err === 'not-allowed') setMicError('Microphone blocked: allow it for this app in Chrome’s site settings.');
-      });
-      if (d) { dict.current = d; setMic('live'); }
-      return;
-    }
-    if (mic === 'idle') {
-      setMic('starting');
-      try { rec.current = await record(); setSecs(0); setMic('recording'); }
-      catch { setMic('idle'); setMicError('Microphone not available: allow it for this app in Chrome’s site settings.'); }
-      return;
-    }
-    if (mic !== 'recording' || !rec.current) return;
-    const r = rec.current; rec.current = null;
-    const mine = round.current;
-    const silent = r.peak() < SILENT;
-    setMic('writing');
-    const audio = await r.stop();
-    if (!audio) { setMic('idle'); return; }
-    if (silent) {
-      setMic('idle');
-      setMicError(`The microphone recorded only silence${r.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`);
-      return;
-    }
-    try {
-      const t = (await transcribeShop(audio)).trim();
-      if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
-      else if (!t) setMicError('Nothing was understood. Try again a bit closer.');
-    } catch (e) {
-      setMicError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.'
-        : e instanceof Error && e.message === 'slow' ? 'Writing it took too long. Try a shorter piece.' : 'Could not turn it into text. Try again.');
-    } finally { setMic('idle'); }
-  };
-  useEffect(() => {
-    if (mic !== 'recording') return;
-    const t = window.setInterval(() => setSecs(n => n + 1), 1000);
-    const m = window.setInterval(() => {
-      const r = rec.current; if (!r) return;
-      setLevel(r.level());
-      setHeard(r.peak() >= SILENT);
-    }, 120);
-    return () => { window.clearInterval(t); window.clearInterval(m); setLevel(0); setHeard(true); };
-  }, [mic]);
-  useEffect(() => () => { void rec.current?.stop(); dict.current?.abort(); }, []);
   // The box grows with the text, from two lines up to six.
   useEffect(() => {
     const ta = input.current; if (!ta) return;
@@ -478,7 +414,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       )}
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void sendPhotos(e.target.files)} />
       <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void sendPhotos(e.target.files)} />
-      {micError && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{micError}</p>}
+      {speech.error && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
@@ -502,13 +438,13 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </>
           )}
         </div>
-        <div className={`relative flex min-w-0 flex-1 items-end rounded-[22px] border bg-pc-surface pl-4 pr-1.5 ${listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
+        <div className={`relative flex min-w-0 flex-1 items-end rounded-[22px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
-            readOnly={mic === 'writing'}
-            placeholder={mic === 'live' ? 'Listening… tap the mic when done' : mic === 'recording' ? (secs >= 3 && !heard ? 'The mic hears nothing… Bluetooth headset or watch connected?' : `Listening ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}… tap the mic when done`) : mic === 'writing' ? 'Writing what you said…' : `Say or type: add, change, remove… (mic: ${getSpeechMode() === 'whisper' ? 'Whisper' : 'Live'})`} aria-label="Instruction for the assistant"
+            readOnly={speech.state === 'writing'}
+            placeholder={speechPlaceholder(speech, 'Say or type: add, change, remove…')} aria-label="Instruction for the assistant"
             className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] shadow-none outline-none focus:outline-none focus-visible:outline-none placeholder:text-pc-text-muted" />
-          {text && !listening && (
+          {text && !speech.listening && (
             <button type="button" onClick={() => { setText(''); input.current?.focus(); }} className="mb-[9px] flex h-8 w-7 shrink-0 items-center justify-center" aria-label="Clear">
               <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-pc-text-faint text-pc-surface"><X size={12} strokeWidth={3} /></span>
             </button>
@@ -519,17 +455,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             </button>
           )}
         </div>
-        {(canRecord() || canDictate()) && (
-          <div className="relative shrink-0">
-            <button type="button" onClick={() => void toggleMic()} disabled={mic === 'writing' || mic === 'starting'}
-              aria-label={listening ? 'Done speaking' : mic === 'writing' ? 'Writing what you said' : 'Speak'} aria-pressed={listening}
-              className={`relative flex h-[60px] w-[60px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95 ${listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
-              {mic === 'recording' && <span className="absolute inset-0 rounded-full bg-red-500/35 transition-transform duration-100" style={{ transform: `scale(${1 + Math.min(level * 1.6, 0.6)})` }} />}
-              {mic === 'live' && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/30" />}
-              {mic === 'recording' || mic === 'live' ? <Square size={20} fill="currentColor" /> : mic === 'writing' ? <Loader2 size={26} className="animate-spin" /> : <Mic size={28} strokeWidth={2.2} />}
-            </button>
-          </div>
-        )}
+        <div className="mb-[2px] shrink-0"><MicButton speech={speech} size={60} /></div>
       </form>
     </div>
   );

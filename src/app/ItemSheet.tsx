@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Receipt, Repeat, ShoppingCart, Undo2, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Receipt, Repeat, ShoppingCart, Undo2, X } from 'lucide-react';
 import { act, domainEmoji, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet } from './api';
+import { Title } from './Todo';
+import { TOPIC_COLORS, railOf } from './todoRules';
 
 /**
  * Details of one item (app v2 §2): what it is, where it came from, and what can be done with it.
@@ -27,6 +29,8 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Editing (oc-app-design.md §4): the title, the due date and the topics.
+  const [edit, setEdit] = useState<{ title: string; due: string; topics: string[] } | null>(null);
 
   const load = () => fetchSheet(id).then(s => { setSheet(s); setError(null); }).catch(e => setError(e.message));
   useEffect(() => { void load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -45,6 +49,17 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
   const str = (k: string) => (it && typeof it[k] === 'string' ? (it[k] as string) : undefined);
   const num = (k: string) => (it && typeof it[k] === 'number' ? (it[k] as number) : undefined);
   const isTopic = kind === 'loop';
+  const topics = Array.isArray(it?.topics) ? (it.topics as string[]) : [];
+  const startEdit = () => it && setEdit({ title: it.title, due: str('due_date') ?? '', topics });
+  const saveEdit = async () => {
+    if (!edit || !it) return;
+    const extra: Record<string, unknown> = {};
+    if (edit.title.trim() !== it.title) extra.title = edit.title.trim();
+    if (edit.due !== (str('due_date') ?? '')) extra.due_date = edit.due;
+    if (edit.topics.join(',') !== topics.join(',')) extra.topics = edit.topics;
+    if (Object.keys(extra).length) await run('edit', extra);
+    setEdit(null);
+  };
 
   const rows: Array<[string, string]> = it ? ([
     ['Amount', num('amount') != null ? formatAmount(num('amount'), str('currency')) : ''],
@@ -76,7 +91,44 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
               <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-pc-accent">
                 <K.icon size={14} /> {K.label}{domainEmoji(str('domain')) ? ` · ${domainEmoji(str('domain'))} ${str('domain')}` : ''}{it.scope === 'shared' ? ' · shared' : ''}
               </p>
-              <h2 className={`pr-6 text-[22px] font-bold leading-tight ${closed ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{it.title}</h2>
+              {edit ? (
+                <div className="space-y-3">
+                  <textarea value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} rows={2} aria-label="Title"
+                    className="w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[17px] leading-snug outline-none focus:border-pc-accent" />
+                  <p className="-mt-2 px-1 text-[12px] text-pc-text-muted">Put **two stars** around a name to make it bold.</p>
+                  {!isTopic && (
+                    <>
+                      <label className="flex items-center justify-between gap-3 rounded-[12px] bg-pc-surface px-3 py-2 text-[15px]">
+                        <span className="text-pc-text-muted">Due</span>
+                        <span className="flex items-center gap-2">
+                          <input type="date" value={edit.due} onChange={e => setEdit({ ...edit, due: e.target.value })} className="bg-transparent text-right outline-none" />
+                          {edit.due && <button type="button" onClick={() => setEdit({ ...edit, due: '' })} className="text-[13px] text-[var(--pc-accent-ink)]">No date</button>}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Topics">
+                        {Object.entries(TOPIC_COLORS).map(([t, c]) => {
+                          const on = edit.topics.includes(t);
+                          return (
+                            <button key={t} type="button" aria-pressed={on}
+                              onClick={() => setEdit({ ...edit, topics: on ? edit.topics.filter(x => x !== t) : [...edit.topics, t] })}
+                              className="h-8 rounded-[8px] border px-3 text-[13px] font-semibold"
+                              style={on ? { background: c.bg, color: c.ink, borderColor: c.rail } : { borderColor: 'var(--pc-border-strong)', color: 'var(--pc-text-muted)' }}>{t}</button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setEdit(null)} className="h-11 flex-1 rounded-[12px] bg-pc-surface text-[15px] font-medium">Cancel</button>
+                    <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void saveEdit()} className="h-11 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">Save</button>
+                  </div>
+                </div>
+              ) : (
+                <h2 className={`pr-6 text-[22px] font-bold leading-tight ${closed ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>
+                  {typeof it.n === 'number' && <span className="mr-2 tabular-nums" style={{ color: closed ? undefined : railOf({ topics }) }}>{it.n}</span>}
+                  <Title text={it.title} />
+                </h2>
+              )}
               {closed && <p className="mt-1 text-[14px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
             </div>
 
@@ -114,7 +166,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
                 <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
                   {isTopic
                     ? <button type="button" onClick={() => { onAsk(`Continue: ${it.title} ⟨${id}⟩`, true); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Continue</button>
-                    : <button type="button" disabled={busy} onClick={() => void run('snooze')} className={secondary}><Clock size={19} className="text-pc-accent" /> In 3 days</button>}
+                    : <button type="button" disabled={busy} onClick={() => void run('snooze')} className={secondary}><Clock size={19} className="text-pc-accent" /> Remind in 3 days</button>}
                   {!isTopic && <button type="button" onClick={() => { onAsk(`About ⟨${id}⟩: `); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Ask</button>}
                   {it.store === 'tasks' && !str('scheduled') && (
                     <button type="button" onClick={() => { onAsk(`Schedule ⟨${id}⟩ for `); onClose(); }} className={secondary}><CalendarClock size={19} className="text-pc-accent" /> Schedule</button>
@@ -122,6 +174,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk }: Props) {
                   {it.store === 'admin' && (
                     <button type="button" disabled={busy} onClick={() => void run('to-task')} className={secondary}><ListChecks size={19} className="text-pc-accent" /> Make a task</button>
                   )}
+                  {!edit && <button type="button" onClick={startEdit} className={secondary}><Pencil size={19} className="text-[var(--pc-accent-ink)]" /> Edit</button>}
                   <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Not needed</button>
                 </div>
                 {!isTopic && (

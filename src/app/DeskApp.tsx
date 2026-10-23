@@ -11,7 +11,7 @@
  * tasks, topics and messages, and no programmer words ("loop" is "In progress" on screen).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, ChevronDown, Copy, Languages, ListChecks, Lightbulb, RefreshCw, Search, StickyNote, X } from 'lucide-react';
+import { ArrowDown, Bell, ChevronRight, Copy, Languages, ListChecks, Lightbulb, Search, StickyNote, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -28,9 +28,9 @@ import { disablePush, enablePush, getPushState, type PushState } from '../mobile
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { searchMessages, snippet } from '../mobile/searchMessages';
-import { act, domainEmoji, fetchLoops, fetchNow, transcribeAudio, whenLabel, whoami, SessionExpired, type Loop, type NowItem } from './api';
-import { NowList } from './NowList';
-import { LoopsList } from './LoopsList';
+import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
+import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
+import { groupTodo, matches, railOf } from './todoRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { SettingsSheet } from './SettingsSheet';
@@ -79,8 +79,6 @@ export default function DeskApp() {
   );
 }
 
-type Tab = 'todo' | 'progress';
-
 function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; look: Look; mode: 'light' | 'dark'; onLook: (l: Look) => void }) {
   const { status, messages, isLoadingHistory, activeSession, sendMessage, logout, getClient, addEventListener, switchSession } = gw;
   const [person, setPerson] = useState<string | null>(null);
@@ -103,10 +101,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [loops, setLoops] = useState<Loop[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
-  const [lists, setLists] = useState<Tab | null>(null);     // the lists sheet (phone)
-  const [tab, setTab] = useState<Tab>('todo');               // the side column (laptop)
+  const [todoOpen, setTodoOpen] = useState(false);          // To do, full screen (phone)
+  const [tab, setTab] = useState<TodoTab>('todo');
   const [selected, setSelected] = useState<Set<string> | null>(null);   // multi-select for copying
-  const [busy, setBusy] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [notice, dismissNotice] = useNotice();
@@ -130,10 +127,16 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, [refresh]);
 
   const doAct = async (item: NowItem, action: 'done' | 'snooze') => {
-    setBusy(item.id);
     setNow(n => ({ ...n, items: n.items.filter(i => i.id !== item.id) }));   // optimistic
     try { await act(item.id, action); } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
-    finally { setBusy(null); void refresh(); }
+    finally { void refresh(); }
+  };
+  // ★ = priority (P1); taking the star off makes it normal (P3).
+  const star = async (item: NowItem) => {
+    const priority = item.priority === 'P1' ? 'P3' : 'P1';
+    setNow(n => ({ ...n, items: n.items.map(i => (i.id === item.id ? { ...i, priority } : i)) }));
+    try { await act(item.id, 'priority', { priority }); } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
   };
 
   // ---- Chat plumbing (outbox, share import, questions, notifications)
@@ -190,7 +193,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const retry = useCallback((msg: ChatMessage) => { send(msg.content, sentAttachments.current.get(msg.content) ?? []); }, [send]);
   const onReply = useCallback((msg: ChatMessage) => { setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || '📷 Photo', mine: msg.role === 'user' }); }, []);
   const putInComposer = (text: string, sendNow = false) => {
-    setLists(null);
+    setTodoOpen(false);
     if (sendNow) { send(text, []); return; }
     setPrefill({ nonce: Date.now(), text, attachments: [] });
   };
@@ -221,7 +224,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const found = useMemo(() => {
     if (!searching) return { todo: [] as NowItem[], progress: [] as Loop[], msgs: [] as ChatMessage[] };
     return {
-      todo: now.items.filter(i => has(q, i.title, i.consequence, i.payee, i.domain)),
+      todo: now.items.filter(i => matches(i, q)),
       progress: loops.filter(l => has(q, l.title, l.state, l.next_step, l.domain)),
       msgs: searchMessages(shown, search ?? ''),
     };
@@ -248,43 +251,83 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const name = person ? person[0].toUpperCase() + person.slice(1) : '';
   const dateTitle = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const top = now.items[0];
-  const topWhen = top ? whenLabel(top, now.today) : null;
+  // The bar leads with what To do leads with: the due box, then priorities, then the rest.
+  const top = useMemo(() => { const g = groupTodo(now.items, now.today); return g.due[0] ?? g.priority[0] ?? g.areas[0]?.items[0] ?? g.waiting[0]; }, [now]);
+  const overdue = now.items.filter(i => i.section === 'overdue').length;
   const urgentCount = now.items.filter(i => i.section === 'overdue' || i.section === 'today').length;
 
-  const listBody = (t: Tab) => expired
-    ? <p className="px-4 py-6 text-[15px] text-pc-text-muted">Signed out of the lists. <a href="/" className="text-pc-accent">Sign in again</a></p>
-    : t === 'todo'
-      ? <NowList items={now.items} today={now.today} busy={busy} onDone={i => void doAct(i, 'done')} onSnooze={i => void doAct(i, 'snooze')} onOpen={i => setSheet(i.id)} />
-      : <LoopsList loops={loops} today={now.today} onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)} onOpen={l => setSheet(l.id)} />;
-  const tabs = (value: Tab, onChange: (t: Tab) => void) => (
-    <div className="grid flex-1 grid-cols-2 gap-1 rounded-[10px] bg-pc-surface p-[3px]" role="tablist">
-      {([['todo', 'To do', now.items.length], ['progress', 'In progress', loops.length]] as const).map(([v, label, n]) => (
-        <button key={v} type="button" role="tab" aria-selected={value === v} onClick={() => onChange(v)}
-          className={`h-8 rounded-[8px] text-[14px] font-medium transition-colors ${value === v ? 'bg-pc-elevated text-pc-text shadow-sm' : 'text-pc-text-muted'}`}>
-          {label}{n > 0 ? <span className="ml-1 text-pc-text-muted">{n}</span> : null}
-        </button>
-      ))}
-    </div>
+  // Adding from the To do screen: the text goes to the assistant as a task; its answer shows under the box.
+  const [asked, setAsked] = useState<{ text: string; ts: number } | null>(null);
+  const addTask = (text: string) => { send(`Task: ${text}`, []); setAsked({ text, ts: Date.now() }); };
+  const taskReply = useMemo(() => {
+    if (!asked) return null;
+    const m = shown.find(x => x.role === 'assistant' && !x.isStreaming && x.timestamp > asked.ts);
+    return { asked: asked.text, text: m ? visibleText(m) : null };
+  }, [asked, shown]);
+
+  // Swipe right on the chat opens To do; swipe left on To do closes it (phone only). A swipe on a
+  // message (left = reply) or a task (right = done) is theirs: the direction tells them apart.
+  const [drag, setDrag] = useState<number | null>(null);
+  const gesture = useRef<{ x: number; y: number; horizontal: boolean | null; from: 'chat' | 'panel' } | null>(null);
+  const swipeStart = (from: 'chat' | 'panel') => (e: React.TouchEvent) => {
+    if (window.matchMedia('(min-width: 768px)').matches || (from === 'chat') === todoOpen) return;
+    gesture.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null, from };
+  };
+  const swipeMove = (e: React.TouchEvent) => {
+    const g = gesture.current; if (!g) return;
+    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
+    if (g.horizontal === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) g.horizontal = Math.abs(dx) > Math.abs(dy) * 1.3 && (g.from === 'chat' ? dx > 0 : dx < 0);
+    if (g.horizontal) setDrag(g.from === 'chat' ? Math.max(0, dx) : Math.min(0, dx));
+  };
+  const swipeEnd = () => {
+    const g = gesture.current; gesture.current = null;
+    if (g?.horizontal && drag !== null) {
+      if (g.from === 'chat' && drag > 70) { setTab('todo'); setTodoOpen(true); }
+      if (g.from === 'panel' && drag < -70) setTodoOpen(false);
+    }
+    setDrag(null);
+  };
+  // The phone's Back closes To do instead of leaving the app.
+  useEffect(() => {
+    if (!todoOpen) return;
+    history.pushState({ oc: 'todo' }, '');
+    const onPop = () => setTodoOpen(false);
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if ((history.state as { oc?: string } | null)?.oc === 'todo') history.back();
+    };
+  }, [todoOpen]);
+
+  const panel = (onClose?: () => void) => (
+    <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} loops={loops} today={now.today}
+      loaded={loaded} expired={expired} refreshing={refreshing} onRefresh={() => void refresh()}
+      onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet}
+      onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}
+      onAdd={addTask} transcribe={transcribeAudio} reply={taskReply} onDismissReply={() => setAsked(null)} onClose={onClose} />
   );
 
   // The pinned bar over the chat (phone): the most pressing thing, and how much else is waiting.
   const pinnedBar = (
-    <button type="button" onClick={() => setLists('todo')} aria-label="Open To do"
-      className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${
-        now.items.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-pc-accent' : urgentCount > 0 ? 'bg-red-500 text-white' : 'bg-pc-accent text-white'}`}>
+    <button type="button" onClick={() => { setTab('todo'); setTodoOpen(true); }} aria-label="Open To do"
+      className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-[14px] border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
+      <span className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[10px] px-1.5 text-[15px] font-bold tabular-nums ${
+        now.items.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]' : urgentCount > 0 ? 'bg-[#dc4c4c] text-white' : 'bg-pc-surface text-pc-text'}`}>
         {now.items.length === 0 ? <ListChecks size={18} /> : now.items.length}
       </span>
       <span className="min-w-0 flex-1">
         {!loaded ? <span className="block text-[15px] text-pc-text-muted">{expired ? 'Signed out of the lists' : 'To do'}</span>
           : top ? (
             <>
-              <span className="block truncate text-[15px] font-medium leading-tight">{domainEmoji(top.domain) ? `${domainEmoji(top.domain)} ` : ''}{top.title}</span>
-              <span className="mt-0.5 block truncate text-[12px] leading-tight text-pc-text-muted">
-                {topWhen && <span className={topWhen.cls}>{topWhen.text}</span>}
-                {now.items.length > 1 && <>{topWhen ? ' · ' : ''}{now.items.length - 1} more to do</>}
-                {loops.length > 0 && <> · {loops.length} in progress</>}
+              <span className="flex items-baseline gap-1.5 text-[15px] leading-tight">
+                {top.n != null && <span className="shrink-0 font-bold tabular-nums" style={{ color: railOf(top) }}>{top.n}</span>}
+                <Title text={top.title} className="min-w-0 truncate" />
+              </span>
+              <span className="mt-1 flex items-center gap-1.5 text-[12px] leading-tight text-pc-text-muted">
+                <DueChip item={top} today={now.today} mode={mode} />
+                <span className="truncate">
+                  {overdue > 1 ? `${overdue} overdue · ` : ''}{now.items.length > 1 ? `${now.items.length - 1} more` : ''}{loops.length > 0 ? `${now.items.length > 1 ? ' · ' : ''}${loops.length} in progress` : ''}
+                </span>
               </span>
             </>
           ) : (
@@ -294,7 +337,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             </>
           )}
       </span>
-      <ChevronDown size={18} className="shrink-0 text-pc-text-faint" />
+      <ChevronRight size={18} className="shrink-0 text-pc-text-faint" />
     </button>
   );
 
@@ -306,11 +349,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <section className="mb-4">
           <h3 className="px-2 pb-1 text-[13px] font-semibold text-pc-text-muted">To do</h3>
           <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-2xl bg-pc-surface">
-            {found.todo.map(i => { const w = whenLabel(i, now.today); return (
-              <button key={i.id} type="button" onClick={() => setSheet(i.id)} className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
-                <span className="block truncate text-[15px]">{domainEmoji(i.domain) ? `${domainEmoji(i.domain)} ` : ''}{i.title}</span>
-                {w && <span className={`text-[12px] ${w.cls}`}>{w.text}</span>}
-              </button>); })}
+            {found.todo.map(i => (
+              <button key={i.id} type="button" onClick={() => setSheet(i.id)} className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+                <span className="w-6 shrink-0 text-right text-[15px] font-bold tabular-nums" style={{ color: railOf(i) }}>{i.n ?? ''}</span>
+                <span className="min-w-0 flex-1">
+                  <Title text={i.title} className="block truncate text-[15px]" />
+                  <span className="mt-1 block"><DueChip item={i} today={now.today} mode={mode} /></span>
+                </span>
+              </button>))}
           </div>
         </section>
       )}
@@ -411,13 +457,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       </header>
 
       <div className="flex min-h-0 flex-1 md:flex-row">
-        <aside className="hidden w-[400px] shrink-0 flex-col border-r border-pc-border bg-pc-elevated md:flex">
-          <div className="flex items-center gap-2 px-3 py-2">
-            {tabs(tab, setTab)}
-            <button type="button" onClick={() => void refresh()} className={iconBtn} aria-label="Refresh"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /></button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{listBody(tab)}</div>
-        </aside>
+        <aside className="hidden w-[420px] shrink-0 flex-col border-r border-pc-border md:flex">{panel()}</aside>
         <div className="relative flex min-w-0 flex-1 flex-col">
           {search === null && notice && (
             <div className="mx-3 mt-2 flex items-start gap-3 rounded-2xl border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
@@ -434,7 +474,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             </div>
           )}
           {search === null && pinnedBar}
-          <main ref={scrollRef} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2" role="log" aria-live="polite">
+          <main ref={scrollRef} onScroll={onScroll} onTouchStart={swipeStart('chat')} onTouchMove={swipeMove} onTouchEnd={swipeEnd} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2" role="log" aria-live="polite">
             {search !== null ? searchResults : <div className="space-y-1 pt-1 md:px-2">{chat}</div>}
           </main>
           {!atBottom && search === null && (
@@ -453,24 +493,19 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
               </button>
             ))}
           </div>
-          <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Type or tap the mic" />
+          <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Message" />
         </div>
       )}
 
-      {lists && (
-        <div className="fixed inset-0 z-30 flex items-end md:hidden" role="dialog" aria-modal="true" aria-label="Lists">
-          <div className="absolute inset-0 bg-[var(--pc-scrim,rgba(0,0,0,0.3))]" onClick={() => setLists(null)} />
-          <div className="relative flex h-[82dvh] w-full flex-col rounded-t-[22px] bg-pc-elevated pb-[env(safe-area-inset-bottom)] shadow-2xl">
-            <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-pc-text-faint/50" />
-            <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-2">
-              {tabs(lists, setLists)}
-              <button type="button" onClick={() => void refresh()} className={iconBtn} aria-label="Refresh"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /></button>
-              <button type="button" onClick={() => setLists(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">{listBody(lists)}</div>
-          </div>
-        </div>
-      )}
+      {/* To do, full screen (phone): slides in from the left, follows the finger. */}
+      <div className="fixed inset-0 z-30 shadow-2xl md:hidden" role="dialog" aria-modal="true" aria-label="To do" inert={!todoOpen}
+        onTouchStart={swipeStart('panel')} onTouchMove={swipeMove} onTouchEnd={swipeEnd}
+        style={{
+          transform: todoOpen ? `translateX(${drag !== null && drag < 0 ? drag : 0}px)` : `translateX(calc(-100% - 24px + ${drag !== null && drag > 0 ? drag : 0}px))`,
+          transition: drag !== null ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}>
+        {panel(() => setTodoOpen(false))}
+      </div>
 
       {sheet && <ItemSheet id={sheet} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }} />}
       {settings && (

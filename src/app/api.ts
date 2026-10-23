@@ -6,9 +6,13 @@ export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 
 export interface NowItem {
   id: string;
+  /** The short number, household-wide ("22 done"). */
+  n?: number;
+  /** What kind of doing it is: Admin, Money, Health, People, Errands (the coloured pills). */
+  topics?: string[];
   title: string;
   kind: string;
-  store: 'admin' | 'tasks' | 'loops';
+  store: 'admin' | 'tasks' | 'loops' | 'shopping' | 'pantry';
   scope: 'private' | 'shared';
   status: string;
   priority: 'P1' | 'P2' | 'P3' | 'P4';
@@ -27,6 +31,7 @@ export interface NowItem {
 
 export interface Loop {
   id: string;
+  n?: number;
   title: string;
   domain?: string;
   state: string;
@@ -43,7 +48,7 @@ export interface Sheet {
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
 }
 
-export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'to-task' | 'loop-close';
+export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'to-task' | 'loop-close';
 
 export class SessionExpired extends Error {}
 

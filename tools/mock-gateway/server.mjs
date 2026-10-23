@@ -305,7 +305,7 @@ const server = http.createServer((req, res) => {
       const sec = (d) => !d ? 'later' : d < today ? 'overdue' : d === today ? 'today' : d <= '2026-10-27' ? 'week' : 'later';
       const pr = { P1: 4, P2: 3, P3: 2, P4: 1 };
       const items = Object.entries(regItems).filter(([, i]) => !['paid', 'done', 'cancelled'].includes(i.status) && i.kind !== 'buy')
-        .map(([id, i]) => { const s = sec(i.due_date); const w = (pr[i.priority] || 2) * (s === 'overdue' ? 1.5 : s === 'today' ? 1.3 : s === 'week' ? 1.15 : 1);
+        .map(([id, i]) => { const s = i.status === 'waiting' ? 'waiting' : sec(i.due_date); const w = (pr[i.priority] || 2) * (s === 'overdue' ? 1.5 : s === 'today' ? 1.3 : s === 'week' ? 1.15 : 1);
           return { id, ...i, priority: i.priority || 'P3', section: s, weight: w }; })
         .sort((a, b) => b.weight - a.weight);
       res.end(JSON.stringify({ today, items }));
@@ -325,6 +325,12 @@ const server = http.createServer((req, res) => {
         if (p.action === 'drop') it.status = 'cancelled';
         if (p.action === 'reopen') it.status = 'open';
         if (p.action === 'snooze') it.remind_on = '2026-10-23';
+        if (p.action === 'priority') it.priority = p.priority;
+        if (p.action === 'edit') {
+          if (p.title !== undefined) it.title = p.title;
+          if (p.due_date !== undefined) { if (p.due_date) it.due_date = p.due_date; else delete it.due_date; }
+          if (p.topics !== undefined) it.topics = p.topics;
+        }
         res.end(JSON.stringify({ ok: true, action: p.action, title: it.title, status: it.status, remind_on: it.remind_on }));
         return;
       }
@@ -341,12 +347,17 @@ const regLoops = [
   { id: 'lp-2026-10-19-bbbbbb', title: 'Car insurance switch', domain: 'finance', state: 'Two quotes requested', next_step: 'compare when the second quote arrives', status: 'open', last_touched: '2026-10-20', scope: 'shared', kind: 'loop' },
 ];
 const regItems = {
-  'adm-2026-10-18-5a672f': { status: 'open', kind: 'deadline', title: 'SFR/CertiDeal trade-in bonus', payee: 'CertiDeal', amount: 300, currency: 'EUR', due_date: '2026-10-22', remind_on: '2026-10-21', scope: 'private', store: 'admin' },
-  'adm-2026-10-18-032d99': { status: 'open', kind: 'bill', title: 'AEDES charges 4T2026', payee: 'Syndicat Le Clos des Hauts de Genève', amount: 693.78, currency: 'EUR', due_date: '2026-10-01', remind_on: '2026-10-23', scope: 'shared', store: 'admin' },
-  'adm-2026-10-18-9ae409': { status: 'open', kind: 'bill', title: 'Taxe foncière 2026', payee: 'DGFiP', amount: 1175, currency: 'EUR', due_date: '2026-10-26', remind_on: '2026-10-25', scope: 'shared', store: 'admin' },
-  'tsk-2026-10-20-c0ffee': { status: 'todo', kind: 'task', title: 'Renew passport', priority: 'P1', consequence: 'travel in December impossible', due_date: '2026-11-15', remind_on: '2026-11-08', scope: 'private', store: 'tasks', domain: 'admin', source: 'a-2026-10-19-004' },
-  'tsk-2026-10-20-dead01': { status: 'waiting', kind: 'task', title: 'Ludmila: Gmail consent', priority: 'P2', scope: 'private', store: 'tasks', domain: 'tech' },
-  'adm-2026-10-19-aaaaaa': { status: 'open', kind: 'task', title: 'Call the plumber about the boiler', due_date: '2026-10-27', remind_on: '2026-10-26', scope: 'shared', store: 'todo', domain: 'home' },
+  'adm-2026-10-18-5a672f': { n: 3, status: 'open', kind: 'deadline', title: '**SFR**/CertiDeal trade-in bonus', payee: 'CertiDeal', amount: 300, currency: 'EUR', due_date: '2026-10-22', remind_on: '2026-10-21', scope: 'private', store: 'admin', topics: ['Money'] },
+  'adm-2026-10-18-032d99': { n: 7, status: 'open', kind: 'bill', title: '**AEDES** charges 4T2026', payee: 'Syndicat Le Clos des Hauts de Genève', amount: 693.78, currency: 'EUR', due_date: '2026-10-01', remind_on: '2026-10-23', scope: 'shared', store: 'admin', topics: ['Money'] },
+  'adm-2026-10-18-9ae409': { n: 8, status: 'open', kind: 'bill', title: 'Taxe foncière 2026', payee: 'DGFiP', amount: 1175, currency: 'EUR', due_date: '2026-10-26', remind_on: '2026-10-25', scope: 'shared', store: 'admin', topics: ['Money', 'Admin'] },
+  'tsk-2026-10-20-c0ffee': { n: 12, status: 'todo', kind: 'task', title: 'Renew **passport**', priority: 'P1', consequence: 'travel in December impossible', due_date: '2026-11-15', remind_on: '2026-11-08', scope: 'private', store: 'tasks', domain: 'admin', source: 'a-2026-10-19-004', topics: ['Admin'] },
+  'tsk-2026-10-20-dead01': { n: 14, status: 'waiting', kind: 'task', title: '**Ludmila**: Gmail consent', priority: 'P2', scope: 'private', store: 'tasks', domain: 'tech', topics: ['People'] },
+  'tsk-2026-10-19-aaaaaa': { n: 9, status: 'todo', kind: 'task', title: 'Call the **plumber** about the boiler', due_date: '2026-10-27', remind_on: '2026-10-26', scope: 'shared', store: 'tasks', domain: 'home', topics: ['Errands'] },
+  'tsk-2026-09-20-fleur1': { n: 22, status: 'todo', kind: 'task', title: 'Email **Fleur** re: 1B suffix for ERP', due_date: '2026-09-20', scope: 'private', store: 'tasks', domain: 'icrc', topics: ['Admin', 'People'] },
+  'tsk-2026-09-20-dent01': { n: 25, status: 'todo', kind: 'task', title: 'Write to **dental clinic in Moldova** about temp crown falling out', due_date: '2026-09-20', scope: 'private', store: 'tasks', domain: 'health', topics: ['Health', 'Admin'] },
+  'tsk-2026-10-10-evgh01': { n: 18, status: 'todo', kind: 'task', title: 'Schedule **Evghenia**’s Lyon visit once her response arrives', scope: 'private', store: 'tasks', domain: 'family', topics: ['People', 'Admin'] },
+  'tsk-2026-10-05-insu01': { n: 6, status: 'todo', kind: 'task', title: 'Follow up with **insurance company** to demand reevaluation of flood claim', scope: 'shared', store: 'tasks', domain: 'home', priority: 'P1', topics: ['Admin', 'Money'] },
+  'tsk-2026-10-15-ccar01': { n: 15, status: 'todo', kind: 'task', title: 'Book **Casa Artlia** roof inspection', scope: 'shared', store: 'tasks', domain: 'casa-artlia', topics: ['Errands'] },
 };
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 26214400 });

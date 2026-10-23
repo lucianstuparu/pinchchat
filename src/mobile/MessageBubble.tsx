@@ -27,7 +27,7 @@ const MD_CLASSES =
 interface Props {
   msg: ChatMessage;
   onRetry?: (msg: ChatMessage) => void;
-  /** Enables swipe-right and long-press → Reply (WhatsApp-style). */
+  /** Enables swipe-left and long-press → Reply (Telegram-style; swipe right opens To do). */
   onReply?: (msg: ChatMessage) => void;
   /** First message of a run shows the sender's avatar; the rest keep its space. */
   showAvatar?: boolean;
@@ -81,9 +81,9 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
     const mx = t.clientX - s.x;
     const my = t.clientY - s.y;
     if (Math.abs(mx) > 8 || Math.abs(my) > 8) clearTimer();
-    if (s.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) s.horizontal = Math.abs(mx) > Math.abs(my) && mx > 0;
+    if (s.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) s.horizontal = Math.abs(mx) > Math.abs(my) && mx < 0;
     if (!s.horizontal) return;
-    const next = Math.max(0, Math.min(SWIPE_MAX, mx));
+    const next = Math.max(0, Math.min(SWIPE_MAX, -mx));
     if (next >= SWIPE_TRIGGER && !s.armed) { s.armed = true; navigator.vibrate?.(10); }
     if (next < SWIPE_TRIGGER) s.armed = false;
     setDx(next);
@@ -113,7 +113,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
       {!mine && <Avatar mine={false} visible={showAvatar} />}
       {dx > 0 && (
         <span
-          className="absolute left-2 z-[1] top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
+          className="absolute right-2 z-[1] top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
           style={{ opacity: dx / SWIPE_TRIGGER }}
           aria-hidden
         >
@@ -128,7 +128,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         onContextMenu={canReply ? e => { e.preventDefault(); setMenu(true); } : undefined}
         // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
         // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
-        style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${dx}px)` } : {}) }}
+        style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${-dx}px)` } : {}) }}
         className={`relative ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-2xl px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
           canReply ? 'select-none [-webkit-touch-callout:none]' : ''
         } ${
