@@ -1,11 +1,12 @@
+import { L } from '../ui/lang';
 import { memo, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply } from 'lucide-react';
-import { AgentAvatar, MeAvatar } from '../app/avatars';
+import { AgentAvatar, MeAvatar, PersonAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
 import { buildImageSrc } from '../lib/image';
-import { formatTime, visibleText } from './messageView';
+import { formatTime, senderOf, visibleText } from './messageView';
 import { extractItems } from './messageItems';
 import { ItemActions } from './ItemActions';
 import { failedTurn, isLong, voiceMessage } from './notice';
@@ -38,7 +39,13 @@ interface Props {
   selecting?: boolean;
   selected?: boolean;
   onSelect?: (msg: ChatMessage) => void;
+  /**
+   * A chat shared by several people (Casa Artlia): messages start with "[Name] ". `me` is the
+   * signed-in person's name; others' messages show on the left with their name and initial.
+   */
+  me?: string;
 }
+
 
 /** A failed turn: one line with the cause; the gateway's full text a tap away. */
 function FailedTurn({ summary, detail, time, showAvatar }: { summary: string; detail: string; time: string; showAvatar: boolean }) {
@@ -60,19 +67,22 @@ function FailedTurn({ summary, detail, time, showAvatar }: { summary: string; de
   );
 }
 
-function Avatar({ mine, visible }: { mine: boolean; visible: boolean }) {
+function Avatar({ mine, visible, person }: { mine: boolean; visible: boolean; person?: string | null }) {
   if (!visible) return <span className="w-7 shrink-0" aria-hidden />;
-  return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar /> : <AgentAvatar />}</span>;
+  return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar /> : person ? <PersonAvatar name={person} /> : <AgentAvatar />}</span>;
 }
 
 const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect }: Props) {
-  const mine = msg.role === 'user';
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect, me }: Props) {
+  const sender = msg.role === 'user' && me !== undefined ? senderOf(visibleText(msg)) : null;
+  const other = sender?.name && sender.name !== me ? sender.name : null;   // someone else in a shared chat
+  const mine = msg.role === 'user' && !other;
   // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
-  const { text: raw, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
+  // Item markers (⟨id⟩) never show as text, in anyone's message: they become the item's card.
+  const { text: raw, items } = extractItems(msg.role === 'user' && sender ? sender.text : visibleText(msg));
   // A voice message shows the words said (Whisper, before sending), after a mic.
   const voiceNote = mine ? voiceMessage(raw) : null;
   const text = voiceNote ? voiceNote.said : raw;
@@ -143,7 +153,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           <CheckSquare size={18} />
         </span>
       )}
-      {!mine && <Avatar mine={false} visible={showAvatar} />}
+      {!mine && <Avatar mine={false} visible={showAvatar} person={other} />}
       {dx > 0 && (
         <span
           className="absolute right-2 z-[1] top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-pc-surface shadow flex items-center justify-center text-pc-text-muted"
@@ -181,25 +191,26 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           />
         ))}
 
+        {other && showAvatar && <p className="text-[12px] font-semibold text-[var(--pc-accent-ink)]">{other}</p>}
         {typing ? (
-          <span className="flex gap-1 py-2" aria-label="OpenClaw is typing">
+          <span className="flex gap-1 py-2" aria-label={L('OpenClaw is typing')}>
             {[0, 1, 2].map(i => (
               <span key={i} className="h-1.5 w-1.5 rounded-full bg-pc-text-muted animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
             ))}
           </span>
         ) : voiceNote && !text ? (
-          <p className="flex items-center gap-1.5 py-0.5 text-[16px] text-pc-text-muted"><Mic size={16} className="shrink-0 text-[var(--pc-accent-ink)]" aria-hidden /> Voice message</p>
+          <p className="flex items-center gap-1.5 py-0.5 text-[16px] text-pc-text-muted"><Mic size={16} className="shrink-0 text-[var(--pc-accent-ink)]" aria-hidden /> {L('Voice message')}</p>
         ) : text ? (
           <>
             {/* Long messages start folded at about eight lines; the rest is a tap away. */}
-            {voiceNote && <Mic size={15} className="float-left mr-1.5 mt-[3px] text-[var(--pc-accent-ink)]" aria-label="Voice message" />}
+            {voiceNote && <Mic size={15} className="float-left mr-1.5 mt-[3px] text-[var(--pc-accent-ink)]" aria-label={L('Voice message')} />}
             <div className={`text-[16px] leading-[22px] ${MD_CLASSES} ${folded ? 'max-h-[176px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
               <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
             </div>
             {long && (
               <button type="button" onClick={e => { e.stopPropagation(); setUnfolded(u => !u); }} aria-expanded={!folded}
                 className="press -ml-1 min-h-10 px-1 text-[15px] font-semibold text-pc-accent">
-                {folded ? 'Show all' : 'Show less'}
+                {folded ? L('Show all') : L('Show less')}
               </button>
             )}
           </>
@@ -208,11 +219,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
 
         <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[12px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>
-          {mine && msg.sendStatus === 'sending' && <Clock size={11} aria-label="sending" />}
-          {mine && (msg.sendStatus === 'sent' || msg.sendStatus === undefined) && <Check size={12} aria-label="sent" />}
+          {mine && msg.sendStatus === 'sending' && <Clock size={11} aria-label={L('sending')} />}
+          {mine && (msg.sendStatus === 'sent' || msg.sendStatus === undefined) && <Check size={12} aria-label={L('sent')} />}
           {mine && msg.sendStatus === 'error' && (
-            <button type="button" onClick={() => onRetry?.(msg)} className="inline-flex items-center gap-0.5 text-red-500" aria-label="Not sent — tap to retry">
-              <AlertCircle size={12} /> Retry
+            <button type="button" onClick={() => onRetry?.(msg)} className="inline-flex items-center gap-0.5 text-red-500" aria-label={L('Not sent — tap to retry')}>
+              <AlertCircle size={12} /> {L('Retry')}
             </button>
           )}
         </div>
@@ -223,16 +234,16 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             className={`absolute top-full z-20 mt-1 w-36 rounded-xl border border-pc-border bg-pc-elevated shadow-lg py-1 text-[15px] ${mine ? 'right-0' : 'left-0'}`}
           >
             <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenu(false); onReply?.(msg); }}>
-              <Reply size={16} /> Reply
+              <Reply size={16} /> {L('Reply')}
             </button>
             {text && (
               <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={copy}>
-                <Copy size={16} /> Copy
+                <Copy size={16} /> {L('Copy')}
               </button>
             )}
             {onSelect && (
               <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenu(false); onSelect(msg); }}>
-                <CheckSquare size={16} /> Select
+                <CheckSquare size={16} /> {L('Select')}
               </button>
             )}
           </div>
@@ -254,7 +265,7 @@ export function AttachmentChip({ name, mimeType, preview, onRemove }: { name: st
         <span className="h-9 w-9 rounded-lg bg-pc-input flex items-center justify-center text-pc-text-muted"><FileText size={18} /></span>
       )}
       <span className="truncate text-[12px] text-pc-text">{name}</span>
-      <button type="button" onClick={onRemove} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-5 w-5 text-pc-text-muted hover:bg-[var(--pc-hover-strong)]" aria-label={`Remove ${name}`}>
+      <button type="button" onClick={onRemove} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-5 w-5 text-pc-text-muted hover:bg-[var(--pc-hover-strong)]" aria-label={L('Remove {name}', { name })}>
         ×
       </button>
     </div>

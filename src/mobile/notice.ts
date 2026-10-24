@@ -3,6 +3,8 @@
  * notices that should read as one short line with the details a tap away.
  */
 
+import { L } from '../ui/lang';
+
 const PREAMBLE_LINE = /^(System:|OpenClaw resumed this CLI session\b)/;
 
 /**
@@ -44,12 +46,12 @@ const CAUSES: Array<[RegExp, string]> = [
 /** A failed-turn notice as one line ("No reply · sign-in expired") plus its full text. */
 export function failedTurn(text: string): Notice | null {
   const t = text.trim();
-  if (CONTENTION.test(t)) return { summary: 'No reply · server was busy', detail: t };
+  if (CONTENTION.test(t)) return { summary: `${L('No reply')} · ${L('server was busy')}`, detail: t };
   const head = FAILED.find(re => re.test(t));
   if (!head && !BARE.test(t)) return null;
   const detail = head ? t.replace(head, '') : t;
-  const cause = CAUSES.find(([re]) => re.test(detail))?.[1] ?? 'something went wrong';
-  return { summary: `No reply · ${cause}`, detail };
+  const cause = L(CAUSES.find(([re]) => re.test(detail))?.[1] ?? 'something went wrong');
+  return { summary: `${L('No reply')} · ${cause}`, detail };
 }
 
 /**

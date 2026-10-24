@@ -88,3 +88,9 @@ export function withoutLeadingQuote(text: string): string {
   while (i < lines.length && !lines[i].trim()) i++;
   return i < lines.length ? lines.slice(i).join('\n') : text;
 }
+
+/** A chat shared by several people (Casa Artlia): "[Ludmila] text" → who wrote it and the text. */
+export function senderOf(text: string): { name: string | null; text: string } {
+  const m = text.match(/^\[([A-ZĂÂÎȘȚ][\p{L}-]{1,30})\]\s+([\s\S]*)$/u);
+  return m ? { name: m[1], text: m[2] } : { name: null, text };
+}

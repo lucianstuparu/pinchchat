@@ -13,6 +13,10 @@ import './index.css'
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const ShopApp = lazy(() => import('./shop/ShopApp'))
 const isShop = import.meta.env.VITE_APP === 'shop'
+// The Casa Artlia app (artlia.stuparu.eu) likewise: VITE_APP=artlia.
+// eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
+const ArtliaApp = lazy(() => import('./artlia/ArtliaApp'))
+const isArtlia = import.meta.env.VITE_APP === 'artlia'
 
 // Register service worker for PWA support (offline caching, installability)
 if ('serviceWorker' in navigator) {
@@ -45,6 +49,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       {isShop ? (
         <Suspense fallback={null}><ShopApp /></Suspense>
+      ) : isArtlia ? (
+        <Suspense fallback={null}><ArtliaApp /></Suspense>
       ) : (
         <ThemeProvider>
           {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}

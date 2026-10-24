@@ -5,6 +5,7 @@
  *  - Live (Settings > The mic): the phone's recogniser writes while you speak, in one language;
  *  - Whisper: the recording goes to the home server, any language or a mix, the text comes after.
  */
+import { L } from '../ui/lang';
 import { useEffect, useRef, useState } from 'react';
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { SILENT, canDictate, canRecord, dictate, getDictationLang, getSpeechMode, record, type Dictation, type Recorder } from './voice';
@@ -60,8 +61,8 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
       const d = dictate(getDictationLang(), t => { if (round.current === mine) setText(() => base + t); }, err => {
         if (round.current !== mine) return;
         dict.current = null; setState('idle');
-        if (err === 'not-allowed') setError('Microphone blocked: allow it for this app in Chrome’s site settings.');
-        else if (err) setError(`The mic stopped (${err}).`);
+        if (err === 'not-allowed') setError(L('Microphone blocked: allow it for this app in Chrome’s site settings.'));
+        else if (err) setError(L('The mic stopped ({err}).', { err }));
       });
       if (d) { dict.current = d; setState('live'); }
       return;
@@ -69,7 +70,7 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     if (state === 'idle') {
       setState('starting');
       try { rec.current = await record(); setSecs(0); setState('recording'); }
-      catch { setState('idle'); setError('Microphone not available: allow it for this app in Chrome’s site settings.'); }
+      catch { setState('idle'); setError(L('Microphone not available: allow it for this app in Chrome’s site settings.')); }
       return;
     }
     if (state !== 'recording' || !rec.current) return;
@@ -81,16 +82,16 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     if (!audio) { setState('idle'); return; }
     if (silent) {
       setState('idle');
-      setError(`The microphone recorded only silence${r.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`);
+      setError(L('The microphone recorded only silence{device}. With a Bluetooth headset or watch connected, try again with it off.', { device: r.device ? ` (${r.device})` : '' }));
       return;
     }
     try {
       const t = (await transcribe(audio)).trim();
       if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
-      else if (!t) setError('Nothing was understood. Try again a bit closer.');
+      else if (!t) setError(L('Nothing was understood. Try again a bit closer.'));
     } catch (e) {
       setError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.'
-        : e instanceof Error && e.message === 'slow' ? 'Writing it took too long. Try a shorter piece.' : 'Could not turn it into text. Try again.');
+        : e instanceof Error && e.message === 'slow' ? L('Writing it took too long. Try a shorter piece.') : L('Could not turn it into text. Try again.'));
     } finally { if (round.current === mine) setState('idle'); }
   };
 
@@ -123,11 +124,11 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 
 /** The text box's placeholder while the mic works; `idle` when it does not. */
 export function speechPlaceholder(s: Speech, idle: string): string {
-  if (s.state === 'live') return 'Listening (Live)… tap the mic when done';
-  if (s.state === 'starting') return 'Starting the mic…';
+  if (s.state === 'live') return L('Listening (Live)… tap the mic when done');
+  if (s.state === 'starting') return L('Starting the mic…');
   if (s.state === 'recording') {
-    return s.secs >= 3 && !s.heard ? 'The mic hears nothing… Bluetooth headset or watch connected?'
-      : `Recording for Whisper ${clock(s.secs)}… tap the mic when done`;
+    return s.secs >= 3 && !s.heard ? L('The mic hears nothing… Bluetooth headset or watch connected?')
+      : L('Recording for Whisper {t}… tap the mic when done', { t: clock(s.secs) });
   }
   if (s.state === 'writing') return '';   // SpeechStatus above the box says it, with the time
   return idle;

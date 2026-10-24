@@ -20,3 +20,13 @@ export function AgentAvatar({ className = 'h-7 w-7' }: { className?: string }) {
     </svg>
   );
 }
+
+/** Another person in a shared chat (Casa Artlia): their initial on a neutral disc. */
+export function PersonAvatar({ name, className = 'h-7 w-7' }: { name: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label={name} role="img">
+      <circle cx="16" cy="16" r="16" fill="#7c5cd6" />
+      <text x="16" y="21" textAnchor="middle" fontFamily="ui-sans-serif, system-ui, sans-serif" fontSize="14" fontWeight="700" fill="#fff">{name[0]}</text>
+    </svg>
+  );
+}

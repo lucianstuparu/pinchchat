@@ -29,7 +29,7 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss(), swVersionPlugin()],
   // Local preview against tools/mock-gateway: the register endpoints the mobile cards use.
-  preview: { proxy: { '/reg': 'http://127.0.0.1:18789', '/shop': 'http://127.0.0.1:18789', '/__shop_offline': 'http://127.0.0.1:18789' } },
+  preview: { proxy: { '/reg': 'http://127.0.0.1:18789', '/shop': 'http://127.0.0.1:18789', '/__shop_offline': 'http://127.0.0.1:18789', '/artlia': 'http://127.0.0.1:18789' } },
   build: {
     rollupOptions: {
       output: {

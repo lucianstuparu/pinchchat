@@ -57,7 +57,7 @@ export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'e
 
 export class SessionExpired extends Error {}
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+export async function post<T>(path: string, body: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

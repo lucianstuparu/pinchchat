@@ -2,6 +2,7 @@
  * Shared controls of oc and Shopping (my.design): the icon button (40 px), segmented tabs and the
  * app header. Sizes and radii come from the my.design tokens: buttons 40 / 48 / 56, radii 8 / 12 / 20.
  */
+import { L } from './lang';
 import type { ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 
@@ -40,7 +41,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
 }
 
 /** The header row while searching: the field (radius 12) and Cancel. */
-export function SearchHeader({ value, onChange, onCancel, placeholder = 'Search' }: {
+export function SearchHeader({ value, onChange, onCancel, placeholder = L('Search') }: {
   value: string; onChange: (v: string) => void; onCancel: () => void; placeholder?: string;
 }) {
   return (
@@ -55,7 +56,7 @@ export function SearchHeader({ value, onChange, onCancel, placeholder = 'Search'
           </button>
         )}
       </div>
-      <button type="button" onClick={onCancel} className="press h-10 px-2 text-[16px] text-[var(--pc-accent-ink)]">Cancel</button>
+      <button type="button" onClick={onCancel} className="press h-10 px-2 text-[16px] text-[var(--pc-accent-ink)]">{L('Cancel')}</button>
     </div>
   );
 }

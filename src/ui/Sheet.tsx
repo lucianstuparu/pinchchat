@@ -3,6 +3,7 @@
  * corners rising from the bottom (centred on a laptop), a grab handle, Back closes it, and scrolling
  * inside never scrolls the page behind. The content keeps its own header and body.
  */
+import { L } from './lang';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useBackLayer } from './useBackLayer';
@@ -30,7 +31,7 @@ export function Sheet({ label, onClose, onScrim, className = '', z = 40, childre
 }
 
 /** The close button of a sheet: a 32 px disc in a 40 px target. */
-export function CloseButton({ onClick, label = 'Close' }: { onClick: () => void; label?: string }) {
+export function CloseButton({ onClick, label = L('Close') }: { onClick: () => void; label?: string }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted"><X size={16} strokeWidth={2.5} /></span>

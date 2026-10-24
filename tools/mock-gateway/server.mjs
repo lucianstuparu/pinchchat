@@ -7,6 +7,7 @@
 //   GET /__ask           push an ask_user question into the main session
 //   GET /__log           JSON of everything clients sent
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 
 
@@ -148,6 +149,7 @@ let seq = 0;
 const clients = new Set();
 
 const now = () => Date.now();
+const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
 const hist = (key) => { if (!sessions.has(key)) sessions.set(key, []); return sessions.get(key); };
 
 // Seed two days of history so date separators and scrolling can be checked
@@ -247,7 +249,7 @@ function reply(sessionKey, message, attachments) {
 
 const handlers = {
   'agent.identity.get': () => ({ name: 'OpenClaw' }),
-  'agents.list': () => ({ agents: AGENTS.map(id => ({ id, name: id })) }),
+  'agents.list': () => ({ agents: [...AGENTS, 'artlia'].map(id => ({ id, name: id })) }),
   'sessions.list': () => ({ sessions: [...sessions.keys()].map(key => ({ key, agentId: key.split(':')[1], label: key.split(':').pop(), updatedAt: now() })) }),
   'chat.history': (p) => ({ messages: hist(p.sessionKey) }),
   'chat.send': (p) => {
@@ -302,6 +304,39 @@ const server = http.createServer((req, res) => {
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL }));
+    });
+    return;
+  }
+  // The Casa Artlia app's API (/artlia/*; ai.manager casa-artlia-app.md). In-memory sample.
+  if (url.pathname.startsWith('/artlia/')) {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      const find = () => artlia.items.find(i => i.id === p.item);
+      if (url.pathname === '/artlia/list') { res.end(JSON.stringify({ today: '2026-10-24', ...artlia })); return; }
+      if (url.pathname === '/artlia/add') {
+        const item = { id: `art-2026-10-24-${(++seq).toString(16).padStart(6, '0')}`, n: 90 + seq, kind: p.kind || 'task', title: p.title, cat: p.cat, status: 'todo', due_date: p.due_date, phase: p.phase, notes: p.notes, source: 'app' };
+        artlia.items.push(item); res.end(JSON.stringify({ ok: true, item })); return;
+      }
+      const it = find();
+      if (!it) { res.statusCode = 404; res.end(JSON.stringify({ error: 'nu există' })); return; }
+      if (url.pathname === '/artlia/file') { (it.files ||= []).push({ name: p.name, ref: `f-${seq++}`, at: new Date().toISOString(), by: 'lucian' }); res.end(JSON.stringify({ ok: true, item: it })); return; }
+      const prev = { ...it };
+      if (p.action === 'undo') { if (!it._prev) { res.statusCode = 400; res.end(JSON.stringify({ error: 'nimic de anulat' })); return; } const back = it._prev; Object.keys(it).forEach(k => delete it[k]); Object.assign(it, back, { _prev: prev }); }
+      else {
+        it._prev = prev;
+        if (p.action === 'done') it.status = 'done';
+        if (p.action === 'reopen') it.status = 'todo';
+        if (p.action === 'drop') it.status = 'cancelled';
+        if (p.action === 'snooze') it.snoozed_until = '2026-10-27';
+        if (p.action === 'status') it.status = p.status;
+        if (p.action === 'note') it.notes = [it.notes, `${p.text} (lucian, 24.10)`].filter(Boolean).join('\n');
+        if (p.action === 'edit') for (const k of ['title', 'due_date', 'cat', 'phase', 'priority']) if (p[k] !== undefined) { if (p[k] === null) delete it[k]; else it[k] = p[k]; }
+      }
+      const { _prev, ...out } = it; void _prev;
+      res.end(JSON.stringify({ ok: true, item: out }));
     });
     return;
   }

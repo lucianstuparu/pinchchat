@@ -4,6 +4,7 @@
  * the boxes at the top (Due & overdue, Priority). Pure functions, so the rules are tested.
  */
 import type { NowItem } from './api';
+import { L, RO } from '../ui/lang';
 
 /** Topic colours (the artifact's palette): rail = the number, bg/ink = the pill. */
 export const TOPIC_COLORS: Record<string, { rail: string; bg: string; ink: string; inkDark: string }> = {
@@ -37,7 +38,7 @@ export function areaOf(item: Pick<NowItem, 'store' | 'domain'> & { store: string
 
 const DAY = 86_400_000;
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / DAY);
-const short = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const short = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString(RO ? 'ro-RO' : undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
 export type DueKind = 'overdue' | 'today' | 'soon' | 'later';
 /** The due chip: "Overdue (3d)", "Today", "Tomorrow", "Fri 24 Oct". Null without a date. */
@@ -45,9 +46,9 @@ export function dueChip(item: Pick<NowItem, 'due_date' | 'scheduled'>, today: st
   const due = item.due_date || item.scheduled?.slice(0, 10);
   if (!due || !today) return null;
   const d = daysBetween(today, due);
-  if (d < 0) return { kind: 'overdue', text: `Overdue (${-d}d)` };
-  if (d === 0) return { kind: 'today', text: 'Today' };
-  if (d === 1) return { kind: 'soon', text: 'Tomorrow' };
+  if (d < 0) return { kind: 'overdue', text: L('Overdue ({d}d)', { d: -d }) };
+  if (d === 0) return { kind: 'today', text: L('Today') };
+  if (d === 1) return { kind: 'soon', text: L('Tomorrow') };
   return { kind: d <= 7 ? 'soon' : 'later', text: short(due) };
 }
 

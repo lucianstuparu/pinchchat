@@ -1,3 +1,4 @@
+import { L } from '../ui/lang';
 import { ArrowUp, Loader2, Mic, Square, X } from 'lucide-react';
 import type { Speech } from './speech';
 
@@ -7,7 +8,7 @@ export function MicButton({ speech, size = 56 }: { speech: Speech; size?: number
   if (!s.available) return null;
   return (
     <button type="button" onClick={s.toggle} disabled={s.state === 'writing' || s.state === 'starting'}
-      aria-label={s.listening ? 'Done speaking' : s.state === 'writing' ? 'Writing what you said' : `Speak (${s.engine})`} aria-pressed={s.listening}
+      aria-label={s.listening ? L('Done speaking') : s.state === 'writing' ? L('Writing what you said') : L('Speak ({engine})', { engine: s.engine })} aria-pressed={s.listening}
       style={{ width: size, height: size }}
       className={`relative flex shrink-0 items-center justify-center rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.18)] press ${
         s.listening ? 'bg-red-500 text-white' : 'bg-pc-accent text-[var(--pc-on-accent)]'}`}>
@@ -28,7 +29,7 @@ export function PrimaryButton({ speech, canSend, onSend, size = 56 }: { speech: 
   const busy = speech.listening || speech.state === 'writing' || speech.state === 'starting';
   if (busy || !canSend) return <MicButton speech={speech} size={size} />;
   return (
-    <button type="button" onClick={onSend} aria-label="Send" style={{ width: size, height: size }}
+    <button type="button" onClick={onSend} aria-label={L('Send')} style={{ width: size, height: size }}
       className="flex shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow-[0_4px_14px_rgba(0,0,0,0.18)] press">
       <ArrowUp size={size * 0.46} strokeWidth={2.6} />
     </button>

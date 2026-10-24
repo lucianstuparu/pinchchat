@@ -5,6 +5,7 @@ import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:f
 
 for (const f of readdirSync('dist/shop')) cpSync(`dist/shop/${f}`, `dist/${f}`);
 rmSync('dist/shop', { recursive: true });
+rmSync('dist/artlia', { recursive: true, force: true });
 const html = readFileSync('dist/index.html', 'utf8')
   .replace(/<title>[^<]*<\/title>/, '<title>Shopping</title>')
   .replace(/<meta name="theme-color" content="[^"]*"/, '<meta name="theme-color" content="#ffffff"');

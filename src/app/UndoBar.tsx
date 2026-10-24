@@ -5,6 +5,7 @@
  * or of a sheet), never positioned over the page with a guessed offset. Undo puts the item back
  * exactly as it was (the server keeps the previous state; Shopping reopens offline).
  */
+import { L } from '../ui/lang';
 import { useEffect } from 'react';
 import { RotateCcw } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export function UndoBar({ info, onClose }: { info: UndoInfo | null; onClose: () 
         <span className="min-w-0 flex-1 truncate text-[15px]">{info.label}</span>
         <button type="button" onClick={() => { info.undo(); onClose(); }}
           className="press flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] px-3 text-[15px] font-semibold">
-          <RotateCcw size={16} strokeWidth={2.5} /> Undo
+          <RotateCcw size={16} strokeWidth={2.5} /> {L('Undo')}
         </button>
       </div>
     </div>
