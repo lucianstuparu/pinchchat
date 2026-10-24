@@ -12,7 +12,7 @@
  */
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
+import { ArrowDown, Bell, MessageCircle, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -35,6 +35,7 @@ import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRule
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { WaCards } from './WaCard';
+import { SpeedDial, type Contact } from './SpeedDial';
 import { SettingsSheet } from './SettingsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
@@ -260,6 +261,16 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     }
     setPrefill({ nonce: Date.now(), text, attachments: [] });
   };
+  // WhatsApp speed dial: pick a person, then say what to tell them (the label carries who).
+  const [dial, setDial] = useState(false);
+  const writeTo = (c: Contact) => {
+    setDial(false);
+    setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: {
+      label: `WhatsApp · ${c.label}`, prefix: `Scrie-i lui ${c.name}: `, icon: MessageCircle,
+      style: mode === 'dark' ? { background: '#1d9e7533', color: '#5fd3a9' } : { background: '#e1f5ee', color: '#0f6e56' },
+      placeholder: `What should I tell ${c.label}?`,
+    } });
+  };
   const putIntent = (q: typeof QUICK[number]) => {
     const intent: Intent = { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder };
     setPrefill({ nonce: Date.now(), text: '', attachments: [], intent });
@@ -274,7 +285,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const last = messages[messages.length - 1];
     if (last?.role === 'assistant' && !last.isStreaming && isShownInMessenger(last)) {
       const t = visibleText(last);
-      notify('OpenClaw', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'New message'));
+      notify(import.meta.env.VITE_APP_NAME || 'Chat', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'New message'));
       void refresh();
     }
   }, [messages, notify, refresh]);
@@ -498,7 +509,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         ) : search !== null ? (
           <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Search to-dos and messages" />
         ) : (
-          <AppHeader title={name ? `Hi, ${name}` : 'OpenClaw'} subtitle={dateTitle} initial={name ? name[0] : '…'} onSettings={() => setSettings(true)}
+          <AppHeader title={name ? `Hi, ${name}` : 'Chat'} subtitle={dateTitle} initial={name ? name[0] : '…'} onSettings={() => setSettings(true)}
             actions={<IconButton label="Search" onClick={() => setSearch('')}><Search size={22} /></IconButton>} />
         )}
         {statusLine && search === null && <div className="flex h-6 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
@@ -536,6 +547,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <div className="shrink-0 border-t border-pc-border bg-pc-base">
           {!sheet && !todoOpen && undoBar}
           <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
+            <button type="button" onClick={() => setDial(true)}
+              className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[15px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
+              <MessageCircle size={16} style={{ color: mode === 'dark' ? '#5fd3a9' : '#1d9e75' }} /> WhatsApp
+            </button>
             {QUICK.map(qq => (
               <button key={qq.label} type="button" onClick={() => putIntent(qq)}
                 className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[15px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
@@ -564,6 +579,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
+      {dial && <SpeedDial onPick={writeTo} onClose={() => setDial(false)} />}
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />

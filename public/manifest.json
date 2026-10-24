@@ -1,8 +1,8 @@
 {
   "id": "/openclaw",
-  "name": "OpenClaw",
-  "short_name": "OpenClaw",
-  "description": "Private messenger for your OpenClaw assistant. Share links, photos and files straight into the conversation.",
+  "name": "Chat",
+  "short_name": "Chat",
+  "description": "Your assistant: say or type anything, to-dos, notes, WhatsApp messages.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -150,6 +150,11 @@ const clients = new Set();
 
 const now = () => Date.now();
 const waDrafts = new Map();
+const waContacts = [
+  { id: 'ct-1', name: 'Eugenia Gamurari', label: 'Bunica', aliases: ['bunica', 'bunicii', 'buni'], phone: '+33600000000', lang: 'ro', tone: 'informal', sent: 3, last_sent: '2026-10-24T08:00:00Z' },
+  { id: 'ct-2', name: 'Fleur Guillemot', label: 'Fleur', aliases: [], phone: '+33600000001', lang: 'fr', tone: 'formal', sent: 0 },
+  { id: 'ct-3', name: 'Mama', label: 'Mama', aliases: ['mama', 'mamei'], phone: '', lang: 'ro', tone: 'informal', sent: 0 },
+];
 const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
 const hist = (key) => { if (!sessions.has(key)) sessions.set(key, []); return sessions.get(key); };
 
@@ -245,7 +250,7 @@ function reply(sessionKey, message, attachments) {
   if (first === 'ask') { const r = streamReply(sessionKey, 'Let me check one thing first.'); setTimeout(() => askQuestion(sessionKey), 900); return r; }
   if (first === 'long') return streamReply(sessionKey, LONG, 8);
   // "scrie-i bunicii că …": a WhatsApp draft card (ai.manager whatsapp-send.md); nothing is ever sent here
-  const wa = m.match(/^scrie-i\s+(\S+)\s+(?:că|ca)\s+(.+)$/i);
+  const wa = m.match(/^scrie-i\s+(\S+)\s+(?:că|ca)\s+(.+)$/i) || m.match(/^scrie-i\s+lui\s+([^:]+):\s+(.+)$/i);
   if (wa) {
     const id = `wa-2026-10-24-${(++seq).toString(16).padStart(6, '0')}`;
     const said = wa[2].trim();
@@ -313,6 +318,20 @@ const server = http.createServer((req, res) => {
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL }));
+    });
+    return;
+  }
+  if (url.pathname === '/reg/wa/contacts' || url.pathname === '/reg/wa/contact') {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      if (url.pathname === '/reg/wa/contacts') { res.end(JSON.stringify({ contacts: waContacts })); return; }
+      let c = waContacts.find(x => x.id === p.id);
+      if (!c) { c = { id: `ct-${++seq}`, sent: 0 }; waContacts.push(c); }
+      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone, lang: p.lang, tone: p.tone });
+      res.end(JSON.stringify({ ok: true, contact: c }));
     });
     return;
   }
