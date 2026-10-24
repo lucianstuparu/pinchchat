@@ -156,7 +156,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
                 <NovaBadge nova={p.health.nova} />
                 {(p.health.flags ?? []).map(f => <span key={f} className="rounded-[8px] bg-pc-elevated px-2 py-0.5 text-[12px] text-pc-text-secondary">{f}</span>)}
               </div>
-              {p.health.note && <p className="mt-2 text-[14px] leading-snug text-pc-text-secondary">{p.health.note}</p>}
+              {p.health.note && <p className="mt-2 text-[15px] leading-snug text-pc-text-secondary">{p.health.note}</p>}
             </div>
           )}
 
@@ -171,7 +171,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
               <p className="mb-1 mt-4 px-1 text-[13px] text-pc-text-muted">Per 100 g</p>
               <dl className="divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface px-4">
                 {NUTRIENTS.filter(([k]) => n[k] != null).map(([k, label, unit]) => (
-                  <div key={k} className="flex justify-between py-2 text-[14px]">
+                  <div key={k} className="flex justify-between py-2 text-[15px]">
                     <dt className={label.startsWith('  ') ? 'pl-3 text-pc-text-muted' : ''}>{label.trim()}</dt>
                     <dd className="tabular-nums">{n[k]} {unit}</dd>
                   </div>
@@ -185,7 +185,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
               <button type="button" onClick={() => setShowIngredients(s => !s)} className="flex w-full items-center justify-between text-[15px] font-medium" aria-expanded={showIngredients}>
                 Ingredients {showIngredients ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
               </button>
-              {showIngredients && <p className="mt-2 text-[14px] leading-snug text-pc-text-secondary">{p.ingredients}</p>}
+              {showIngredients && <p className="mt-2 text-[15px] leading-snug text-pc-text-secondary">{p.ingredients}</p>}
             </div>
           )}
 
@@ -194,7 +194,7 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
               <p className="mb-1 mt-4 px-1 text-[13px] text-pc-text-muted">Bought {p.stats ? `${p.stats.times} time${p.stats.times === 1 ? '' : 's'} this year` : ''}</p>
               <div className="divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface px-4">
                 {mine.map(x => (
-                  <div key={x.id} className="flex justify-between py-2 text-[14px]">
+                  <div key={x.id} className="flex justify-between py-2 text-[15px]">
                     <span>{fmtDay(x.date)}{x.store ? ` · ${storeName(x.store)}` : ''}{x.by ? ` · ${x.by}` : ''}</span>
                     <span className="tabular-nums">{money(x.price, x.currency)}</span>
                   </div>

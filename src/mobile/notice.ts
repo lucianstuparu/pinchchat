@@ -26,7 +26,10 @@ export interface Notice { summary: string; detail: string }
 const FAILED = [
   /^This turn ended before a reply:\s*/i,
   /^Error:\s*/,
+  /^FailoverError:\s*/,
 ];
+/** The bare error text the gateway also sends next to its notice (same failure, no prefix). */
+const BARE = /^(Failed to authenticate|OAuth session expired|Request timed out|Overloaded|Rate limit)/i;
 const CONTENTION = /^The turn was interrupted while the server was busy\b/;
 
 const CAUSES: Array<[RegExp, string]> = [
@@ -43,10 +46,30 @@ export function failedTurn(text: string): Notice | null {
   const t = text.trim();
   if (CONTENTION.test(t)) return { summary: 'No reply · server was busy', detail: t };
   const head = FAILED.find(re => re.test(t));
-  if (!head) return null;
-  const detail = t.replace(head, '');
+  if (!head && !BARE.test(t)) return null;
+  const detail = head ? t.replace(head, '') : t;
   const cause = CAUSES.find(([re]) => re.test(detail))?.[1] ?? 'something went wrong';
   return { summary: `No reply · ${cause}`, detail };
+}
+
+/**
+ * One failure, one line: the gateway reports a failed turn twice (its notice and the bare error),
+ * so a failure right after the same failure is left out.
+ */
+export function dropRepeatedFailures<T>(msgs: T[], textOf: (m: T) => string): T[] {
+  let last: string | null = null;
+  return msgs.filter(m => {
+    const f = failedTurn(textOf(m));
+    const repeat = !!f && f.summary === last;
+    last = f ? f.summary : null;
+    return !repeat;
+  });
+}
+
+/** A voice message: "Voice message: <what was said>" (older ones: "🎤 Voice note", no words). */
+export function voiceMessage(text: string): { said: string } | null {
+  const m = text.trim().match(/^(?:Voice message|🎤 Voice note)(?::\s*([\s\S]*))?$/u);
+  return m ? { said: (m[1] ?? '').trim() } : null;
 }
 
 /** Long bubbles start folded: more than this many characters or lines. */

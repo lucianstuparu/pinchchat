@@ -175,6 +175,9 @@ The grant is paid after the works, on the invoice of a certified installer. Appl
 
 ${pasted}` }], timestamp: yesterday + 8000 });
   h.push({ id: 'h7', role: 'assistant', content: [{ type: 'text', text: 'This turn ended before a reply: Failed to authenticate: OAuth session expired and could not be refreshed' }], timestamp: yesterday + 9000 });
+  h.push({ id: 'h7b', role: 'assistant', content: [{ type: 'text', text: 'Failed to authenticate: OAuth session expired and could not be refreshed' }], timestamp: yesterday + 9100 });
+  h.push({ id: 'h8', role: 'user', content: [{ type: 'text', text: 'Voice message: Cumpără sare pentru mașina de spălat vase când sunt la Carrefour' }], timestamp: yesterday + 10000 });
+  h.push({ id: 'h9', role: 'user', content: [{ type: 'text', text: '\u{1F3A4} Voice note' }], timestamp: yesterday + 11000 });
 }
 
 function broadcast(event, payload) {

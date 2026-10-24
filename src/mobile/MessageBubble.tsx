@@ -1,5 +1,5 @@
 import { memo, useRef, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Reply } from 'lucide-react';
+import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply } from 'lucide-react';
 import { AgentAvatar, MeAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
@@ -8,7 +8,7 @@ import { buildImageSrc } from '../lib/image';
 import { formatTime, visibleText } from './messageView';
 import { extractItems } from './messageItems';
 import { ItemActions } from './ItemActions';
-import { failedTurn, isLong } from './notice';
+import { failedTurn, isLong, voiceMessage } from './notice';
 
 const mdComponents: Components = {
   a: ({ node, ...props }) => {
@@ -48,10 +48,10 @@ function FailedTurn({ summary, detail, time, showAvatar }: { summary: string; de
       <Avatar mine={false} visible={showAvatar} />
       <div className="min-w-0 max-w-[80%]">
         <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
-          className="press inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] border border-pc-border bg-pc-surface px-3 text-left text-[14px] text-pc-text">
+          className="press inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] border border-pc-border bg-pc-surface px-3 text-left text-[15px] text-pc-text">
           <AlertCircle size={16} className="shrink-0 text-red-500" aria-hidden />
           <span className="min-w-0 truncate">{summary}</span>
-          <span className="shrink-0 text-[11px] text-pc-text-muted">{time}</span>
+          <span className="shrink-0 text-[12px] text-pc-text-muted">{time}</span>
           <ChevronDown size={16} className={`shrink-0 text-pc-text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
         </button>
         {open && <p className="mt-1 px-1 text-[13px] leading-snug text-pc-text-muted break-words select-text">{detail}</p>}
@@ -72,7 +72,10 @@ const LONG_PRESS_MS = 450;
 export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect }: Props) {
   const mine = msg.role === 'user';
   // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
-  const { text, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
+  const { text: raw, items } = msg.role === 'user' ? { text: visibleText(msg), items: [] } : extractItems(visibleText(msg));
+  // A voice message shows the words said (Whisper, before sending), after a mic.
+  const voiceNote = mine ? voiceMessage(raw) : null;
+  const text = voiceNote ? voiceNote.said : raw;
   const images = msg.blocks.filter(b => b.type === 'image') as Array<{ type: 'image'; mediaType: string; data?: string; url?: string }>;
   const typing = msg.isStreaming && !text;
   const canReply = !!onReply && !msg.isStreaming && (text.length > 0 || images.length > 0);
@@ -81,7 +84,10 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   const [menu, setMenu] = useState(false);
   const [unfolded, setUnfolded] = useState(false);
   const failed = !mine && !msg.isStreaming ? failedTurn(text) : null;
-  const folded = isLong(text) && !unfolded;
+  const long = isLong(text);
+  const folded = long && !unfolded;
+  // A long-press (menu) or a swipe (reply) is not a tap that opens a folded message.
+  const noTap = useRef(false);
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null; timer: number | null; armed: boolean } | null>(null);
 
   const clearTimer = () => {
@@ -92,9 +98,10 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   const onTouchStart = (e: React.TouchEvent) => {
     if (!canReply) return;
     const t = e.touches[0];
+    noTap.current = false;
     touch.current = {
       x: t.clientX, y: t.clientY, horizontal: null, armed: false,
-      timer: window.setTimeout(() => { setMenu(true); navigator.vibrate?.(10); }, LONG_PRESS_MS),
+      timer: window.setTimeout(() => { noTap.current = true; setMenu(true); navigator.vibrate?.(10); }, LONG_PRESS_MS),
     };
   };
 
@@ -104,7 +111,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
     const t = e.touches[0];
     const mx = t.clientX - s.x;
     const my = t.clientY - s.y;
-    if (Math.abs(mx) > 8 || Math.abs(my) > 8) clearTimer();
+    if (Math.abs(mx) > 8 || Math.abs(my) > 8) { clearTimer(); noTap.current = true; }
     if (s.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) s.horizontal = Math.abs(mx) > Math.abs(my) && mx < 0;
     if (!s.horizontal) return;
     const next = Math.max(0, Math.min(SWIPE_MAX, -mx));
@@ -152,10 +159,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
         onContextMenu={canReply ? e => { e.preventDefault(); setMenu(true); } : undefined}
+        onClick={folded && !selecting ? () => { if (!noTap.current) setUnfolded(true); } : undefined}
         // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
         // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
         style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${-dx}px)` } : {}) }}
-        className={`relative ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-[20px] px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
+        className={`relative ${folded ? 'cursor-pointer' : ''} ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-[20px] px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
           canReply ? 'select-none [-webkit-touch-callout:none]' : ''
         } ${
           mine
@@ -179,15 +187,18 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
               <span key={i} className="h-1.5 w-1.5 rounded-full bg-pc-text-muted animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
             ))}
           </span>
+        ) : voiceNote && !text ? (
+          <p className="flex items-center gap-1.5 py-0.5 text-[16px] text-pc-text-muted"><Mic size={16} className="shrink-0 text-[var(--pc-accent-ink)]" aria-hidden /> Voice message</p>
         ) : text ? (
           <>
             {/* Long messages start folded at about eight lines; the rest is a tap away. */}
-            <div className={`text-[15px] leading-snug ${MD_CLASSES} ${folded ? 'max-h-[10.5rem] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
+            {voiceNote && <Mic size={15} className="float-left mr-1.5 mt-[3px] text-[var(--pc-accent-ink)]" aria-label="Voice message" />}
+            <div className={`text-[16px] leading-[22px] ${MD_CLASSES} ${folded ? 'max-h-[176px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
               <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
             </div>
-            {isLong(text) && (
+            {long && (
               <button type="button" onClick={e => { e.stopPropagation(); setUnfolded(u => !u); }} aria-expanded={!folded}
-                className="press -ml-1 min-h-10 px-1 text-[14px] font-semibold text-pc-accent">
+                className="press -ml-1 min-h-10 px-1 text-[15px] font-semibold text-pc-accent">
                 {folded ? 'Show all' : 'Show less'}
               </button>
             )}
@@ -195,7 +206,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         ) : null}
         {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items) : <ItemActions items={items} />)}
 
-        <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[11px] text-pc-text-muted select-none">
+        <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[12px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>
           {mine && msg.sendStatus === 'sending' && <Clock size={11} aria-label="sending" />}
           {mine && (msg.sendStatus === 'sent' || msg.sendStatus === undefined) && <Check size={12} aria-label="sent" />}
@@ -242,7 +253,7 @@ export function AttachmentChip({ name, mimeType, preview, onRemove }: { name: st
       ) : (
         <span className="h-9 w-9 rounded-lg bg-pc-input flex items-center justify-center text-pc-text-muted"><FileText size={18} /></span>
       )}
-      <span className="truncate text-xs text-pc-text">{name}</span>
+      <span className="truncate text-[12px] text-pc-text">{name}</span>
       <button type="button" onClick={onRemove} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-5 w-5 text-pc-text-muted hover:bg-[var(--pc-hover-strong)]" aria-label={`Remove ${name}`}>
         ×
       </button>

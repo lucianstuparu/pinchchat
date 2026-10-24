@@ -80,21 +80,21 @@ export function QuestionCard({ record, onAnswer, onSkip }: Props) {
 
   return (
     <div className="mx-3 my-2 rounded-2xl border border-pc-border bg-pc-surface shadow-sm overflow-hidden" role="group" aria-label="Question from OpenClaw">
-      <div className="flex items-center justify-between px-4 pt-3 text-xs text-pc-text-muted">
+      <div className="flex items-center justify-between px-4 pt-3 text-[12px] text-pc-text-muted">
         <span>OpenClaw is asking</span>
         <span aria-label="time remaining">{remaining}</span>
       </div>
 
       {hasSecret ? (
-        <p className="px-4 py-3 text-sm text-pc-text">
+        <p className="px-4 py-3 text-[15px] text-pc-text">
           This question asks for a secret. Answer it in the OpenClaw Control UI — secrets are not collected here.
         </p>
       ) : record.questions.map(q => (
         <div key={q.questionId} className="px-4 py-2">
-          {q.header && <div className="text-[11px] uppercase tracking-wide text-pc-accent font-semibold">{q.header}</div>}
+          {q.header && <div className="text-[12px] uppercase tracking-wide text-pc-accent font-semibold">{q.header}</div>}
           <p className="text-[15px] text-pc-text mt-0.5">{q.question}</p>
           {q.url && (
-            <a href={q.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-pc-accent">
+            <a href={q.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[12px] text-pc-accent">
               <ExternalLink size={12} /> {safeHost(q.url)}
             </a>
           )}
@@ -117,7 +117,7 @@ export function QuestionCard({ record, onAnswer, onSkip }: Props) {
                     )}
                     {opt.label}
                   </span>
-                  {opt.description && <span className="block text-xs text-pc-text-muted mt-0.5">{opt.description}</span>}
+                  {opt.description && <span className="block text-[12px] text-pc-text-muted mt-0.5">{opt.description}</span>}
                 </button>
               );
             })}
@@ -136,14 +136,14 @@ export function QuestionCard({ record, onAnswer, onSkip }: Props) {
         </div>
       ))}
 
-      {error && <p className="px-4 text-xs text-red-500">{error}</p>}
+      {error && <p className="px-4 text-[12px] text-red-500">{error}</p>}
 
       <div className="flex justify-end gap-2 px-3 py-2.5">
-        <button type="button" disabled={busy} onClick={() => void onSkip(record.id)} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-pc-text-muted hover:bg-[var(--pc-hover)]">
+        <button type="button" disabled={busy} onClick={() => void onSkip(record.id)} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[15px] text-pc-text-muted hover:bg-[var(--pc-hover)]">
           <X size={14} /> Skip
         </button>
         {!hasSecret && (!oneTap || (other[record.questions[0].questionId] ?? '').trim()) && (
-          <button type="button" disabled={busy || !complete} onClick={() => void submit(collect())} className="rounded-full px-4 py-1.5 text-sm font-medium bg-pc-accent text-white disabled:opacity-50">
+          <button type="button" disabled={busy || !complete} onClick={() => void submit(collect())} className="rounded-full px-4 py-1.5 text-[15px] font-medium bg-pc-accent text-white disabled:opacity-50">
             Send
           </button>
         )}

@@ -10,9 +10,9 @@
  * folded into a pinned bar, a real Settings sheet, one mic for speaking to type, search across
  * tasks, topics and messages, and no programmer words ("loop" is "In progress" on screen).
  */
-import { failedTurn } from '../mobile/notice';
+import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, ChevronRight, Copy, Languages, ListChecks, Lightbulb, Search, StickyNote, X } from 'lucide-react';
+import { ArrowDown, Bell, CalendarClock, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -21,7 +21,7 @@ import { getStoredCredentials } from '../lib/credentials';
 import type { ChatMessage } from '../types';
 import { MessageBubble } from '../mobile/MessageBubble';
 import { collapseCliTurns, isShownInMessenger, visibleText, withoutLeadingQuote } from '../mobile/messageView';
-import { Composer, type ComposerPrefill } from '../mobile/Composer';
+import { Composer, type ComposerPrefill, type Intent } from '../mobile/Composer';
 import { QuestionCard } from '../mobile/QuestionCard';
 import { useQuestions } from '../mobile/useQuestions';
 import { switchUiMode } from '../mobile/uiMode';
@@ -31,7 +31,7 @@ import { clearShareParam, pendingShareId, takeSharedContent } from '../share/sha
 import { searchMessages, snippet } from '../mobile/searchMessages';
 import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
-import { groupTodo, matches, plainTitle, railOf } from './todoRules';
+import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { SettingsSheet } from './SettingsSheet';
@@ -57,14 +57,17 @@ function dayLabel(ts: number): string {
 const isLocal = () => ['127.0.0.1', 'localhost'].includes(window.location.hostname);
 const has = (q: string, ...fields: Array<string | undefined>) => fields.some(f => f && f.toLowerCase().includes(q));
 
-/** Quick starts: they set the intent of the next message (app v2 §2). */
-const QUICK = [
-  { label: 'Task', icon: ListChecks, text: 'Task: ' },
-  { label: 'Remind me', icon: Bell, text: 'Remind me ' },
-  { label: 'Note', icon: StickyNote, text: 'Note: ' },
-  { label: 'Translate', icon: Languages, text: 'Translate: ' },
-  { label: 'Think through', icon: Lightbulb, text: 'Let’s think through: ' },
+/** Quick starts: they set the intent of the next message (app v2 §2), shown as a coloured label. */
+type Tone = { bg: string; ink: string; inkDark: string; rail: string };
+const VIOLET: Tone = { rail: '#7c5cd6', bg: '#efeafd', ink: '#5b3fb5', inkDark: '#b9a6f5' };
+const QUICK: Array<{ label: string; icon: LucideIcon; prefix: string; tone: Tone; placeholder: string }> = [
+  { label: 'Task', icon: ListChecks, prefix: 'Task: ', tone: TOPIC_COLORS.Admin, placeholder: 'What needs doing?' },
+  { label: 'Remind me', icon: Bell, prefix: 'Remind me ', tone: TOPIC_COLORS.People, placeholder: 'What, and when?' },
+  { label: 'Note', icon: StickyNote, prefix: 'Note: ', tone: TOPIC_COLORS.Money, placeholder: 'What to keep?' },
+  { label: 'Translate', icon: Languages, prefix: 'Translate: ', tone: VIOLET, placeholder: 'Text to translate' },
+  { label: 'Think through', icon: Lightbulb, prefix: 'Let’s think through: ', tone: TOPIC_COLORS.Errands, placeholder: 'What’s on your mind?' },
 ];
+const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { background: `${t.rail}33`, color: t.inkDark } : { background: t.bg, color: t.ink });
 
 export default function DeskApp() {
   const [look, setLookState] = useState<Look>(getLook);
@@ -224,11 +227,29 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const putInComposer = (text: string, sendNow = false) => {
     setTodoOpen(false);
     if (sendNow) { send(text, []); return; }
+    // A question about an item: a label naming it (number and title), never its id in the text.
+    const about = text.match(/^(About|Schedule) ⟨([^⟩]+)⟩(: | for )$/);
+    if (about) {
+      const it = now.items.find(i => i.id === about[2]);
+      const name = it ? `${it.n != null ? `${it.n} ` : ''}${plainTitle(it.title)}` : 'this item';
+      const tone = TOPIC_COLORS[it?.topics?.[0] ?? ''];
+      setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: {
+        label: `${about[1]} ${name.length > 28 ? `${name.slice(0, 27)}…` : name}`, prefix: text,
+        icon: about[1] === 'About' ? MessageSquare : CalendarClock,
+        style: tone ? toneStyle(tone, mode) : { background: 'var(--pc-hover-strong)', color: 'var(--pc-text)' },
+        placeholder: about[1] === 'About' ? 'Your question' : 'When?',
+      } });
+      return;
+    }
     setPrefill({ nonce: Date.now(), text, attachments: [] });
+  };
+  const putIntent = (q: typeof QUICK[number]) => {
+    const intent: Intent = { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder };
+    setPrefill({ nonce: Date.now(), text: '', attachments: [], intent });
   };
 
   // A new reply may have filed or closed something: refresh the lists.
-  const shown = useMemo(() => collapseCliTurns(messages).filter(isShownInMessenger), [messages]);
+  const shown = useMemo(() => dropRepeatedFailures(collapseCliTurns(messages).filter(isShownInMessenger), visibleText), [messages]);
   const prevCount = useRef(messages.length);
   useEffect(() => {
     const before = prevCount.current; prevCount.current = messages.length;
@@ -286,7 +307,6 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const active = useMemo(() => now.items.filter(i => !i.hidden), [now.items]);
   const top = useMemo(() => { const g = groupTodo(active, now.today); return g.due[0] ?? g.priority[0] ?? g.areas[0]?.items[0] ?? g.waiting[0]; }, [active, now.today]);
   const overdue = active.filter(i => i.section === 'overdue').length;
-  const urgentCount = active.filter(i => i.section === 'overdue' || i.section === 'today').length;
 
   // Adding from the To do screen: the text goes to the assistant as a task; its answer shows under the box.
   const [asked, setAsked] = useState<{ text: string; ts: number } | null>(null);
@@ -334,38 +354,38 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       footer={onClose && todoOpen && !sheet && undo ? undoBar : null} />
   );
 
-  // The pinned bar over the chat (phone): the most pressing thing, and how much else is waiting.
+  // The pinned card over the chat (phone): the most pressing thing, and how much else is waiting.
+  // It sits on a band with a shadow edge, so the chat clearly scrolls under it.
+  const moreOverdue = overdue - (top?.section === 'overdue' ? 1 : 0);
   const pinnedBar = (
-    <button type="button" onClick={() => { setTab('todo'); setTodoOpen(true); }} aria-label="Open To do"
-      className="mx-3 mt-2 mb-1 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-[12px] border border-pc-border bg-pc-elevated px-3 py-2 text-left shadow-[0_2px_10px_rgba(0,0,0,0.06)] active:scale-[0.99] md:hidden">
-      <span className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[12px] px-1.5 text-[15px] font-bold tabular-nums ${
-        active.length === 0 ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]' : urgentCount > 0 ? 'bg-[#dc4c4c] text-white' : 'bg-pc-surface text-pc-text'}`}>
-        {active.length === 0 ? <ListChecks size={18} /> : active.length}
-      </span>
-      <span className="min-w-0 flex-1">
-        {!loaded ? <span className="block text-[15px] text-pc-text-muted">{expired ? 'Signed out of the lists' : 'To do'}</span>
-          : top ? (
-            <>
-              <span className="flex items-baseline gap-1.5 text-[15px] leading-tight">
-                {top.n != null && <span className="shrink-0 font-bold tabular-nums" style={{ color: railOf(top) }}>{top.n}</span>}
-                <Title text={top.title} className="min-w-0 truncate" />
-              </span>
-              <span className="mt-1 flex items-center gap-1.5 text-[12px] leading-tight text-pc-text-muted">
-                <DueChip item={top} today={now.today} mode={mode} />
-                <span className="truncate">
-                  {[overdue - (top?.section === 'overdue' ? 1 : 0) > 0 ? `${overdue - (top?.section === 'overdue' ? 1 : 0)} more overdue` : '', loops.length > 0 ? `${loops.length} in progress` : ''].filter(Boolean).join(' · ')}
+    <div className="relative z-10 bg-pc-base px-3 pb-2 pt-2 shadow-[0_10px_12px_-12px_rgba(0,0,0,0.35)] md:hidden">
+      <button type="button" onClick={() => { setTab('todo'); setTodoOpen(true); }} aria-label="Open To do"
+        className="flex w-full items-center gap-3 rounded-[12px] bg-pc-elevated px-4 py-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.08),0_4px_14px_rgba(0,0,0,0.10)] ring-1 ring-[var(--pc-separator)] active:scale-[0.99]">
+        <span className="min-w-0 flex-1">
+          {!loaded ? <span className="block text-[16px] text-pc-text-muted">{expired ? 'Signed out of the lists' : 'To do'}</span>
+            : top ? (
+              <>
+                <span className="flex items-baseline gap-1.5 text-[16px] leading-tight">
+                  {top.n != null && <span className="shrink-0 font-bold tabular-nums" style={{ color: railOf(top) }}>{top.n}</span>}
+                  <Title text={top.title} className="min-w-0 truncate" />
                 </span>
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="block text-[15px] font-medium leading-tight">All clear</span>
-              <span className="mt-0.5 block text-[12px] leading-tight text-pc-text-muted">{loops.length > 0 ? `${loops.length} in progress` : 'Nothing needs you right now'}</span>
-            </>
-          )}
-      </span>
-      <ChevronRight size={18} className="shrink-0 text-pc-text-faint" />
-    </button>
+                <span className="mt-1.5 flex items-center gap-1.5 text-[13px] leading-tight text-pc-text-muted">
+                  <DueChip item={top} today={now.today} mode={mode} />
+                  <span className="truncate">
+                    {[moreOverdue > 0 ? `${moreOverdue} more overdue` : active.length > 1 ? `${active.length - 1} more to do` : '', loops.length > 0 ? `${loops.length} in progress` : ''].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="block text-[16px] font-medium leading-tight">All clear</span>
+                <span className="mt-1 block text-[13px] leading-tight text-pc-text-muted">{loops.length > 0 ? `${loops.length} in progress` : 'Nothing needs you right now'}</span>
+              </>
+            )}
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-pc-text-faint" />
+      </button>
+    </div>
   );
 
   const searchResults = (
@@ -407,7 +427,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             {found.msgs.map(m => { const sn = snippet(visibleText(m), search ?? ''); return (
               <button key={m.id} type="button" onClick={() => jumpTo(m.id)} className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
                 <span className="mb-0.5 block text-[12px] text-pc-text-muted">{m.role === 'user' ? 'You' : 'Assistant'} · {dayLabel(m.timestamp)}</span>
-                <span className="line-clamp-2 text-[14px] leading-snug">{sn.before}<mark className="rounded bg-[rgba(var(--pc-accent-rgb),0.25)] px-0.5 text-pc-text-primary">{sn.match}</mark>{sn.after}</span>
+                <span className="line-clamp-2 text-[15px] leading-snug">{sn.before}<mark className="rounded bg-[rgba(var(--pc-accent-rgb),0.25)] px-0.5 text-pc-text-primary">{sn.match}</mark>{sn.after}</span>
               </button>); })}
           </div>
         </section>
@@ -417,7 +437,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
   const chat = (
     <>
-      {isLoadingHistory && shown.length === 0 && <p className="py-6 text-center text-xs text-pc-text-muted">Loading…</p>}
+      {isLoadingHistory && shown.length === 0 && <p className="py-6 text-center text-[12px] text-pc-text-muted">Loading…</p>}
       {!isLoadingHistory && shown.length === 0 && outbox.length === 0 && (
         <div className="px-10 py-16 text-center">
           <p className="text-[17px] font-semibold">What’s on your mind?</p>
@@ -472,7 +492,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
               <Bell size={18} className="mt-0.5 shrink-0 text-pc-accent" />
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold leading-snug">{notice.title}</p>
-                {notice.body && <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-snug text-pc-text-secondary">{notice.body}</p>}
+                {notice.body && <p className="mt-0.5 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-secondary">{notice.body}</p>}
                 <p className="mt-1 text-[12px] text-pc-text-muted">
                   Notification · {new Date(notice.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                   {notice.item && <> · <button type="button" onClick={() => { setSheet(notice.item!); dismissNotice(); }} className="font-medium text-pc-accent">Open it</button></>}
@@ -496,9 +516,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           {!sheet && !todoOpen && undoBar}
           <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
             {QUICK.map(qq => (
-              <button key={qq.label} type="button" onClick={() => putInComposer(qq.text)}
-                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[14px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
-                <qq.icon size={15} className="text-pc-accent" /> {qq.label}
+              <button key={qq.label} type="button" onClick={() => putIntent(qq)}
+                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[15px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
+                <qq.icon size={16} style={{ color: mode === 'dark' ? qq.tone.inkDark : qq.tone.rail }} /> {qq.label}
               </button>
             ))}
           </div>

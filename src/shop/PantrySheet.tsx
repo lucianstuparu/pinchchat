@@ -70,7 +70,7 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
                         <span className="block truncate text-[16px]">{e.title}{e.qty ? <span className="text-pc-text-muted"> ×{e.qty}</span> : null}</span>
                         <span className={`text-[13px] ${g === 'expired' ? 'text-red-500' : g === 'week' ? 'text-[var(--pc-accent-ink)]' : 'text-pc-text-muted'}`}>{expiryLabel(e, today)}</span>
                       </button>
-                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'used' })} className="press inline-flex h-10 items-center gap-1 rounded-full bg-pc-surface px-3 text-[14px] font-medium" aria-label={`${e.title} used`}>
+                      <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'used' })} className="press inline-flex h-10 items-center gap-1 rounded-full bg-pc-surface px-3 text-[15px] font-medium" aria-label={`${e.title} used`}>
                         <Check size={15} className="text-emerald-600" /> Used
                       </button>
                       <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'wasted' })} className="press flex h-10 w-10 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted" aria-label={`${e.title} thrown away`}>
@@ -142,7 +142,7 @@ function PantryEdit({ entry, onOp, onClose }: { entry: PantryEntry; onOp: (op: P
           <span className="text-[15px] font-semibold">At home</span>
           <button type="button" onClick={save} className="press h-10 px-1 text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
         </div>
-        <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[18px] font-semibold`} aria-label="Name" />
+        <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[17px] font-semibold`} aria-label="Name" />
         <div className="mt-2 flex gap-2">
           <input value={qty} onChange={e => setQty(e.target.value)} placeholder="Quantity" className={`${field} w-32`} aria-label="Quantity" />
           <label className="flex flex-1 items-center justify-between gap-2 rounded-[12px] bg-pc-surface px-3.5 text-[15px]">

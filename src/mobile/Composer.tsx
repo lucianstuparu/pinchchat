@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
-import { ArrowUp, AudioLines, Paperclip, Plus, Trash2, X } from 'lucide-react';
+import { ArrowUp, AudioLines, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
 import { FieldControls, PrimaryButton } from '../app/MicButton';
 import { speechPlaceholder, useSpeech } from '../app/speech';
@@ -9,11 +9,25 @@ import { AttachmentChip } from './MessageBubble';
 import { quoteForReply } from './messageView';
 import { encodeAttachment, AttachmentTooLargeError, type OutgoingAttachment } from './attachments';
 
+/**
+ * What the next message is (Task, Remind me, Note, a question about an item): a coloured label in
+ * the box, not text the person has to read past; its prefix is added when the message is sent.
+ */
+export interface Intent {
+  label: string;
+  prefix: string;
+  icon: LucideIcon;
+  /** Label colours (soft background, ink), already chosen for light or dark. */
+  style: CSSProperties;
+  placeholder: string;
+}
+
 export interface ComposerPrefill {
   /** Changes whenever new content should be injected; used as the remount key */
   nonce: number;
   text: string;
   attachments: OutgoingAttachment[];
+  intent?: Intent;
 }
 
 interface Props {
@@ -47,6 +61,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   // The draft comes back after a reload; shared or retried content replaces it.
   const [text, setText] = useDraft('chat', prefill?.text ? prefill.text + '\n' : undefined);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
+  const [intent, setIntent] = useState<Intent | null>(prefill?.intent ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -55,7 +70,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const speech = useSpeech(text, setText, transcribe ?? noTranscriber);
 
   // ---- a voice message: audio sent as is (the + menu)
-  const [vm, setVm] = useState<'idle' | 'starting' | 'recording'>('idle');
+  const [vm, setVm] = useState<'idle' | 'starting' | 'recording' | 'writing'>('idle');
   const rec = useRef<Recorder | null>(null);
   const [secs, setSecs] = useState(0);
   const startVoiceMessage = async () => {
@@ -67,13 +82,22 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     catch { setVm('idle'); setError('Microphone not available: allow it for this app in Chrome’s site settings'); }
   };
   const stopVoiceMessage = async (keep: boolean) => {
-    const r = rec.current; rec.current = null; setVm('idle');
+    const r = rec.current; rec.current = null;
     const silent = !!r && r.peak() < SILENT;
     const note = await r?.stop();
-    if (!keep) return;
-    if (silent) { setError(`The microphone recorded only silence${r?.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`); return; }
-    if (note) onSend('Voice message', [note]);   // a caption, so the bubble shows and the agent knows what it is
-    else setError('Nothing was recorded');
+    if (!keep) { setVm('idle'); return; }
+    if (silent) { setVm('idle'); setError(`The microphone recorded only silence${r?.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`); return; }
+    if (!note) { setVm('idle'); setError('Nothing was recorded'); return; }
+    // The bubble shows the words said, so Whisper writes them first; the audio goes along. If
+    // Whisper fails, the audio goes alone and the gateway transcribes it for the assistant.
+    let said = '';
+    if (transcribe) {
+      setVm('writing');
+      try { said = (await transcribe(note)).trim(); } catch { said = ''; }
+    }
+    setVm('idle');
+    onSend(said ? `Voice message: ${intent ? intent.prefix : ''}${said}` : 'Voice message', [note]);
+    setIntent(null);
   };
   useEffect(() => {
     if (vm !== 'recording') return;
@@ -101,8 +125,8 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 56), 6 * 22 + 20)}px`;
-  }, [text]);
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, intent ? 40 : 56), 6 * 22 + 20)}px`;
+  }, [text, intent]);
 
   const canSend = !busy && (text.trim().length > 0 || attachments.length > 0);
   useBusy('chat', busy || !!text.trim() || attachments.length > 0 || vm !== 'idle' || speech.listening || speech.state === 'writing');
@@ -111,8 +135,10 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     if (!canSend) return;
     speech.cancel();
     const body = text.trim();
-    onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${body}` : body, attachments);
+    const said = intent ? `${intent.prefix}${body}` : body;
+    onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${said}` : said, attachments);
     setText('');
+    setIntent(null);
     setAttachments([]);
     setError(null);
     onHintDismiss?.();
@@ -151,7 +177,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
       {replyTo && (
         <div className="mx-1 mb-1.5 flex items-start gap-2 rounded-[12px] border-l-[3px] border-pc-accent bg-pc-surface px-3 py-1.5">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-[var(--pc-accent-ink)]">{replyTo.mine ? 'You' : 'Assistant'}</p>
+            <p className="text-[12px] font-semibold text-[var(--pc-accent-ink)]">{replyTo.mine ? 'You' : 'Assistant'}</p>
             <p className="line-clamp-2 text-[13px] text-pc-text-muted break-words">{replyTo.text || 'Photo'}</p>
           </div>
           <button type="button" onClick={onReplyCancel} className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted" aria-label="Cancel reply"><X size={14} /></button>
@@ -167,12 +193,18 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
         </div>
       )}
       <SpeechStatus speech={speech} />
+      {vm === 'writing' && (
+        <div className="mx-2 mb-1.5" role="status" aria-live="polite">
+          <p className="text-[13px] text-pc-text-muted">Writing down your voice message…</p>
+          <div className="mt-1 h-1 overflow-hidden rounded-[2px] bg-[var(--pc-separator)]" aria-hidden><div className="progress-indeterminate h-full w-1/3 rounded-[2px] bg-pc-accent" /></div>
+        </div>
+      )}
       {shownError && <p className="mx-3 mb-1 text-[13px] text-red-500" role="alert">{shownError}</p>}
 
       <input ref={fileRef} type="file" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <div className="flex items-end gap-2">
         {vm !== 'idle' ? (
-          <button type="button" onClick={() => void stopVoiceMessage(false)} className={`${round} mb-[6px] text-red-500 active:bg-[var(--pc-hover-strong)]`} aria-label="Discard voice message">
+          <button type="button" disabled={vm === 'writing'} onClick={() => void stopVoiceMessage(false)} className={`${round} mb-[6px] text-red-500 disabled:opacity-40 active:bg-[var(--pc-hover-strong)]`} aria-label="Discard voice message">
             <Trash2 size={20} />
           </button>
         ) : (
@@ -205,7 +237,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
         {vm !== 'idle' ? (
           <div className="mb-[4px] flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-[20px] bg-pc-surface px-4" role="status" aria-live="polite">
             <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-            <span className="text-[15px] tabular-nums">{vm === 'starting' ? 'Starting…' : `Voice message ${clock(secs)}`}</span>
+            <span className="text-[15px] tabular-nums">{vm === 'starting' ? 'Starting…' : vm === 'writing' ? 'Writing it down…' : `Voice message ${clock(secs)}`}</span>
             <span className="flex min-w-0 flex-1 items-center justify-end gap-[3px] overflow-hidden" aria-hidden>
               {Array.from({ length: 14 }).map((_, i) => (
                 <span key={i} className="w-[3px] rounded-full bg-[rgba(var(--pc-accent-rgb),0.55)]"
@@ -219,20 +251,29 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           </div>
         ) : (
           <div className={`flex min-w-0 flex-1 items-end rounded-[20px] border bg-pc-surface pl-4 pr-1.5 transition-colors ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
+            <div className="flex min-w-0 flex-1 flex-col">
+            {intent && (
+              <button type="button" onClick={() => { setIntent(null); taRef.current?.focus(); }} style={intent.style}
+                className="press relative mt-2 inline-flex h-8 items-center gap-1.5 self-start rounded-[8px] pl-2 pr-1.5 text-[13px] font-semibold before:absolute before:-inset-1 before:content-['']"
+                aria-label={`${intent.label}, tap to remove`}>
+                <intent.icon size={15} aria-hidden /> {intent.label} <X size={14} className="opacity-70" aria-hidden />
+              </button>
+            )}
             <textarea
               ref={taRef}
-              rows={2}
+              rows={intent ? 1 : 2}
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey && !isTouch()) { e.preventDefault(); send(); }
               }}
               readOnly={speech.state === 'writing'}
-              placeholder={speechPlaceholder(speech, placeholder)}
+              placeholder={speechPlaceholder(speech, intent?.placeholder ?? placeholder)}
               enterKeyHint={isTouch() ? 'enter' : 'send'}
-              className="min-h-[56px] min-w-0 flex-1 resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] text-pc-text shadow-none placeholder:text-pc-text-muted outline-none focus:outline-none focus-visible:outline-none"
+              className={`${intent ? 'min-h-[40px]' : 'min-h-[56px]'} w-full resize-none border-0 bg-transparent py-[9px] text-[16px] leading-[22px] text-pc-text shadow-none placeholder:text-pc-text-muted outline-none focus:outline-none focus-visible:outline-none`}
               aria-label="Message"
             />
+            </div>
             {voice ? <FieldControls speech={speech} hasText={text.length > 0} onClear={clear} />
               : text.length > 0 && (
                 <button type="button" onClick={clear} className="mb-[8px] flex h-10 w-10 shrink-0 items-center justify-center" aria-label="Clear">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { failedTurn, isLong, stripSystemPreamble } from '../notice';
+import { dropRepeatedFailures, failedTurn, isLong, stripSystemPreamble, voiceMessage } from '../notice';
 import { visibleText } from '../messageView';
 import type { ChatMessage } from '../../types';
 
@@ -58,5 +58,21 @@ describe('folding', () => {
     expect(isLong('a'.repeat(421))).toBe(true);
     expect(isLong(Array(9).fill('x').join('\n'))).toBe(true);
     expect(isLong('✓ done')).toBe(false);
+  });
+});
+
+describe('the same failure twice', () => {
+  it('the bare error after the notice is left out; real replies stay', () => {
+    const msgs = ['This turn ended before a reply: Failed to authenticate: OAuth session expired', 'Failed to authenticate: OAuth session expired', 'ok', 'Error: 429'];
+    expect(dropRepeatedFailures(msgs, m => m)).toEqual([msgs[0], 'ok', 'Error: 429']);
+  });
+});
+
+describe('voice messages', () => {
+  it('reads the words said, and knows the older caption without words', () => {
+    expect(voiceMessage('Voice message: cumpar lapte')).toEqual({ said: 'cumpar lapte' });
+    expect(voiceMessage('Voice message')).toEqual({ said: '' });
+    expect(voiceMessage('\u{1F3A4} Voice note')).toEqual({ said: '' });
+    expect(voiceMessage('A voice message about milk')).toBeNull();
   });
 });

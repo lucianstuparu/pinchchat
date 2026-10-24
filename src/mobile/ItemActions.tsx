@@ -88,7 +88,7 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
 
         return (
           <div key={item.id} className={`rounded-xl border border-pc-border border-l-[3px] ${edge} bg-pc-elevated px-3 py-2.5 shadow-[0_1px_1px_rgba(0,0,0,0.04)]`}>
-            <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide ${due.tone}`}>
+            <div className={`flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide ${due.tone}`}>
               <span>{due.text}{snoozed && <span className="text-pc-text-muted"> · snoozed to {formatDay(s!.remind_on!)}</span>}</span>
               {s?.scope === 'shared' && (
                 <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[var(--pc-hover-strong)] px-1.5 py-0.5 normal-case tracking-normal text-pc-text-muted">
@@ -108,7 +108,7 @@ export function ItemActions({ items }: { items: MessageItem[] }) {
             </div>
             <div className="mt-2.5 flex items-center gap-1">
               <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'done')}
-                className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-pc-accent text-[14px] font-semibold text-white active:opacity-80 disabled:opacity-60">
+                className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-pc-accent text-[15px] font-semibold text-white active:opacity-80 disabled:opacity-60">
                 <Check size={16} /> {s?.kind === 'bill' ? 'Paid' : 'Done'}
               </button>
               <button type="button" disabled={isBusy} onClick={() => void act(item.id, 'snooze')}

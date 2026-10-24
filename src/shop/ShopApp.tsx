@@ -189,7 +189,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
                       aria-label={`Add ${u.title} to the list`}
                       className="press flex h-12 shrink-0 items-center gap-2 rounded-[12px] border border-pc-border bg-pc-elevated pl-3 pr-2 text-left">
                       <span className="min-w-0">
-                        <span className="block max-w-[160px] truncate text-[14px] font-medium leading-tight">{u.title}</span>
+                        <span className="block max-w-[160px] truncate text-[15px] font-medium leading-tight">{u.title}</span>
                         <span className="block text-[12px] leading-tight text-pc-text-muted">
                           {u.reason === 'favourite' ? (u.since === null ? 'favourite' : `favourite · ${u.since} d ago`) : `every ~${u.every} d · ${u.since} d ago`}
                         </span>
@@ -241,7 +241,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       </main>
 
       {offer && search === null && (
-        <div className="mx-3 mb-1 flex items-center gap-2 rounded-[12px] bg-pc-text px-3 py-2 text-[14px] text-pc-base shadow-lg" role="status">
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-[12px] bg-pc-text px-3 py-2 text-[15px] text-pc-base shadow-lg" role="status">
           <WhereIcon where="fridge" size={20} className="shrink-0 opacity-80" />
           <span className="min-w-0 flex-1 leading-snug">At home until {new Date(`${addDays(snap.today || new Date().toISOString().slice(0, 10), offer.days)}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}? <span className="opacity-70">{offer.item.title}</span></span>
           <button type="button" onClick={() => { apply({ op: 'pantry-add', id: newPantryId(), title: offer.item.title, product: offer.item.product, qty: offer.item.qty, in_days: offer.days }); setOffer(null); }}
@@ -307,7 +307,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 function Chip({ on, onClick, label, n }: { on: boolean; onClick: () => void; label: string; n: number }) {
   return (
     <button type="button" role="tab" aria-selected={on} onClick={onClick}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors ${on ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary active:bg-[var(--pc-hover-strong)]'}`}>
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-medium transition-colors ${on ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary active:bg-[var(--pc-hover-strong)]'}`}>
       {label}{n > 0 && <span className={on ? 'opacity-70' : 'text-pc-text-muted'}>{n}</span>}
     </button>
   );
@@ -441,7 +441,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           {recent.map(a => (
             <div key={a.id} className="flex items-start gap-2 rounded-[12px] bg-pc-surface px-3 py-2">
               <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
-              <div className="min-w-0 flex-1 text-[14px] leading-snug">
+              <div className="min-w-0 flex-1 text-[15px] leading-snug">
                 <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
                 {/* A reply reads at a glance: three lines, the rest on tap; a failure is one line. */}
                 <p className={`${a.status === 'failed' ? 'text-red-500' : 'text-pc-text'} ${openReply === a.id ? '' : 'line-clamp-3'}`}
@@ -466,7 +466,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} aria-label="Suggestions">
           {hints.map(h => (
             <button key={h.title} type="button" onClick={() => add(h)}
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-pc-border px-3 text-[14px] active:bg-[var(--pc-hover-strong)]">
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-pc-border px-3 text-[15px] active:bg-[var(--pc-hover-strong)]">
               {h.title}
             </button>
           ))}
@@ -561,7 +561,7 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
           <button type="button" onClick={save} className="press h-10 px-1 text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
         </div>
 
-        <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[18px] font-semibold`} aria-label="Name" />
+        <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[17px] font-semibold`} aria-label="Name" />
         <div className="mt-2 flex gap-2">
           <input value={qty} onChange={e => setQty(e.target.value)} placeholder="Quantity" className={`${field} w-32`} aria-label="Quantity" />
           {item.status !== 'open' && item.bought_on && (
@@ -573,10 +573,10 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
         <div className="flex flex-wrap gap-2">
           {stores.map(s => (
             <button key={s.tag} type="button" onClick={() => toggle(s.tag)} aria-pressed={tags.includes(s.tag)}
-              className={`h-8 rounded-full px-3.5 text-[14px] ${tags.includes(s.tag) ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
+              className={`h-8 rounded-full px-3.5 text-[15px] ${tags.includes(s.tag) ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
           ))}
           {others.map(t => (
-            <button key={t} type="button" onClick={() => toggle(t)} aria-label={`Remove tag ${t}`} className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-surface pl-3.5 pr-2.5 text-[14px] text-pc-text-secondary">#{t}<X size={14} aria-hidden /></button>
+            <button key={t} type="button" onClick={() => toggle(t)} aria-label={`Remove tag ${t}`} className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-surface pl-3.5 pr-2.5 text-[15px] text-pc-text-secondary">#{t}<X size={14} aria-hidden /></button>
           ))}
         </div>
 
@@ -602,7 +602,7 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
             <ChevronRight size={17} className="text-pc-text-faint" />
           </button>
         )}
-        {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[14px] text-[var(--pc-accent-ink)]">{item.link}</a>}
+        {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 block truncate px-1 text-[15px] text-[var(--pc-accent-ink)]">{item.link}</a>}
 
         {item.status === 'open' ? (
           <button type="button" onClick={() => { apply({ op: 'drop', id: item.id }); onClose(); }} className="mt-5 h-12 w-full rounded-[12px] bg-pc-surface text-[16px] font-medium text-red-500">

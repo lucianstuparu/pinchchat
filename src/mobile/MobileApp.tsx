@@ -70,7 +70,7 @@ export default function MobileApp() {
 
 function mobileScreen(gw: ReturnType<typeof useGateway>) {
   if (gw.authenticated === null) {
-    return <div className="h-dvh flex items-center justify-center bg-pc-base text-pc-text-muted text-sm">Connecting…</div>;
+    return <div className="h-dvh flex items-center justify-center bg-pc-base text-pc-text-muted text-[15px]">Connecting…</div>;
   }
   // Upstream treats any failed first connect as "not logged in". On a phone that
   // is usually just no signal: with saved credentials and a plain network failure
@@ -285,9 +285,9 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
 
       {/* Conversation */}
       <main ref={scrollRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-1" role="log" aria-live="polite">
-        {isLoadingHistory && shown.length === 0 && <p className="text-center text-xs text-pc-text-muted py-6">Loading…</p>}
+        {isLoadingHistory && shown.length === 0 && <p className="text-center text-[12px] text-pc-text-muted py-6">Loading…</p>}
         {!isLoadingHistory && shown.length === 0 && outbox.length === 0 && (
-          <p className="text-center text-sm text-pc-text-muted px-8 py-10">{agent.placeholder}</p>
+          <p className="text-center text-[15px] text-pc-text-muted px-8 py-10">{agent.placeholder}</p>
         )}
 
         {search !== null && search.trim().length >= 2 && (
@@ -297,13 +297,13 @@ function MobileChat({ gw }: { gw: ReturnType<typeof useGateway> }) {
               return (
                 <li key={m.id}>
                   <button type="button" onClick={() => jumpTo(m.id)} className="w-full rounded-xl bg-pc-surface px-3 py-2 text-left hover:bg-[var(--pc-hover)]">
-                    <div className="mb-0.5 text-[11px] text-pc-text-muted">{m.role === 'user' ? 'You' : agent.label} · {dayLabel(m.timestamp)}</div>
-                    <div className="line-clamp-2 text-[14px] leading-snug">{sn.before}<mark className="rounded bg-amber-200 px-0.5 text-pc-text-primary">{sn.match}</mark>{sn.after}</div>
+                    <div className="mb-0.5 text-[12px] text-pc-text-muted">{m.role === 'user' ? 'You' : agent.label} · {dayLabel(m.timestamp)}</div>
+                    <div className="line-clamp-2 text-[15px] leading-snug">{sn.before}<mark className="rounded bg-amber-200 px-0.5 text-pc-text-primary">{sn.match}</mark>{sn.after}</div>
                   </button>
                 </li>
               );
             })}
-            {results.length === 0 && <li className="py-8 text-center text-sm text-pc-text-muted">Nothing matches “{search.trim()}”</li>}
+            {results.length === 0 && <li className="py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{search.trim()}”</li>}
           </ul>
         )}
 

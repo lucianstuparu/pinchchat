@@ -102,8 +102,8 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
         <div className="flex justify-end">
           <CloseButton onClick={onClose} />
         </div>
-        {!it && !error && <p className="py-10 text-center text-sm text-pc-text-muted">Loading…</p>}
-        {error && <p className="py-2 text-sm text-red-500">{error}</p>}
+        {!it && !error && <p className="py-10 text-center text-[15px] text-pc-text-muted">Loading…</p>}
+        {error && <p className="py-2 text-[15px] text-red-500">{error}</p>}
         {it && (
           <>
             <div className="-mt-2 mb-4">
@@ -158,7 +158,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   <Title text={it.title} />
                 </h2>
               )}
-              {closed && <p className="mt-1 text-[14px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
+              {closed && <p className="mt-1 text-[15px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
             </div>
 
             {rows.length > 0 && (
@@ -171,10 +171,10 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                 ))}
               </dl>
             )}
-            {str('notes') && <p className="mb-3 whitespace-pre-wrap rounded-[12px] bg-pc-surface px-4 py-3 text-[14px] text-pc-text-secondary">{str('notes')}</p>}
+            {str('notes') && <p className="mb-3 whitespace-pre-wrap rounded-[12px] bg-pc-surface px-4 py-3 text-[15px] text-pc-text-secondary">{str('notes')}</p>}
 
             {sheet?.origin && (
-              <div className="mb-3 rounded-[12px] bg-pc-surface px-4 py-3 text-[14px]">
+              <div className="mb-3 rounded-[12px] bg-pc-surface px-4 py-3 text-[15px]">
                 <p className="mb-1 text-[12px] font-medium text-pc-text-muted">Came from</p>
                 {sheet.origin.kind === 'message'
                   ? <p className="whitespace-pre-wrap">“{sheet.origin.text}”<span className="mt-1 block text-[12px] text-pc-text-faint">{sheet.origin.ts?.slice(0, 10)}</span></p>

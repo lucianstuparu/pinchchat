@@ -90,7 +90,7 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
       onTouchEnd={e => { if (touch.current?.horizontal) e.stopPropagation(); if (dx >= 90) tick(); setDx(0); touch.current = null; }}
       style={{ touchAction: 'pan-y' }}>
       {dx > 0 && (
-        <div className={`absolute inset-y-0 left-0 flex items-center gap-1.5 pl-4 text-[14px] font-semibold text-white ${dx >= 90 ? 'bg-[#1d9e75]' : 'bg-[#1d9e75]/60'}`} style={{ width: dx }} aria-hidden>
+        <div className={`absolute inset-y-0 left-0 flex items-center gap-1.5 pl-4 text-[15px] font-semibold text-white ${dx >= 90 ? 'bg-[#1d9e75]' : 'bg-[#1d9e75]/60'}`} style={{ width: dx }} aria-hidden>
           <Check size={18} strokeWidth={3} /> {dx >= 90 ? 'Done' : ''}
         </div>
       )}
@@ -223,7 +223,7 @@ function AddTask({ onAdd, transcribe, reply, onDismissReply }: {
       {reply && (
         <div className="mt-2 flex items-start gap-2 rounded-[12px] bg-pc-surface px-3 py-2" aria-live="polite">
           <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${reply.text ? '' : 'animate-pulse'}`} />
-          <div className="min-w-0 flex-1 text-[14px] leading-snug">
+          <div className="min-w-0 flex-1 text-[15px] leading-snug">
             <p className="truncate text-pc-text-muted">“{reply.asked}”</p>
             <p className="whitespace-pre-wrap text-pc-text">{reply.text ? <Title text={reply.text.replace(/\s*⟨[^⟩]+⟩/g, '')} /> : `Adding it · ${Math.max(0, Math.floor((now - reply.since) / 1000))} s`}</p>
             {!reply.text && <div className="mt-1.5 h-1 overflow-hidden rounded-[2px] bg-[var(--pc-separator)]" aria-hidden><div className="progress-indeterminate h-full w-1/3 rounded-[2px] bg-pc-accent" /></div>}
@@ -312,13 +312,13 @@ export function TodoPanel(p: TodoPanelProps) {
                 <div className="flex flex-col items-center px-8 py-10 text-center">
                   <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]"><Check size={24} /></span>
                   <p className="text-[16px] font-semibold">All clear</p>
-                  <p className="mt-1 text-[14px] text-pc-text-muted">Nothing needs you right now.</p>
+                  <p className="mt-1 text-[15px] text-pc-text-muted">Nothing needs you right now.</p>
                 </div>
               ) : items.length === 0 && q.trim() ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
               : items.length === 0 ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
               : <TodoList items={items} today={p.today} mode={p.mode} filter={filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} />}
             {putOff.length > 0 && !q.trim() && (
-              <button type="button" onClick={() => setShowPutOff(v => !v)} className="press flex h-10 w-full items-center gap-2 px-2 text-left text-[14px] text-pc-text-muted" aria-expanded={showPutOff}>
+              <button type="button" onClick={() => setShowPutOff(v => !v)} className="press flex h-10 w-full items-center gap-2 px-2 text-left text-[15px] text-pc-text-muted" aria-expanded={showPutOff}>
                 <Clock size={16} aria-hidden /> {putOff.length} put off until later · <span className="font-medium text-[var(--pc-accent-ink)]">{showPutOff ? 'Hide' : 'Show'}</span>
               </button>
             )}
