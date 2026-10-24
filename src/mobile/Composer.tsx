@@ -64,6 +64,12 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [text, setText] = useDraft('chat', prefill?.text ? prefill.text + '\n' : undefined);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [intent, setIntent] = useState<Intent | null>(prefill?.intent ?? null);
+  // A draft that is only a bare "Task:" / "Note:" / "Remind me" is left from before these were
+  // labels (2026-10-24): it would sit under the label as text, so it goes.
+  useEffect(() => {
+    if (/^(Task:|Remind me|Note:|Translate:|Let’s think through:|Buy)$/i.test(text.trim())) setText('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
