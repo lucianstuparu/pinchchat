@@ -12,8 +12,9 @@ import { L } from '../ui/lang';
 export interface WaDraft { name: string; text: string; back?: string; lang?: string; status: 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed' | 'expired'; sent_at?: string; error?: string }
 
 const fetchDrafts = (ids: string[]) => post<{ drafts: Record<string, WaDraft> }>('/reg/wa/status', { ids });
+// The server answers with the draft itself (register-api wa/act).
 const actOnDraft = (draft: string, action: 'send' | 'cancel' | 'edit', text?: string) =>
-  post<{ ok: boolean; draft: WaDraft }>('/reg/wa/act', { draft, action, ...(text !== undefined ? { text } : {}) });
+  post<WaDraft>('/reg/wa/act', { draft, action, ...(text !== undefined ? { text } : {}) });
 
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '');
 
@@ -37,7 +38,7 @@ function WaCard({ id, draft, onChange }: { id: string; draft?: WaDraft; onChange
   if (!draft) return <div className="rounded-[12px] border border-pc-border bg-pc-elevated px-3 py-2.5 text-[13px] text-pc-text-muted">WhatsApp…</div>;
   const run = async (action: 'send' | 'cancel' | 'edit', text?: string) => {
     setBusy(true); setError(null);
-    try { const r = await actOnDraft(id, action, text); onChange(r.draft); if (action === 'edit') setEdit(null); }
+    try { onChange(await actOnDraft(id, action, text)); if (action === 'edit') setEdit(null); }
     catch (e) { setError(e instanceof Error && e.message ? e.message : L('Could not send it')); }
     finally { setBusy(false); }
   };

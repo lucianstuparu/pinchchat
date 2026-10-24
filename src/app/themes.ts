@@ -9,7 +9,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 
 export type Appearance = 'auto' | 'light' | 'dark';
-export type Accent = 'terracotta' | 'teal' | 'coral' | 'green' | 'blue' | 'graphite' | 'keep';
+export type Accent = 'terracotta' | 'teal' | 'coral' | 'green' | 'blue' | 'graphite' | 'keep' | 'signal';
 export interface Look { appearance: Appearance; accent: Accent }
 
 /** Accent per mode (dark needs lighter tones), and the agent's colour that goes with it. */
@@ -24,6 +24,8 @@ export const ACCENTS: Record<Accent, { name: string; light: string; dark: string
   graphite:   { name: 'Graphite',   light: '#3d3d42', dark: '#c7c7cc', pairLight: '#c2593a', pairDark: '#e07a58' },
   // Google Keep's yellow (the Shopping app, so the move from the Keep list feels familiar). Yellow is a
   // fill colour: text in it is a dark amber (ink), text on it is near-black (on).
+  // The WhatsApp app's call green (2026-10-25): bright like a phone's call button, with dark text on it.
+  signal:     { name: 'Call green', light: '#1db954', dark: '#3ddc84', pairLight: '#5f6368', pairDark: '#9aa0a6', ink: ['#0f7a3a', '#5fe39b'], on: '#052e16' },
   keep:       { name: 'Keep yellow', light: '#fbbc04', dark: '#fdd663', pairLight: '#5f6368', pairDark: '#9aa0a6', ink: ['#a05a00', '#fdd663'], on: '#202124' },
 };
 

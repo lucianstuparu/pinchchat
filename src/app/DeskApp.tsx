@@ -12,7 +12,7 @@
  */
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, MessageCircle, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
+import { ArrowDown, Bell, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -39,7 +39,6 @@ import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRule
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { WaCards } from './WaCard';
-import { SpeedDial, type Contact } from './SpeedDial';
 import { SettingsSheet } from './SettingsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
@@ -47,6 +46,8 @@ import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useNotice } from './notice';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
+/** The WhatsApp app (Relay): /wa/ on this host until whatsapp.stuparu.eu exists (VITE_WA_URL). */
+const WA_APP = import.meta.env.VITE_WA_URL || '/wa/';
 interface OutboxItem { id: string; text: string; attachments: OutgoingAttachment[]; queuedAt: number }
 function loadOutbox(): OutboxItem[] {
   try { return (JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') as OutboxItem[]).map(r => ({ ...r, attachments: [] })); } catch { return []; }
@@ -198,14 +199,13 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const { notify } = useNotifications();
   useEffect(() => setBaseTitle(), []);
 
-  // A WhatsApp notification ("Bunica: …") opens her conversation: ?wa=<contact id>.
+  // WhatsApp has its own app since 2026-10-25 (Relay; Lucian: "a separate scope"). A WhatsApp
+  // notification ("Bunica: …", ?wa=<contact id>) and the icon's WhatsApp shortcut open it there; the
+  // assistant here still prepares a WhatsApp when asked in the chat (the card with Send).
   useEffect(() => {
     const url = new URL(window.location.href);
     const wa = url.searchParams.get('wa');
-    if (!wa) return;
-    url.searchParams.delete('wa');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-    setDial(wa);
+    if (wa) window.location.replace(`${WA_APP}?c=${encodeURIComponent(wa)}`);
   }, []);
 
   // A shortcut on the app icon (manifest "shortcuts", long-press): ?quick=task|remind|buy|… opens
@@ -216,7 +216,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     if (!quick) return;
     url.searchParams.delete('quick');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-    if (quick === 'wa') { setDial(true); return; }
+    if (quick === 'wa') { window.location.replace(WA_APP); return; }
     const q = QUICK.find(x => x.key === quick);
     if (q) setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder } });
     else if (quick === 'voice') setPrefill({ nonce: Date.now(), text: '', attachments: [], voice: true });
@@ -275,16 +275,6 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       return;
     }
     setPrefill({ nonce: Date.now(), text, attachments: [] });
-  };
-  // WhatsApp speed dial: pick a person, then say what to tell them (the label carries who).
-  const [dial, setDial] = useState<string | boolean>(false);   // true = the grid, a contact id = that conversation
-  const writeTo = (c: Contact, dictate = false) => {
-    setDial(false);
-    setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate, intent: {
-      label: `WhatsApp · ${c.label}`, prefix: `Scrie-i lui ${c.name}: `, icon: MessageCircle,
-      style: mode === 'dark' ? { background: '#1d9e7533', color: '#5fd3a9' } : { background: '#e1f5ee', color: '#0f6e56' },
-      placeholder: `What should I tell ${c.label}?`,
-    } });
   };
   const putIntent = (q: typeof QUICK[number]) => {
     const intent: Intent = { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder };
@@ -597,10 +587,6 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <div className="shrink-0 border-t border-pc-border bg-pc-base">
           {!sheet && !todoOpen && undoBar}
           <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
-            <button type="button" onClick={() => setDial(true)}
-              className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[15px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
-              <MessageCircle size={16} style={{ color: mode === 'dark' ? '#5fd3a9' : '#1d9e75' }} /> WhatsApp
-            </button>
             {QUICK.map(qq => (
               <button key={qq.label} type="button" onClick={() => putIntent(qq)}
                 className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-pc-surface px-3.5 text-[15px] text-pc-text-secondary active:bg-[var(--pc-hover-strong)]">
@@ -629,7 +615,6 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
-      {dial && <SpeedDial onPick={writeTo} onClose={() => setDial(false)} openId={typeof dial === 'string' ? dial : null} />}
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />

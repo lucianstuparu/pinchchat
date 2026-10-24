@@ -25,11 +25,11 @@ export function MicButton({ speech, size = 56 }: { speech: Speech; size?: number
  * The one big button of an input bar (oc and Shopping, after ChatGPT's and WhatsApp's bars): the mic
  * while the box is empty, Send once there is something to send, Stop while listening.
  */
-export function PrimaryButton({ speech, canSend, onSend, size = 56 }: { speech: Speech; canSend: boolean; onSend: () => void; size?: number }) {
+export function PrimaryButton({ speech, canSend, onSend, size = 56, sendLabel = L('Send') }: { speech: Speech; canSend: boolean; onSend: () => void; size?: number; sendLabel?: string }) {
   const busy = speech.listening || speech.state === 'writing' || speech.state === 'starting';
   if (busy || !canSend) return <MicButton speech={speech} size={size} />;
   return (
-    <button type="button" onClick={onSend} aria-label={L('Send')} style={{ width: size, height: size }}
+    <button type="button" onClick={onSend} aria-label={sendLabel} style={{ width: size, height: size }}
       className="flex shrink-0 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow-[0_4px_14px_rgba(0,0,0,0.18)] press">
       <ArrowUp size={size * 0.46} strokeWidth={2.6} />
     </button>

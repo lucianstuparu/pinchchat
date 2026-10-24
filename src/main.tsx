@@ -17,11 +17,15 @@ const isShop = import.meta.env.VITE_APP === 'shop'
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const ArtliaApp = lazy(() => import('./artlia/ArtliaApp'))
 const isArtlia = import.meta.env.VITE_APP === 'artlia'
+// The WhatsApp app (Relay; whatsapp.stuparu.eu, for now chat.stuparu.eu/wa/): VITE_APP=wa, built with VITE_BASE.
+// eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
+const WaApp = lazy(() => import('./wa/WaApp'))
+const isWa = import.meta.env.VITE_APP === 'wa'
 
 // Register service worker for PWA support (offline caching, installability)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then((reg) => {
       // Check for updates periodically (every 30 min)
       setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
 
@@ -51,6 +55,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Suspense fallback={null}><ShopApp /></Suspense>
       ) : isArtlia ? (
         <Suspense fallback={null}><ArtliaApp /></Suspense>
+      ) : isWa ? (
+        <Suspense fallback={null}><WaApp /></Suspense>
       ) : (
         <ThemeProvider>
           {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}

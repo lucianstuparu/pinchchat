@@ -7,11 +7,15 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
+// VITE_BASE: the path the app is served under (the WhatsApp app at /wa/ for now); relative paths stay relative.
+const base = process.env.VITE_BASE || '/';
 const v = (file) => createHash('sha256').update(readFileSync(`dist/${file}`)).digest('hex').slice(0, 10);
 const stamp = (path) => {
-  const file = path.replace(/^\//, '').replace(/\?.*$/, '');
-  return existsSync(`dist/${file}`) ? `/${file}?v=${v(file)}` : path;
+  const rel = !path.startsWith('/');
+  const file = (path.startsWith(base) ? path.slice(base.length) : path.replace(/^\//, '')).replace(/\?.*$/, '');
+  return existsSync(`dist/${file}`) ? `${rel ? '' : base}${file}?v=${v(file)}` : path;
 };
+const esc = base.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 const manifest = JSON.parse(readFileSync('dist/manifest.json', 'utf8'));
 for (const icon of manifest.icons ?? []) icon.src = stamp(icon.src);
@@ -19,8 +23,8 @@ for (const s of manifest.shortcuts ?? []) for (const icon of s.icons ?? []) icon
 writeFileSync('dist/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 
 let html = readFileSync('dist/index.html', 'utf8');
-html = html.replace(/(href|src)="(\/(?:manifest\.json|favicon-\d+\.png|apple-touch-icon\.png|logo[^"]*\.png))"/g, (_, attr, path) => `${attr}="${stamp(path)}"`);
-const logo = stamp('/logo-192.png');
+html = html.replace(new RegExp(`(href|src)="(${esc}(?:manifest\\.json|favicon-\\d+\\.png|apple-touch-icon\\.png|logo[^"]*\\.png))"`, 'g'), (_, attr, path) => `${attr}="${stamp(path)}"`);
+const logo = stamp(`${base}logo-192.png`);
 html = html.replace(/<meta name="app-logo"[^>]*>\s*/g, '').replace('</head>', `  <meta name="app-logo" content="${logo}" />\n  </head>`);
 writeFileSync('dist/index.html', html);
 console.log(`icons stamped (manifest ${v('manifest.json')}, logo ${logo})`);

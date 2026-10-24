@@ -82,7 +82,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             <Icon bg="#af52de"><Palette size={16} /></Icon>
             <span className="flex-1 text-[16px]">Colour</span>
             <div className="flex gap-2.5" role="radiogroup" aria-label="Accent colour">
-              {(Object.keys(ACCENTS) as Accent[]).filter(a => a !== 'keep').map(a => (
+              {(Object.keys(ACCENTS) as Accent[]).filter(a => a !== 'keep' && a !== 'signal').map(a => (
                 <button key={a} type="button" role="radio" aria-checked={look.accent === a} aria-label={ACCENTS[a].name} onClick={() => onLook({ ...look, accent: a })}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-white ring-offset-2 ring-offset-[var(--pc-bg-elevated)] transition"
                   style={{ background: mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light, boxShadow: look.accent === a ? `0 0 0 2px var(--pc-bg-elevated), 0 0 0 4px ${mode === 'dark' ? ACCENTS[a].dark : ACCENTS[a].light}` : undefined }}>

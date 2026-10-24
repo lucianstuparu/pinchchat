@@ -56,15 +56,21 @@ interface Props {
   /** Speech to text on the server (Whisper). */
   transcribe?: (audio: OutgoingAttachment) => Promise<string>;
   placeholder?: string;
+  /** Where the unsent text is kept (each app its own; oc's is "chat"). */
+  draftKey?: string;
+  /** The + (photos, files, voice message). The WhatsApp app has words only. */
+  attach?: boolean;
+  /** What the arrow does, for screen readers ("Send"; the WhatsApp app: "Prepare the message"). */
+  sendLabel?: string;
 }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const noTranscriber = () => Promise.reject(new Error('no transcriber'));
 
-export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, transcribe, placeholder = L('Message') }: Props) {
+export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, transcribe, placeholder = L('Message'), draftKey = 'chat', attach = true, sendLabel }: Props) {
   // The draft comes back after a reload; shared or retried content replaces it.
-  const [text, setText] = useDraft('chat', prefill?.text ? prefill.text + '\n' : undefined);
+  const [text, setText] = useDraft(draftKey, prefill?.text ? prefill.text + '\n' : undefined);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [intent, setIntent] = useState<Intent | null>(prefill?.intent ?? null);
   // A quick start or "Ask" while the box is open: the label changes, photos and text stay.
@@ -235,7 +241,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           <button type="button" disabled={vm === 'writing'} onClick={() => void stopVoiceMessage(false)} className={`${round} mb-[6px] text-red-500 disabled:opacity-40 active:bg-[var(--pc-hover-strong)]`} aria-label={L('Discard voice message')}>
             <Trash2 size={20} />
           </button>
-        ) : (
+        ) : !attach ? null : (
           <div className="relative mb-[6px] shrink-0">
             <button type="button" onClick={() => (voice && canRecord() ? setPlusOpen(o => !o) : fileRef.current?.click())}
               className={`${round} bg-pc-surface text-pc-text-secondary press ${plusOpen ? 'rotate-45' : ''}`}
@@ -311,7 +317,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           </div>
         )}
 
-        {voice && vm === 'idle' ? <div className="shrink-0"><PrimaryButton speech={speech} canSend={canSend} onSend={send} size={56} /></div>
+        {voice && vm === 'idle' ? <div className="shrink-0"><PrimaryButton speech={speech} canSend={canSend} onSend={send} size={56} sendLabel={sendLabel} /></div>
           : !voice && (
             <button type="button" onClick={send} disabled={!canSend} className={`${round} mb-[6px] bg-pc-accent text-[var(--pc-on-accent)] disabled:opacity-40`} aria-label={L('Send')}>
               <ArrowUp size={21} strokeWidth={2.5} />
