@@ -159,6 +159,22 @@ const hist = (key) => { if (!sessions.has(key)) sessions.set(key, []); return se
   h.push({ id: 'h3', role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'exec', input: { cmd: 'route.sh' } }], timestamp: yesterday + 5000 });
   h.push({ id: 'h4', role: 'user', content: [{ type: 'text', text: 'Read HEARTBEAT.md if it exists' }], timestamp: yesterday + 6000 });
   h.push({ id: 'h5', role: 'assistant', content: [{ type: 'text', text: 'HEARTBEAT_OK' }], timestamp: yesterday + 7000 });
+  // Gateway noise in front of a long pasted message, and a failed turn (both shown short by the app)
+  const sys = `OpenClaw resumed this CLI session after prompt content changed.
+
+System: [2026-10-22 13:28:51 UTC] WhatsApp gateway disconnected (status 428)
+System: [2026-10-22 13:28:54 UTC] WhatsApp gateway connected as +40700000000.`;
+  const pasted = `Note this, for when I may install a heat pump
+
+A heat-pump water heater (detached house, zone H1):
+926 € for a very modest household
+720 € for a modest household
+411 € for other households
+The grant is paid after the works, on the invoice of a certified installer. Apply online before signing the quote; keep the quote, the invoice and the certificate. Ask the installer whether the model is on the eligible list, and check the household income bracket on the tax notice of the previous year.`;
+  h.push({ id: 'h6', role: 'user', content: [{ type: 'text', text: `${sys}
+
+${pasted}` }], timestamp: yesterday + 8000 });
+  h.push({ id: 'h7', role: 'assistant', content: [{ type: 'text', text: 'This turn ended before a reply: Failed to authenticate: OAuth session expired and could not be refreshed' }], timestamp: yesterday + 9000 });
 }
 
 function broadcast(event, payload) {

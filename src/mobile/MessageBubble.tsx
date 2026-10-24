@@ -1,5 +1,5 @@
 import { memo, useRef, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, CheckSquare, Clock, Copy, FileText, Reply } from 'lucide-react';
+import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Reply } from 'lucide-react';
 import { AgentAvatar, MeAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
@@ -8,6 +8,7 @@ import { buildImageSrc } from '../lib/image';
 import { formatTime, visibleText } from './messageView';
 import { extractItems } from './messageItems';
 import { ItemActions } from './ItemActions';
+import { failedTurn, isLong } from './notice';
 
 const mdComponents: Components = {
   a: ({ node, ...props }) => {
@@ -39,6 +40,26 @@ interface Props {
   onSelect?: (msg: ChatMessage) => void;
 }
 
+/** A failed turn: one line with the cause; the gateway's full text a tap away. */
+function FailedTurn({ summary, detail, time, showAvatar }: { summary: string; detail: string; time: string; showAvatar: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex gap-1.5 px-2 justify-start">
+      <Avatar mine={false} visible={showAvatar} />
+      <div className="min-w-0 max-w-[80%]">
+        <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+          className="press inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] border border-pc-border bg-pc-surface px-3 text-left text-[14px] text-pc-text">
+          <AlertCircle size={16} className="shrink-0 text-red-500" aria-hidden />
+          <span className="min-w-0 truncate">{summary}</span>
+          <span className="shrink-0 text-[11px] text-pc-text-muted">{time}</span>
+          <ChevronDown size={16} className={`shrink-0 text-pc-text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        </button>
+        {open && <p className="mt-1 px-1 text-[13px] leading-snug text-pc-text-muted break-words select-text">{detail}</p>}
+      </div>
+    </div>
+  );
+}
+
 function Avatar({ mine, visible }: { mine: boolean; visible: boolean }) {
   if (!visible) return <span className="w-7 shrink-0" aria-hidden />;
   return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar /> : <AgentAvatar />}</span>;
@@ -58,6 +79,9 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
 
   const [dx, setDx] = useState(0);
   const [menu, setMenu] = useState(false);
+  const [unfolded, setUnfolded] = useState(false);
+  const failed = !mine && !msg.isStreaming ? failedTurn(text) : null;
+  const folded = isLong(text) && !unfolded;
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null; timer: number | null; armed: boolean } | null>(null);
 
   const clearTimer = () => {
@@ -101,6 +125,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
     setMenu(false);
     void navigator.clipboard?.writeText(text).catch(() => undefined);
   };
+
+  if (failed && !selecting) return <FailedTurn {...failed} time={formatTime(msg.timestamp)} showAvatar={showAvatar} />;
 
   return (
     <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-[20px]' : ''}`}
@@ -154,9 +180,18 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             ))}
           </span>
         ) : text ? (
-          <div className={`text-[15px] leading-snug ${MD_CLASSES}`}>
-            <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
-          </div>
+          <>
+            {/* Long messages start folded at about eight lines; the rest is a tap away. */}
+            <div className={`text-[15px] leading-snug ${MD_CLASSES} ${folded ? 'max-h-[10.5rem] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
+              <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
+            </div>
+            {isLong(text) && (
+              <button type="button" onClick={e => { e.stopPropagation(); setUnfolded(u => !u); }} aria-expanded={!folded}
+                className="press -ml-1 min-h-10 px-1 text-[14px] font-semibold text-pc-accent">
+                {folded ? 'Show all' : 'Show less'}
+              </button>
+            )}
+          </>
         ) : null}
         {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items) : <ItemActions items={items} />)}
 

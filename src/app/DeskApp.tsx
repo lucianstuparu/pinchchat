@@ -10,6 +10,7 @@
  * folded into a pinned bar, a real Settings sheet, one mic for speaking to type, search across
  * tasks, topics and messages, and no programmer words ("loop" is "In progress" on screen).
  */
+import { failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, Bell, ChevronRight, Copy, Languages, ListChecks, Lightbulb, Search, StickyNote, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
@@ -234,7 +235,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     if (messages.length <= before) return;
     const last = messages[messages.length - 1];
     if (last?.role === 'assistant' && !last.isStreaming && isShownInMessenger(last)) {
-      notify('OpenClaw', visibleText(last).slice(0, 120) || 'New message');
+      const t = visibleText(last);
+      notify('OpenClaw', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'New message'));
       void refresh();
     }
   }, [messages, notify, refresh]);

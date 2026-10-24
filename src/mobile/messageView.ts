@@ -1,6 +1,7 @@
 /** Pure helpers deciding what the messenger view shows for a message. */
 import type { ChatMessage } from '../types';
 import { stripWebchatEnvelope, hasWebchatEnvelope, stripWebhookScaffolding, hasWebhookScaffolding } from '../lib/systemEvent';
+import { stripSystemPreamble } from './notice';
 
 export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -9,8 +10,10 @@ export function formatTime(ts: number): string {
 function cleanUserText(text: string): string {
   let out = text;
   if (hasWebhookScaffolding(out)) out = stripWebhookScaffolding(out);
+  // The gateway's own lines (WhatsApp reconnects, session notes) can sit before or after the envelope.
+  out = stripSystemPreamble(out);
   if (hasWebchatEnvelope(out)) out = stripWebchatEnvelope(out);
-  return out.trim();
+  return stripSystemPreamble(out).trim();
 }
 
 /** Text shown for a message, or '' when it carries nothing a messenger would show. */

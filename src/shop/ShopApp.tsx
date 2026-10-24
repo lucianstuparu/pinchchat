@@ -4,6 +4,7 @@
  * marked "just me"; returns pinned on top while there are any. Works offline (see useShop).
  * Same look and pieces as the oc desk: themes, Settings sheet, speak to type.
  */
+import { failedTurn } from '../mobile/notice';
 import { SpeechStatus } from '../app/SpeechStatus';
 import { formatBytes, useNow } from '../ui/progress';
 import { ProgressRow } from '../ui/ProgressRow';
@@ -376,6 +377,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   // The last few instructions (within half an hour of the newest), newest last, until dismissed.
   const newest = Math.max(0, ...asks.map(a => Date.parse(a.ts)));
+  const [openReply, setOpenReply] = useState<string | null>(null);
   const recent = asks.filter(a => !hidden.has(a.id) && newest - Date.parse(a.ts) < 30 * 60_000).slice(-2);   // the last two answers, so repeated adding does not pile up
   const now = useNow(recent.some(a => a.status === 'working'));   // ticks once a second while one is working
   const [text, setText] = useDraft('shop', prefill ?? undefined);
@@ -441,9 +443,12 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
               <Sparkles size={15} className={`mt-0.5 shrink-0 text-[var(--pc-accent-ink)] ${a.status === 'working' || a.status === 'queued' ? 'animate-pulse' : ''}`} />
               <div className="min-w-0 flex-1 text-[14px] leading-snug">
                 <p className="truncate text-pc-text-muted">{a.text ? `“${a.text}”` : ''}{a.photos?.length ? `${a.text ? ' · ' : ''}${a.photos.length} photo${a.photos.length > 1 ? 's' : ''}` : ''}</p>
-                <p className={a.status === 'failed' ? 'text-red-500' : 'text-pc-text'}>
+                {/* A reply reads at a glance: three lines, the rest on tap; a failure is one line. */}
+                <p className={`${a.status === 'failed' ? 'text-red-500' : 'text-pc-text'} ${openReply === a.id ? '' : 'line-clamp-3'}`}
+                  onClick={() => setOpenReply(o => (o === a.id ? null : a.id))}>
                   {a.status === 'queued' ? 'Waiting for a connection…'
                     : a.status === 'working' ? `Working on it · ${Math.max(0, Math.floor((now - Date.parse(a.ts)) / 1000))} s`
+                    : openReply !== a.id && failedTurn(plainReply(a.reply) || '') ? failedTurn(plainReply(a.reply) || '')!.summary
                     : plainReply(a.reply) || 'Done.'}
                 </p>
                 {a.status === 'working' && (
