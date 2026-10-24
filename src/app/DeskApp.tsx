@@ -538,7 +538,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
               </button>
             ))}
           </div>
-          <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Message" />
+          <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={send} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Message" />
         </div>
       )}
 

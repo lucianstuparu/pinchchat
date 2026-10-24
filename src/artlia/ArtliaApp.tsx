@@ -15,7 +15,8 @@ import { LoginScreen } from '../components/LoginScreen';
 import { getStoredCredentials } from '../lib/credentials';
 import type { ChatMessage } from '../types';
 import { MessageBubble } from '../mobile/MessageBubble';
-import { collapseCliTurns, isShownInMessenger, visibleText, withoutLeadingQuote } from '../mobile/messageView';
+import { collapseCliTurns, isShownInMessenger, senderOf, visibleText, withoutLeadingQuote } from '../mobile/messageView';
+import { extractItems } from '../mobile/messageItems';
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { Composer, type ComposerPrefill, type Intent } from '../mobile/Composer';
 import { QuestionCard } from '../mobile/QuestionCard';
@@ -30,7 +31,7 @@ import { Sheet, CloseButton } from '../ui/Sheet';
 import { AppHeader, IconButton, Segmented } from '../ui/Controls';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
-import { actOn, cachedList, fetchList, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
+import { actOn, cachedList, fetchList, roError, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
 import { CatsView, CategoryView, NowView, PlanView } from './Lists';
 import { ArtSheet } from './ArtSheet';
 import { toneOf, toneStyle, topOf, withSender } from './rules';
@@ -87,23 +88,38 @@ type Tab = 'now' | 'plan' | 'cats';
 function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; look: Look; mode: 'light' | 'dark'; onLook: (l: Look) => void }) {
   const { status, messages, isLoadingHistory, activeSession, sendMessage, logout, getClient, addEventListener, switchSession } = gw;
   const [person, setPerson] = useState<string | null>(null);
-  useEffect(() => { void whoami().then(setPerson); }, []);
+  // Who is signed in: asked again when the phone comes back online or the app comes to the front.
+  // An empty answer counts only while online (offline, the request fails the same way).
+  const askWho = useCallback(() => {
+    void whoami().then(p => setPerson(prev => (p ? p : navigator.onLine ? (prev || '') : prev)));
+  }, []);
+  useEffect(() => {
+    askWho();
+    const onVisible = () => { if (document.visibilityState === 'visible') askWho(); };
+    window.addEventListener('online', askWho);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('online', askWho); document.removeEventListener('visibilitychange', onVisible); };
+  }, [askWho]);
   const name = person ? person[0].toUpperCase() + person.slice(1) : (person === '' && isLocal() ? 'Lucian' : '');
 
   // One shared chat; fail closed without an identity (except in local dev).
   const allowed = !!person || (person === '' && isLocal());
   const ready = status === 'connected' && allowed && gw.agents.includes('artlia');
   useEffect(() => { if (ready && activeSession !== SESSION) switchSession(SESSION); }, [ready, activeSession, switchSession]);
+  // Only the shared Casa Artlia chat is ever shown, sent to or notified from (never another session).
+  const onArtlia = ready && activeSession === SESSION;
 
   // ---- the list (last copy first, then the server)
   const [list, setList] = useState<ArtList | null>(cachedList);
   const [loadState, setLoadState] = useState<'ok' | 'offline' | 'expired'>('ok');
   const [refreshing, setRefreshing] = useState(false);
+  const latest = useRef(0);
   const refresh = useCallback(async () => {
+    const mine = ++latest.current;   // answers can arrive out of order: only the latest one counts
     setRefreshing(true);
-    try { setList(await fetchList()); setLoadState('ok'); }
-    catch (e) { setLoadState(e instanceof SessionExpired && e.message !== 'offline or signed out' ? 'expired' : 'offline'); }
-    finally { setRefreshing(false); }
+    try { const l = await fetchList(); if (mine === latest.current) { setList(l); setLoadState('ok'); } }
+    catch (e) { if (mine === latest.current) setLoadState(e instanceof SessionExpired && navigator.onLine ? 'expired' : 'offline'); }
+    finally { if (mine === latest.current) setRefreshing(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
@@ -127,29 +143,41 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  useBackLayer(panelOpen, () => setPanelOpen(false));
+  // Closing the list closes its category too, in the same step, so no Back step is left behind.
+  const closePanel = useCallback(() => { setPanelOpen(false); setCat(null); }, []);
+  useBackLayer(panelOpen, closePanel);
   useBackLayer(!!cat, () => setCat(null));
-  useBackLayer(!!sheetId, () => setSheetId(null));
   const sheetItem = list?.items.find(i => i.id === sheetId) ?? null;
+  // A sheet opens only for an item in the list; one that leaves the list closes its sheet.
+  const openSheet = useCallback((id: string) => {
+    if (list?.items.some(i => i.id === id)) setSheetId(id); else setHint('Nu mai e în lista Casa Artlia');
+  }, [list]);
+  useEffect(() => { if (sheetId && list && !list.items.some(i => i.id === sheetId)) setSheetId(null); }, [sheetId, list]);
 
   const [undo, setUndo] = useState<UndoInfo | null>(null);
   const closeUndo = useCallback(() => setUndo(null), []);
   const short = (i: ArtItem) => `${i.n != null ? `${i.n} · ` : ''}${i.title.replace(/\*\*/g, '')}`;
   const SAID: Partial<Record<ArtAction, string>> = { done: 'Făcut', snooze: 'Amânat 3 zile', drop: 'Nu mai e nevoie', reopen: 'Redeschis', edit: 'Salvat', status: 'Stare schimbată', note: 'Notă adăugată' };
+  const swap = (id: string, next: ArtItem) => setList(l => (l ? { ...l, items: l.items.map(i => (i.id === id ? next : i)) } : l));
+  const offerUndo = (item: ArtItem, label: string) => setUndo({ key: Date.now(), label: `${label}: ${short(item)}`,
+    undo: () => { void actOn(item.id, 'undo').catch(e => setHint(roError(e))).finally(() => void refresh()); } });
   const doAct = async (item: ArtItem, action: ArtAction, extra?: Record<string, unknown>) => {
-    if (action === 'done' && list) setList({ ...list, items: list.items.map(i => (i.id === item.id ? { ...i, status: 'done' } : i)) });   // optimistic
+    if (action === 'done') swap(item.id, { ...item, status: 'done' });   // optimistic; put back if it fails
     try {
       const r = await actOn(item.id, action, extra);
-      if (r.item && list) setList(l => (l ? { ...l, items: l.items.map(i => (i.id === item.id ? r.item! : i)) } : l));
-      if (SAID[action]) setUndo({ key: Date.now(), label: `${SAID[action]}: ${short(item)}`, undo: () => { void actOn(item.id, 'undo').catch(e => setHint(e instanceof Error ? e.message : 'Nu s-a putut anula')).finally(() => void refresh()); } });
+      if (r.item) swap(item.id, r.item);
+      if (SAID[action]) offerUndo(item, SAID[action]!);
     } catch (e) {
-      setHint(e instanceof Error ? e.message : 'Nu s-a putut schimba');
+      swap(item.id, item);
+      setHint(roError(e));
       throw e;
     } finally { void refresh(); }
   };
   const upload = async (item: ArtItem, f: File) => {
-    const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = () => rej(new Error('Nu s-a putut citi fișierul')); r.readAsDataURL(f); });
-    await uploadFile(item.id, { name: f.name, mimeType: f.type || 'application/octet-stream', data });
+    const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = () => rej(new Error('read')); r.readAsDataURL(f); });
+    const r = await uploadFile(item.id, { name: f.name, mimeType: f.type || 'application/octet-stream', data });
+    if (r.item) swap(item.id, r.item);
+    offerUndo(item, 'Dovadă adăugată');
     void refresh();
   };
   const undoBar = <UndoBar info={undo} onClose={closeUndo} />;
@@ -165,27 +193,32 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   useEffect(() => setBaseTitle(), []);
   useEffect(() => saveOutbox(outbox), [outbox]);
   useEffect(() => {
-    if (!ready || activeSession !== SESSION || outbox.length === 0 || flushing.current) return;
+    if (!onArtlia || !name || outbox.length === 0 || flushing.current) return;
     flushing.current = true;
     void (async () => {
       for (const item of outbox) {
-        if (item.attachments.length > 0) sentAttachments.current.set(item.text, item.attachments);
-        await sendMessage(item.text, item.attachments);
+        const signed = withSender(name, item.text);
+        if (item.attachments.length > 0) sentAttachments.current.set(signed, item.attachments);
+        await sendMessage(signed, item.attachments);
         setOutbox(prev => prev.filter(p => p.id !== item.id));
       }
       flushing.current = false;
       setOutbox(prev => (prev.length > 0 ? [...prev] : prev));
     })();
-  }, [ready, activeSession, outbox, sendMessage]);
+  }, [onArtlia, name, outbox, sendMessage]);
+  // Every message carries its writer's name; until the name is known it waits in the outbox.
   const send = useCallback((text: string, attachments: OutgoingAttachment[]) => {
+    if (!onArtlia || !name) { setOutbox(prev => [...prev, { id: 'q-' + Date.now(), text, attachments, queuedAt: Date.now() }]); return; }
     const signed = withSender(name, text);
-    if (!ready) { setOutbox(prev => [...prev, { id: 'q-' + Date.now(), text: signed, attachments, queuedAt: Date.now() }]); return; }
     if (attachments.length > 0) sentAttachments.current.set(signed, attachments);
     void sendMessage(signed, attachments);
-  }, [ready, sendMessage, name]);
+  }, [onArtlia, sendMessage, name]);
   const retry = useCallback((msg: ChatMessage) => { void sendMessage(msg.content, sentAttachments.current.get(msg.content) ?? []); }, [sendMessage]);
-  const onReply = useCallback((msg: ChatMessage) => { setReplyTo({ text: withoutLeadingQuote(visibleText(msg)) || 'Fotografie', mine: msg.role === 'user' }); }, []);
-  const putIntent = (intent: Intent) => { setPanelOpen(false); setSheetId(null); setPrefill({ nonce: Date.now(), text: '', attachments: [], intent }); };
+  const onReply = useCallback((msg: ChatMessage) => {
+    const s = msg.role === 'user' ? senderOf(visibleText(msg)) : { name: null, text: visibleText(msg) };
+    setReplyTo({ text: extractItems(withoutLeadingQuote(s.text)).text || 'Fotografie', mine: msg.role === 'user' && (!s.name || s.name === name) });
+  }, [name]);
+  const putIntent = (intent: Intent) => { closePanel(); setSheetId(null); setPrefill({ nonce: Date.now(), text: '', attachments: [], intent }); };
   const askAbout = (item: ArtItem) => {
     const label = short(item);
     putIntent({ label: `Despre ${label.length > 28 ? `${label.slice(0, 27)}…` : label}`, prefix: `Despre ⟨${item.id}⟩: `, icon: MessageSquare,
@@ -194,18 +227,18 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const addIn = (c: Category) => putIntent({ label: `De făcut · ${c.label}`, prefix: `De făcut în ${c.label}: `, icon: Plus,
     style: list ? toneStyle(toneOf(c.id, list.categories), mode) : {}, placeholder: 'Ce trebuie făcut, și până când?' });
 
-  const shown = useMemo(() => dropRepeatedFailures(collapseCliTurns(messages).filter(isShownInMessenger), visibleText), [messages]);
+  const shown = useMemo(() => (onArtlia ? dropRepeatedFailures(collapseCliTurns(messages).filter(isShownInMessenger), visibleText) : []), [messages, onArtlia]);
   const prevCount = useRef(messages.length);
   useEffect(() => {
     const before = prevCount.current; prevCount.current = messages.length;
     if (messages.length <= before) return;
     const last = messages[messages.length - 1];
-    if (last?.role === 'assistant' && !last.isStreaming && isShownInMessenger(last)) {
-      const t = visibleText(last);
+    if (onArtlia && last?.role === 'assistant' && !last.isStreaming && isShownInMessenger(last)) {
+      const t = extractItems(visibleText(last)).text;
       notify('Casa Artlia', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'Mesaj nou'));
       void refresh();
     }
-  }, [messages, notify, refresh]);
+  }, [messages, notify, refresh, onArtlia]);
 
   // ---- scrolling
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -233,20 +266,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const g = gesture.current; gesture.current = null;
     if (g?.horizontal && drag !== null) {
       if (g.from === 'chat' && drag > 70) setPanelOpen(true);
-      if (g.from === 'panel' && drag < -70) setPanelOpen(false);
+      if (g.from === 'panel' && drag < -70) closePanel();
     }
     setDrag(null);
   };
 
   const [settings, setSettings] = useState(false);
-  useBackLayer(settings, () => setSettings(false));
   const statusLine = status === 'connected' ? (allowed && gw.agents.length > 0 && !gw.agents.includes('artlia') ? 'Asistentul Casa Artlia nu e pornit încă' : null)
     : status === 'connecting' ? 'Se conectează…' : outbox.length > 0 ? `Fără conexiune · ${outbox.length} de trimis` : 'Fără conexiune';
   const today = list?.today ?? new Date().toISOString().slice(0, 10);
   const items = list?.items ?? [];
   const cats = list?.categories ?? [];
   const { top, overdue, week } = topOf(items, today);
-  const renderChips = useCallback((its: Array<{ id: string; label: string }>) => <ItemChips items={its} onOpen={setSheetId} />, []);
+  const renderChips = useCallback((its: Array<{ id: string; label: string }>) => <ItemChips items={its} onOpen={openSheet} />, [openSheet]);
+  useEffect(() => { if (!hint) return; const t = window.setTimeout(() => setHint(null), 6000); return () => window.clearTimeout(t); }, [hint]);
 
   // ---- the pinned card: the most pressing thing, on a band with a shadow edge
   const pinned = (
@@ -299,9 +332,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6 pt-1">
         {!list ? <p className="py-16 text-center text-[15px] text-pc-text-muted">{spinning ? 'Se încarcă…' : ''}</p>
-          : cat ? <CategoryView cat={cat} items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => setSheetId(i.id)} />
-          : tab === 'now' ? <NowView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => setSheetId(i.id)} />
-          : tab === 'plan' ? <PlanView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => setSheetId(i.id)} />
+          : cat ? <CategoryView cat={cat} items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
+          : tab === 'now' ? <NowView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
+          : tab === 'plan' ? <PlanView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
           : <CatsView items={items} today={today} mode={mode} cats={cats} onPick={setCat} />}
       </div>
       {onClose && panelOpen && !sheetId && undo && <div className="shrink-0 pb-[env(safe-area-inset-bottom)]">{undoBar}</div>}
@@ -320,19 +353,19 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {shown.map((msg, i) => {
         const prev = shown[i - 1];
         const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
-        const firstOfRun = newDay || prev.role !== msg.role || (msg.role === 'user' && visibleText(prev).slice(0, 12) !== visibleText(msg).slice(0, 12) && /^\[/.test(visibleText(msg)));
+        const firstOfRun = newDay || prev.role !== msg.role || (msg.role === 'user' && senderOf(visibleText(prev)).name !== senderOf(visibleText(msg)).name);
         return (
           <div key={msg.id} className={firstOfRun && i > 0 ? 'pt-2' : ''}>
             {newDay && <div className="flex justify-center pb-2 pt-3"><span className="text-[12px] font-medium text-pc-text-muted">{dayLabel(msg.timestamp)}</span></div>}
-            <MessageBubble msg={msg} me={name} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips} />
+            <MessageBubble msg={msg} shared me={name || undefined} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips} />
           </div>
         );
       })}
       {outbox.map((item, i) => (
-        <MessageBubble key={item.id} me={name} showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
+        <MessageBubble key={item.id} shared me={name || undefined} showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
           msg={{ id: item.id, role: 'user', content: item.text, timestamp: item.queuedAt, blocks: [{ type: 'text', text: item.text || `${item.attachments.length} atașamente` }], sendStatus: 'sending' }} />
       ))}
-      {questions.map(qq => <QuestionCard key={qq.id} record={qq} onAnswer={answer} onSkip={skip} />)}
+      {onArtlia && questions.map(qq => <QuestionCard key={qq.id} record={qq} onAnswer={answer} onSkip={skip} />)}
     </>
   );
 
@@ -361,7 +394,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
       <div className="shrink-0 border-t border-pc-border bg-pc-base">
         {!sheetId && !panelOpen && undoBar}
-        {hint && <p className="mx-3 mt-2 text-[13px] text-red-500" role="alert" onClick={() => setHint(null)}>{hint}</p>}
+        {hint && <button type="button" className="mx-3 mt-2 flex min-h-10 w-[calc(100%-1.5rem)] items-center text-left text-[13px] text-red-500" role="alert" onClick={() => setHint(null)}>{hint}</button>}
         <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
           {QUICK.map(qq => (
             <button key={qq.key} type="button" onClick={() => putIntent({ label: qq.label, prefix: qq.prefix, icon: qq.icon, style: quickStyle(qq.tone, mode), placeholder: qq.placeholder })}
@@ -370,7 +403,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             </button>
           ))}
         </div>
-        <Composer key={prefill?.nonce ?? 0} onSend={send} prefill={prefill} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Scrie sau spune" />
+        <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={send} prefill={prefill} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Scrie sau spune" />
       </div>
 
       {!wide && (

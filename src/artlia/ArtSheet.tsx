@@ -11,7 +11,7 @@ import { Segmented } from '../ui/Controls';
 import { useBusy } from '../ui/draft';
 import { useDelayedFlag } from '../ui/progress';
 import { DueChip, Title } from '../app/Todo';
-import { fileUrl, type ArtAction, type ArtItem, type ArtList, type Phase, type Status } from './api';
+import { fileUrl, roError, type ArtAction, type ArtItem, type ArtList, type Phase, type Status } from './api';
 import { CatPill } from './Lists';
 import { KIND_LABEL, NEED_LABEL, PHASE_LABEL, isOpen, termRuns } from './rules';
 
@@ -49,23 +49,29 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
   const saving = useDelayedFlag(busy);
   const open = isOpen(item);
 
-  const run = async (action: ArtAction, extra?: Record<string, unknown>) => {
+  /** True when it worked; on failure the typed text stays where it is. */
+  const run = async (action: ArtAction, extra?: Record<string, unknown>): Promise<boolean> => {
     setBusy(true); setError(null);
-    try { await onAct(item, action, extra); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Nu s-a putut schimba'); }
+    try { await onAct(item, action, extra); return true; }
+    catch (e) { setError(roError(e)); return false; }
     finally { setBusy(false); }
   };
   const save = async () => {
     if (!edit) return;
-    await run('edit', { title: edit.title.trim(), due_date: edit.due || null, cat: edit.cat, phase: edit.phase || null });
-    setEdit(null);
+    // Only what changed: sending the date again would reset the item's reminder and put-off.
+    const changes: Record<string, unknown> = {};
+    if (edit.title.trim() !== item.title) changes.title = edit.title.trim();
+    if (edit.due !== (item.due_date ?? '')) changes.due_date = edit.due || null;
+    if (edit.cat !== item.cat) changes.cat = edit.cat;
+    if (edit.phase !== (item.phase ?? '')) changes.phase = edit.phase || null;
+    if (Object.keys(changes).length === 0 || await run('edit', changes)) setEdit(null);
   };
-  const addNote = async () => { const t = note.trim(); if (!t) return; await run('note', { text: t }); setNote(''); };
+  const addNote = async () => { const t = note.trim(); if (!t) return; if (await run('note', { text: t })) setNote(''); };
   const pick = async (f: File | undefined) => {
     if (!f) return;
     if (f.size > 20 * 1024 * 1024) { setError('Fișierul e prea mare (maxim 20 MB)'); return; }
     setBusy(true); setError(null);
-    try { await onUpload(item, f); } catch (e) { setError(e instanceof Error ? e.message : 'Nu s-a putut încărca'); } finally { setBusy(false); }
+    try { await onUpload(item, f); } catch (e) { setError(roError(e)); } finally { setBusy(false); }
   };
 
   const secondary = 'press flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-surface py-3 text-[13px] text-pc-text active:bg-[var(--pc-hover-strong)] disabled:opacity-50';

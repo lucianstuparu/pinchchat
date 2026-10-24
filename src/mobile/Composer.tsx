@@ -65,6 +65,8 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [text, setText] = useDraft('chat', prefill?.text ? prefill.text + '\n' : undefined);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
   const [intent, setIntent] = useState<Intent | null>(prefill?.intent ?? null);
+  // A quick start or "Ask" while the box is open: the label changes, photos and text stay.
+  useEffect(() => { if (prefill?.intent) { setIntent(prefill.intent); taRef.current?.focus(); } }, [prefill]);
   // A draft that is only a bare "Task:" / "Note:" / "Remind me" is left from before these were
   // labels (2026-10-24): it would sit under the label as text, so it goes.
   useEffect(() => {
@@ -95,7 +97,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     const silent = !!r && r.peak() < SILENT;
     const note = await r?.stop();
     if (!keep) { setVm('idle'); return; }
-    if (silent) { setVm('idle'); setError(`The microphone recorded only silence${r?.device ? ` (${r.device})` : ''}. With a Bluetooth headset or watch connected, try again with it off.`); return; }
+    if (silent) { setVm('idle'); setError(L('The microphone recorded only silence{device}. With a Bluetooth headset or watch connected, try again with it off.', { device: r?.device ? ` (${r.device})` : '' })); return; }
     if (!note) { setVm('idle'); setError(L('Nothing was recorded')); return; }
     // The bubble shows the words said, so Whisper writes them first; the audio goes along. If
     // Whisper fails, the audio goes alone and the gateway transcribes it for the assistant.

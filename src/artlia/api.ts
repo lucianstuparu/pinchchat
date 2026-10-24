@@ -3,7 +3,7 @@
  * through register-api's /artlia/* routes (ai.manager casa-artlia-app.md). The last list is kept on
  * the phone, so the app opens with it at once and still shows it offline.
  */
-import { post } from '../app/api';
+import { SessionExpired, post } from '../app/api';
 
 export type Kind = 'task' | 'check' | 'decision' | 'milestone';
 export type Status = 'todo' | 'check' | 'waiting' | 'done' | 'cancelled';
@@ -44,5 +44,12 @@ export const addItem = (fields: { title: string; cat: string; kind?: Kind; due_d
 
 export const uploadFile = (item: string, file: { name: string; mimeType: string; data: string }) =>
   post<{ ok: boolean; item: ArtItem }>('/artlia/file', { item, ...file });
+
+/** One short Romanian line for a failed call; the server's own (English) text never reaches the screen. */
+export function roError(e: unknown): string {
+  if (!navigator.onLine) return 'Fără conexiune · încearcă din nou';
+  if (e instanceof SessionExpired) return 'Sesiunea a expirat · reîncarcă aplicația';
+  return 'Nu s-a putut salva · încearcă din nou';
+}
 
 export const fileUrl = (ref: string) => `/artlia/files/${encodeURIComponent(ref)}`;

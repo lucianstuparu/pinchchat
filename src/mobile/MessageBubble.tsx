@@ -44,6 +44,8 @@ interface Props {
    * signed-in person's name; others' messages show on the left with their name and initial.
    */
   me?: string;
+  /** The chat is shared: user messages carry "[Name] ", taken off the text. */
+  shared?: boolean;
 }
 
 
@@ -76,15 +78,15 @@ const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect, me }: Props) {
-  const sender = msg.role === 'user' && me !== undefined ? senderOf(visibleText(msg)) : null;
-  const other = sender?.name && sender.name !== me ? sender.name : null;   // someone else in a shared chat
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect, me, shared }: Props) {
+  const sender = msg.role === 'user' && shared ? senderOf(visibleText(msg)) : null;
+  const other = sender?.name && me && sender.name !== me ? sender.name : null;   // someone else in a shared chat
   const mine = msg.role === 'user' && !other;
   // Agent messages may name register items (⟨adm-…⟩ markers): hide the markers, add Done / Snooze rows.
   // Item markers (⟨id⟩) never show as text, in anyone's message: they become the item's card.
   const { text: raw, items } = extractItems(msg.role === 'user' && sender ? sender.text : visibleText(msg));
   // A voice message shows the words said (Whisper, before sending), after a mic.
-  const voiceNote = mine ? voiceMessage(raw) : null;
+  const voiceNote = msg.role === 'user' ? voiceMessage(raw) : null;
   const text = voiceNote ? voiceNote.said : raw;
   const images = msg.blocks.filter(b => b.type === 'image') as Array<{ type: 'image'; mediaType: string; data?: string; url?: string }>;
   const typing = msg.isStreaming && !text;

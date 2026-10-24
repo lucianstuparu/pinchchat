@@ -90,7 +90,7 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
       if (round.current === mine && t) setText(prev => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${t}` : t));
       else if (!t) setError(L('Nothing was understood. Try again a bit closer.'));
     } catch (e) {
-      setError(e instanceof Error && e.message === 'offline' ? 'Speech needs a connection; type it for now.'
+      setError(e instanceof Error && e.message === 'offline' ? L('Speech needs a connection; type it for now.')
         : e instanceof Error && e.message === 'slow' ? L('Writing it took too long. Try a shorter piece.') : L('Could not turn it into text. Try again.'));
     } finally { if (round.current === mine) setState('idle'); }
   };

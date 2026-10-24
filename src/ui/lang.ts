@@ -35,6 +35,7 @@ const ro: Record<string, string> = {
   'Microphone blocked: allow it for this app in Chrome’s site settings.': 'Microfon blocat: permite-l pentru aplicație în setările site-ului din Chrome.',
   'The mic stopped ({err}).': 'Microfonul s-a oprit ({err}).',
   'The microphone recorded only silence{device}. With a Bluetooth headset or watch connected, try again with it off.': 'Microfonul a înregistrat doar liniște{device}. Dacă e conectată o cască sau un ceas Bluetooth, încearcă fără.',
+  'Speech needs a connection; type it for now.': 'Dictarea are nevoie de conexiune; scrie deocamdată.',
   'Nothing was understood. Try again a bit closer.': 'Nu s-a înțeles nimic. Încearcă din nou, mai aproape.',
   'Writing it took too long. Try a shorter piece.': 'A durat prea mult. Încearcă o bucată mai scurtă.',
   'Could not turn it into text. Try again.': 'Nu s-a putut transforma în text. Încearcă din nou.',
