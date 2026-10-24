@@ -83,6 +83,8 @@ function shopApply(op) {
     const e = shopOwned.find(x => x.id === op.id);
     if (!e) return { error: 'not in Things we own' };
     if (op.op === 'owned-close' && e.status === 'owned') Object.assign(e, { status: op.how, closed_on: addD(0) });
+    if (op.op === 'owned-delete') Object.assign(e, { status: 'deleted', closed_on: addD(0) });
+    if (op.op === 'owned-edit') for (const k of ['title', 'group', 'shop', 'bought_on', 'price', 'return_by', 'warranty_until']) if (op[k] !== undefined) e[k] = op[k] === '' ? undefined : op[k];
     if (op.op === 'owned-reopen') Object.assign(e, { status: 'owned', closed_on: undefined });
     return { ok: true, entry: e };
   }

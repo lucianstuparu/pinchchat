@@ -6,13 +6,14 @@
  * Filled each morning by the Shopper from the order mails, or by telling the assistant.
  */
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Mail, PackageCheck, Search, Undo2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Mail, PackageCheck, Pencil, Search, Trash2, Undo2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { HomeTabs, type HomeTab } from './Products';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf } from './groups';
 import { fold } from './logic';
 import { daysUntil } from './pantry';
 import { mailLink, money, type OwnedEntry, type OwnedOp } from './owned';
+import { type Group } from './groups';
 
 const fmtDay = (d: string, year = true) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) });
 
@@ -28,7 +29,8 @@ export function OwnedSheet({ owned, today, mode, onOp, onTab, counts, onClose, f
   const words = fold(q).split(/\s+/).filter(Boolean);
   const match = (e: OwnedEntry) => { const hay = fold([e.title, e.shop, e.order, e.notes].join(' ')); return words.every(w => hay.includes(w)); };
   const kept = owned.filter(e => e.status === 'owned' && match(e)).sort((a, b) => (b.bought_on ?? '').localeCompare(a.bought_on ?? ''));
-  const closed = owned.filter(e => e.status !== 'owned').sort((a, b) => (b.closed_on ?? '').localeCompare(a.closed_on ?? ''));
+  const [editing, setEditing] = useState<string | null>(null);
+  const closed = owned.filter(e => e.status === 'returned' || e.status === 'gone').sort((a, b) => (b.closed_on ?? '').localeCompare(a.closed_on ?? ''));
   const kindOf = (e: OwnedEntry) => groupOf({ title: e.title, tags: [], group: e.group });
 
   return (
@@ -87,9 +89,12 @@ export function OwnedSheet({ owned, today, mode, onOp, onTab, counts, onClose, f
                               <Mail size={16} aria-hidden /> Open the email
                             </a>
                           )}
+                          <button type="button" onClick={() => setEditing(e.id)} className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-white/70 px-3.5 text-[15px] font-medium text-pc-text dark:bg-black/30"><Pencil size={15} aria-hidden /> Edit</button>
                           <button type="button" onClick={() => { onOp({ op: 'owned-close', id: e.id, how: 'returned' }); setOpenId(null); }} className="press inline-flex h-10 items-center rounded-full bg-white/70 px-3.5 text-[15px] font-medium text-pc-text dark:bg-black/30">Sent back</button>
                           <button type="button" onClick={() => { onOp({ op: 'owned-close', id: e.id, how: 'gone' }); setOpenId(null); }} className="press inline-flex h-10 items-center rounded-full bg-white/70 px-3.5 text-[15px] font-medium text-pc-text dark:bg-black/30">No longer ours</button>
+                          <button type="button" onClick={() => { onOp({ op: 'owned-delete', id: e.id }); setOpenId(null); }} className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-white/70 px-3.5 text-[15px] font-medium text-red-600 dark:bg-black/30 dark:text-red-400"><Trash2 size={15} aria-hidden /> Remove</button>
                         </div>
+                        <p className="mt-1.5 text-[12px] text-pc-text-muted">Remove = a duplicate or a mistake. Edit fixes the name, kind, price or dates.</p>
                       </div>
                     )}
                   </div>
@@ -118,6 +123,64 @@ export function OwnedSheet({ owned, today, mode, onOp, onTab, counts, onClose, f
         )}
       </div>
       {footer}
+      {editing && (() => {
+        const e = owned.find(x => x.id === editing);
+        return e ? <EditOwned entry={e} kind={kindOf(e)} mode={mode} onClose={() => setEditing(null)} onSave={f => { onOp({ op: 'owned-edit', id: e.id, ...f }); setEditing(null); }} /> : null;
+      })()}
+    </Sheet>
+  );
+}
+
+/** Fix what the mail scan got wrong: the name, the kind, the shop, the price, the dates. */
+function EditOwned({ entry, kind, mode, onClose, onSave }: {
+  entry: OwnedEntry; kind: Group; mode: 'light' | 'dark'; onClose: () => void;
+  onSave: (f: { title?: string; group?: string; shop?: string; bought_on?: string; price?: number; return_by?: string; warranty_until?: string }) => void;
+}) {
+  const [title, setTitle] = useState(entry.title);
+  const [group, setGroup] = useState<Group>(kind);
+  const [shop, setShop] = useState(entry.shop ?? '');
+  const [price, setPrice] = useState(entry.price === undefined ? '' : String(entry.price));
+  const [bought, setBought] = useState(entry.bought_on ?? '');
+  const [ret, setRet] = useState(entry.return_by ?? '');
+  const [warranty, setWarranty] = useState(entry.warranty_until ?? '');
+  const field = 'w-full rounded-[12px] border-0 bg-pc-surface px-3.5 py-2.5 text-[16px] outline-none focus:outline-none focus-visible:outline-none';
+  const date = 'rounded-[8px] bg-pc-elevated px-2 py-1 text-[15px] outline-none';
+  const save = () => {
+    const n = price.trim() === '' ? undefined : Number(price.replace(',', '.'));
+    onSave({ title: title.trim() || entry.title, group: group !== kind ? group : undefined, shop: shop.trim() !== (entry.shop ?? '') ? shop.trim() : undefined,
+      price: n !== undefined && isFinite(n) && n !== entry.price ? n : undefined,
+      bought_on: bought !== (entry.bought_on ?? '') ? bought : undefined, return_by: ret !== (entry.return_by ?? '') ? ret : undefined,
+      warranty_until: warranty !== (entry.warranty_until ?? '') ? warranty : undefined });
+  };
+  return (
+    <Sheet label={`Edit ${entry.title}`} onClose={onClose} z={50} className="max-h-[90dvh] overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
+      <div className="mb-3 flex items-center justify-between">
+        <button type="button" onClick={onClose} className="press h-10 px-1 text-[16px] text-pc-text-muted">Cancel</button>
+        <span className="text-[15px] font-semibold">Edit</span>
+        <button type="button" onClick={save} className="press h-10 px-1 text-[16px] font-semibold text-[var(--pc-accent-ink)]">Done</button>
+      </div>
+      <input value={title} onChange={e => setTitle(e.target.value)} className={`${field} text-[17px] font-semibold`} aria-label="Name" />
+      <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Kind of thing">
+        {GROUPS.filter(g => g !== 'groceries').map(g => {
+          const c = groupColours(g, mode);
+          return (
+            <button key={g} type="button" role="radio" aria-checked={group === g} onClick={() => setGroup(g)}
+              className="press inline-flex h-8 items-center gap-1 rounded-full border px-3.5 text-[15px]"
+              style={group === g ? { background: c.ink, borderColor: c.ink, color: c.card } : { background: c.card, borderColor: c.border, color: c.ink }}>
+              {group === g && <Check size={14} strokeWidth={3} aria-hidden />}{GROUP_NAMES[g]}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <input value={shop} onChange={e => setShop(e.target.value)} placeholder="Shop" className={field} aria-label="Shop" />
+        <input value={price} onChange={e => setPrice(e.target.value)} placeholder={`Price${entry.currency ? ` (${entry.currency})` : ''}`} inputMode="decimal" className={`${field} w-36`} aria-label="Price" />
+      </div>
+      <div className="mt-3 divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface">
+        <label className="flex items-center justify-between gap-3 px-4 py-2.5 text-[16px]">Bought on<input type="date" value={bought} onChange={e => setBought(e.target.value)} className={date} /></label>
+        <label className="flex items-center justify-between gap-3 px-4 py-2.5 text-[16px]">Return by<input type="date" value={ret} onChange={e => setRet(e.target.value)} className={date} /></label>
+        <label className="flex items-center justify-between gap-3 px-4 py-2.5 text-[16px]">Warranty to<input type="date" value={warranty} onChange={e => setWarranty(e.target.value)} className={date} /></label>
+      </div>
     </Sheet>
   );
 }

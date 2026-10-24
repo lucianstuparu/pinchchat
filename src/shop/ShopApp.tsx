@@ -308,6 +308,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           onOp={op => {
             apply(op);
             const e = owned.find(x => x.id === op.id);
+            if (op.op === 'owned-delete') setUndo({ key: Date.now(), label: `Removed: ${e?.title ?? ''}`, undo: () => apply({ op: 'owned-reopen', id: op.id }) });
             if (op.op === 'owned-close') setUndo({ key: Date.now(), label: `${op.how === 'returned' ? 'Sent back' : 'No longer ours'}: ${e?.title ?? ''}`, undo: () => apply({ op: 'owned-reopen', id: op.id }) });
           }} />
       )}
