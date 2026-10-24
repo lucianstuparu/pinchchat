@@ -54,6 +54,7 @@ const ro: Record<string, string> = {
   'Reply': 'Răspunde',
   'Copy': 'Copiază',
   'Select': 'Selectează',
+  'Read aloud': 'Citește cu voce tare',
   'sending': 'se trimite',
   'sent': 'trimis',
   'Not sent — tap to retry': 'Netrimis — atinge pentru a reîncerca',

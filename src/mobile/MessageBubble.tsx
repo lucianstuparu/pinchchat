@@ -1,6 +1,6 @@
 import { L } from '../ui/lang';
 import { memo, useRef, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply } from 'lucide-react';
+import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply, Volume2 } from 'lucide-react';
 import { AgentAvatar, MeAvatar, PersonAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
@@ -10,6 +10,7 @@ import { formatTime, senderOf, visibleText } from './messageView';
 import { extractItems } from './messageItems';
 import { ItemActions } from './ItemActions';
 import { failedTurn, isLong, voiceMessage } from './notice';
+import { canSpeak, speak } from '../ui/speak';
 
 const mdComponents: Components = {
   a: ({ node, ...props }) => {
@@ -241,6 +242,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             {text && (
               <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={copy}>
                 <Copy size={16} /> {L('Copy')}
+              </button>
+            )}
+            {text && canSpeak() && (
+              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={() => { setMenu(false); speak([text], 'ro'); }}>
+                <Volume2 size={16} /> {L('Read aloud')}
               </button>
             )}
             {onSelect && (

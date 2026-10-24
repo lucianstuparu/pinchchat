@@ -151,7 +151,7 @@ const clients = new Set();
 const now = () => Date.now();
 const waDrafts = new Map();
 const waContacts = [
-  { id: 'ct-1', name: 'Eugenia Gamurari', label: 'Bunica', aliases: ['bunica', 'bunicii', 'buni'], phone: '+33600000000', lang: 'ro', tone: 'informal', sent: 3, last_sent: '2026-10-24T08:00:00Z' },
+  { id: 'ct-1', name: 'Eugenia Gamurari', label: 'Bunica', aliases: ['bunica', 'bunicii', 'buni'], phone: '+33600000000', lang: 'ro', tone: 'informal', sent: 3, last_sent: '2026-10-24T08:00:00Z', listen: true, unread: 2, last_in: { text: 'Ai ajuns cu bine?', ts: '2026-10-24T11:40:00Z' } },
   { id: 'ct-2', name: 'Fleur Guillemot', label: 'Fleur', aliases: [], phone: '+33600000001', lang: 'fr', tone: 'formal', sent: 0 },
   { id: 'ct-3', name: 'Mama', label: 'Mama', aliases: ['mama', 'mamei'], phone: '', lang: 'ro', tone: 'informal', sent: 0 },
 ];
@@ -321,16 +321,25 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  if (url.pathname === '/reg/wa/contacts' || url.pathname === '/reg/wa/contact') {
+  if (url.pathname === '/reg/wa/contacts' || url.pathname === '/reg/wa/contact' || url.pathname === '/reg/wa/inbox') {
     let body = '';
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       const p = JSON.parse(body || '{}');
       res.setHeader('content-type', 'application/json');
       if (url.pathname === '/reg/wa/contacts') { res.end(JSON.stringify({ contacts: waContacts })); return; }
+      if (url.pathname === '/reg/wa/inbox') {
+        const c = waContacts.find(x => x.id === p.contact); if (c) c.unread = 0;
+        res.end(JSON.stringify({ messages: p.contact === 'ct-1' ? [
+          { id: 'm1', from: 'me', text: 'Am plecat acum de acasă.', ts: '2026-10-24T08:00:00Z' },
+          { id: 'm2', from: 'them', text: 'Bine, drum bun! Să-mi scrii când ajungi.', ts: '2026-10-24T08:05:00Z' },
+          { id: 'm3', from: 'them', text: 'Ai ajuns cu bine?', ts: '2026-10-24T11:40:00Z' },
+        ] : [] }));
+        return;
+      }
       let c = waContacts.find(x => x.id === p.id);
       if (!c) { c = { id: `ct-${++seq}`, sent: 0 }; waContacts.push(c); }
-      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone, lang: p.lang, tone: p.tone });
+      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone, lang: p.lang, tone: p.tone, listen: p.listen });
       res.end(JSON.stringify({ ok: true, contact: c }));
     });
     return;

@@ -31,6 +31,8 @@ export interface ComposerPrefill {
   intent?: Intent;
   /** Start a voice message right away (the "Voice message" shortcut on the app icon). */
   voice?: boolean;
+  /** Start dictating into the box right away (WhatsApp "Reply by voice"). */
+  dictate?: boolean;
 }
 
 interface Props {
@@ -67,6 +69,14 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [intent, setIntent] = useState<Intent | null>(prefill?.intent ?? null);
   // A quick start or "Ask" while the box is open: the label changes, photos and text stay.
   useEffect(() => { if (prefill?.intent) { setIntent(prefill.intent); taRef.current?.focus(); } }, [prefill]);
+  // "Reply by voice": the mic starts with the label already set, so the person only speaks.
+  const dictateFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!prefill?.dictate || dictateFor.current === prefill.nonce) return;
+    dictateFor.current = prefill.nonce;
+    if (!speech.listening && speech.state !== 'writing') speech.toggle();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request
+  }, [prefill]);
   // A draft that is only a bare "Task:" / "Note:" / "Remind me" is left from before these were
   // labels (2026-10-24): it would sit under the label as text, so it goes.
   useEffect(() => {

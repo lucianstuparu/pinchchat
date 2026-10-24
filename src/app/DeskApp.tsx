@@ -194,6 +194,16 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const { notify } = useNotifications();
   useEffect(() => setBaseTitle(), []);
 
+  // A WhatsApp notification ("Bunica: …") opens her conversation: ?wa=<contact id>.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const wa = url.searchParams.get('wa');
+    if (!wa) return;
+    url.searchParams.delete('wa');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    setDial(wa);
+  }, []);
+
   // A shortcut on the app icon (manifest "shortcuts", long-press): ?quick=task|remind|buy|… opens
   // straight into the box with that label; ?quick=voice starts a voice message.
   useEffect(() => {
@@ -202,6 +212,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     if (!quick) return;
     url.searchParams.delete('quick');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    if (quick === 'wa') { setDial(true); return; }
     const q = QUICK.find(x => x.key === quick);
     if (q) setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder } });
     else if (quick === 'voice') setPrefill({ nonce: Date.now(), text: '', attachments: [], voice: true });
@@ -262,10 +273,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     setPrefill({ nonce: Date.now(), text, attachments: [] });
   };
   // WhatsApp speed dial: pick a person, then say what to tell them (the label carries who).
-  const [dial, setDial] = useState(false);
-  const writeTo = (c: Contact) => {
+  const [dial, setDial] = useState<string | boolean>(false);   // true = the grid, a contact id = that conversation
+  const writeTo = (c: Contact, dictate = false) => {
     setDial(false);
-    setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: {
+    setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate, intent: {
       label: `WhatsApp · ${c.label}`, prefix: `Scrie-i lui ${c.name}: `, icon: MessageCircle,
       style: mode === 'dark' ? { background: '#1d9e7533', color: '#5fd3a9' } : { background: '#e1f5ee', color: '#0f6e56' },
       placeholder: `What should I tell ${c.label}?`,
@@ -579,7 +590,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
-      {dial && <SpeedDial onPick={writeTo} onClose={() => setDial(false)} />}
+      {dial && <SpeedDial onPick={writeTo} onClose={() => setDial(false)} openId={typeof dial === 'string' ? dial : null} />}
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />
