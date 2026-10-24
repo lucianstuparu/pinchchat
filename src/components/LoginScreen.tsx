@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RO } from '../ui/lang';
 import { Sparkles, Eye, EyeOff, Loader2, Key, Lock, ChevronDown } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
 import { getStoredCredentials, type AuthMode } from '../lib/credentials';
@@ -61,12 +62,12 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
       <div className="w-full max-w-md mx-4">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <img src="/logo.png" alt="PinchChat" className="h-20 w-20 drop-shadow-lg" />
+          <img src="/logo.png" alt="" className="h-20 w-20 rounded-[20px] drop-shadow-lg" />
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-pc-text tracking-wide">{t('login.title')}</h1>
+            <h1 className="text-2xl font-bold text-pc-text tracking-wide">{import.meta.env.VITE_APP_NAME || t('login.title')}</h1>
             <Sparkles className="h-5 w-5 text-pc-accent-light/60" />
           </div>
-          <p className="text-sm text-pc-text-muted">{t('login.subtitle')}</p>
+          <p className="px-4 text-center text-sm text-pc-text-muted">{RO ? 'O singură dată pe acest telefon: lipește tokenul gateway-ului (în 1Password, „OpenClaw gateway token”).' : t('login.subtitle')}</p>
         </div>
 
         {/* Form */}

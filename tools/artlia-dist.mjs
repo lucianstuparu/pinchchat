@@ -5,6 +5,7 @@
 import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 for (const f of readdirSync('dist/artlia')) cpSync(`dist/artlia/${f}`, `dist/${f}`);
+cpSync('dist/logo-512.png', 'dist/logo.png');   // the login screen's picture
 for (const d of ['artlia', 'shop', 'shortcuts']) rmSync(`dist/${d}`, { recursive: true, force: true });
 const html = readFileSync('dist/index.html', 'utf8')
   .replace(/<html lang="[^"]*"/, '<html lang="ro"')
