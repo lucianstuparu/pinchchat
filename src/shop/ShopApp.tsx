@@ -23,6 +23,8 @@ import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { ShopPicker } from './ShopPicker';
+import { GroupCards } from './GroupCards';
+import { GROUPS, GROUP_NAMES, groupColours, groupOf, type Group } from './groups';
 import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
@@ -94,10 +96,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const usual = (snap.usual ?? []).filter(u => !openNow.has(fold(u.title)) && !(u.product && openNow.has(u.product))).sort((a, b) => Number(!!store && b.tags.includes(store)) - Number(!!store && a.tags.includes(store)));
   const returns = here.filter(i => i.kind === 'return').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
   const toBuy = here.filter(i => i.kind === 'buy');
-  const forThisShop = store ? toBuy.filter(i => storeTagsOf(i, stores).length > 0) : toBuy;
-  const anywhere = store ? toBuy.filter(i => storeTagsOf(i, stores).length === 0) : [];
+  // At a shop, its own things first in each card, then what can be got anywhere.
+  const inCards = store ? [...toBuy.filter(i => storeTagsOf(i, stores).length > 0), ...toBuy.filter(i => storeTagsOf(i, stores).length === 0)] : toBuy;
   const bought = snap.items.filter(i => i.status === 'bought' || i.status === 'returned')
     .sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+  // Ticked today or yesterday: folded at the foot of their card, to untick a slip in the shop.
+  const yesterday = new Date(Date.parse(`${snap.today || new Date().toISOString().slice(0, 10)}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const justTicked = bought.filter(i => i.kind === 'buy' && !isWish(i) && (i.bought_on ?? '') >= yesterday && atStore(i, store, stores));
   const countAt = (tag: string | null) => open.filter(i => atStore(i, tag, stores)).length;
   // Shops: one button that searches them all, and quick chips only for shops with something to get.
   const shopCounts = Object.fromEntries(stores.map(s => [s.tag, open.filter(i => storeTagsOf(i, stores).includes(s.tag)).length]));
@@ -219,17 +224,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               </div>
             )}
 
-            {forThisShop.length > 0 && (
-              <section className="pt-1">
-                {store && anywhere.length > 0 && <h2 className="px-4 pb-0.5 pt-3 text-[13px] font-semibold text-pc-text-muted">At {storeName(store)}</h2>}
-                <Rows items={forThisShop} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} hideStore={store} />
-              </section>
-            )}
-            {anywhere.length > 0 && (
-              <section>
-                <h2 className="px-4 pb-0.5 pt-4 text-[13px] font-semibold text-pc-text-muted">Anywhere</h2>
-                <Rows items={anywhere} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />
-              </section>
+            {inCards.length > 0 && (
+              <GroupCards items={inCards} ticked={justTicked} stores={stores} storeName={storeName} store={store} mode={mode} onTick={tick} onOpen={setEditing} />
             )}
 
             {wished.length > 0 && (
@@ -272,7 +268,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 
       {editing && (() => {
         const item = snap.items.find(i => i.id === editing);
-        return item ? <ItemSheet item={item} stores={stores} today={snap.today} onClose={() => setEditing(null)} apply={op => { apply(op); if (op.op === 'drop') offerUndo(item, 'Removed'); }} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
+        return item ? <ItemSheet item={item} stores={stores} today={snap.today} mode={mode} onClose={() => setEditing(null)} apply={op => { apply(op); if (op.op === 'drop') offerUndo(item, 'Removed'); }} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
       })()}
       {showPantry && (
         <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onClose={() => setShowPantry(false)} footer={<UndoBar info={undo} onClose={closeUndo} />}
@@ -537,8 +533,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   );
 }
 
-function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: {
-  item: Item; stores: Store[]; today: string; onClose: () => void; apply: ReturnType<typeof useShop>['apply'];
+function ItemSheet({ item, stores, today, mode, onClose, apply, product, onProduct }: {
+  item: Item; stores: Store[]; today: string; mode: 'light' | 'dark'; onClose: () => void; apply: ReturnType<typeof useShop>['apply'];
   product?: Product; onProduct: (id: string) => void;
 }) {
   useBusy('item-edit', true);   // an update never reloads over unsaved edits
@@ -549,6 +545,7 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
   const [isReturn, setIsReturn] = useState(item.kind === 'return');
   const [due, setDue] = useState(item.due_date ?? '');
   const [priv, setPriv] = useState(item.scope === 'private');
+  const [group, setGroup] = useState<Group>(groupOf(item));
   const toggle = (t: string) => setTags(ts => (ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t]));
   const others = tags.filter(t => !stores.some(s => s.tag === t));
   const chosen = tags.filter(t => stores.some(s => s.tag === t));
@@ -557,8 +554,8 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
   const save = () => {
     const kind = isReturn ? 'return' : 'buy';
     if (title !== item.title || qty !== (item.qty ?? '') || notes !== (item.notes ?? '') || due !== (item.due_date ?? '') || kind !== item.kind
-      || tags.join(',') !== item.tags.join(',')) {
-      apply({ op: 'edit', id: item.id, title, qty, notes, tags, due_date: isReturn ? due : '', kind });
+      || tags.join(',') !== item.tags.join(',') || group !== groupOf(item)) {
+      apply({ op: 'edit', id: item.id, title, qty, notes, tags, due_date: isReturn ? due : '', kind, ...(group !== groupOf(item) ? { group } : {}) });
     }
     if (priv !== (item.scope === 'private')) apply({ op: 'scope', id: item.id, scope: priv ? 'private' : 'shared' });
     onClose();
@@ -580,6 +577,21 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
             <span className="flex items-center text-[13px] text-pc-text-muted">{item.status === 'returned' ? 'Returned' : 'Bought'} {item.bought_on === today ? 'today' : fmtDay(item.bought_on)}{item.bought_by ? ` by ${item.bought_by}` : ''}</span>
           )}
         </div>
+
+        {!isReturn && (
+          <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label="Kind of thing">
+            {GROUPS.map(g => {
+              const c = groupColours(g, mode);
+              return (
+                <button key={g} type="button" role="radio" aria-checked={group === g} onClick={() => setGroup(g)}
+                  className="press inline-flex h-8 items-center gap-1 rounded-full border px-3.5 text-[15px]"
+                  style={group === g ? { background: c.ink, borderColor: c.ink, color: c.card } : { background: c.card, borderColor: c.border, color: c.ink }}>
+                  {group === g && <Check size={14} strokeWidth={3} aria-hidden />}{GROUP_NAMES[g]}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <p className="mb-1.5 mt-4 px-1 text-[13px] text-pc-text-muted">{isReturn ? "Where to return it" : "Where to get it"} <span className="text-pc-text-faint">(none = anywhere)</span></p>
         <div className="flex flex-wrap gap-2">

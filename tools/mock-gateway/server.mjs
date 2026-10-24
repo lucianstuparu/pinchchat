@@ -30,6 +30,11 @@ const shopItems = [
   si('shp-2026-10-21-c3d4e5', 'Vitamin D', ['pharmacy'], { scope: 'private' }),
   si('shp-2026-10-21-d4e5f6', 'Mangoes', ['grand-frais'], { added_by: 'ludmila' }),
   si('shp-2026-10-20-e5f6a7', 'Philips kettle', ['leclerc'], { kind: 'return', due_date: '2026-10-24', notes: 'receipt in the drawer' }),
+  si('shp-2026-10-24-0a0001', 'Baterii LR44 (pastilă)', []),
+  si('shp-2026-10-24-0a0002', 'Distribuitor robinet grădină, 4 căi (GEKA)', ['hornbach']),
+  si('shp-2026-10-24-0a0003', 'Coș de rufe', ['ikea']),
+  si('shp-2026-10-24-0a0004', 'Ouă', [], { qty: '10' }),
+  si('shp-2026-10-24-0a0005', 'Dulceață de căpșuni', [], { status: 'bought', bought_on: '2026-10-24', bought_by: 'lucian', updated: '2026-10-24T17:00:00Z' }),
   si('shp-2026-10-20-f6a7b8', 'Bread', ['paniere'], { status: 'bought', bought_on: '2026-10-21', bought_by: 'ludmila', updated: '2026-10-21T18:00:00Z' }),
 ];
 const shopAsks = [];
@@ -123,7 +128,7 @@ function shopApply(op) {
   }
   if (op.op === 'add') {
     if (shopItems.some(i => i.id === op.id)) return { ok: true, duplicate: true };
-    const e = si(op.id, op.title, op.tags || [], { product: op.product, kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, created: nowIso, updated: nowIso });
+    const e = si(op.id, op.title, op.tags || [], { product: op.product, kind: op.kind === 'return' ? 'return' : 'buy', qty: op.qty, scope: op.scope === 'private' ? 'private' : 'shared', due_date: op.due_date, group: op.group, created: nowIso, updated: nowIso });
     if (op.smart) {   // imitate the assistant: after 3 s, a tidy title and the shop it heard
       e.sorting = true;
       setTimeout(() => {
@@ -141,7 +146,7 @@ function shopApply(op) {
   if (op.op === 'untick') Object.assign(e, { status: 'open', bought_on: undefined, bought_by: undefined });
   if (op.op === 'drop') e.status = 'cancelled';
   if (op.op === 'scope') e.scope = op.scope;
-  if (op.op === 'edit') for (const k of ['title', 'tags', 'qty', 'notes', 'due_date', 'kind']) if (op[k] !== undefined) e[k] = op[k] || undefined;
+  if (op.op === 'edit') for (const k of ['title', 'tags', 'qty', 'notes', 'due_date', 'kind', 'group']) if (op[k] !== undefined) e[k] = op[k] || undefined;
   e.updated = nowIso;
   return { ok: true, item: e };
 }

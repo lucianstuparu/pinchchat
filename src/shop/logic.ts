@@ -12,6 +12,8 @@ export interface Item {
   added_by?: string; created?: string; updated?: string; bought_on?: string; bought_by?: string; bought_at?: string;
   /** The catalogue product this item is (prd-…). */
   product?: string;
+  /** groceries | house | garden | tech | other: one card each (groups.ts). The server always sends it. */
+  group?: string;
 }
 export interface Known { title: string; tags: string[]; n: number }
 /** An instruction for the assistant, typed or said in the app, and its answer. */
@@ -32,7 +34,7 @@ export interface Usual { key: string; title: string; product?: string; tags: str
 export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[]; usual?: Usual[] }
 
 export type Op =
-  | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string }
+  | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string; group?: string }
   | { op: 'ask'; id: string; text: string; store?: string; photos?: string[] }
   | { op: 'photo'; ref: string; data: string }
   | { op: 'favorite'; product: string; on: boolean }
@@ -40,7 +42,7 @@ export type Op =
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
-  | { op: 'edit'; id: string; title?: string; tags?: string[]; qty?: string; notes?: string; due_date?: string; kind?: 'buy' | 'return' }
+  | { op: 'edit'; id: string; title?: string; tags?: string[]; qty?: string; notes?: string; due_date?: string; kind?: 'buy' | 'return'; group?: string }
   | { op: 'scope'; id: string; scope: 'shared' | 'private' }
   | { op: 'shop'; name: string; also?: string[] };
 
@@ -161,7 +163,7 @@ export function applyLocal(items: Item[], op: Op, person: string, now = new Date
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {
       id: op.id, kind: op.kind === 'return' ? 'return' : 'buy', title: op.title.trim(), tags: [...new Set((op.tags ?? []).map(tagOf).filter(Boolean))],
-      qty: op.qty, notes: op.notes, due_date: op.due_date, link: op.link, product: op.product, status: 'open', scope: op.scope === 'private' ? 'private' : 'shared',
+      qty: op.qty, notes: op.notes, due_date: op.due_date, link: op.link, product: op.product, group: op.group, status: 'open', scope: op.scope === 'private' ? 'private' : 'shared',
       added_by: person, created: now, updated: now,
     }];
   }
@@ -188,6 +190,7 @@ export function applyLocal(items: Item[], op: Op, person: string, now = new Date
           ...(op.notes !== undefined ? { notes: op.notes || undefined } : {}),
           ...(op.due_date !== undefined ? { due_date: op.due_date || undefined } : {}),
           ...(op.kind ? { kind: op.kind } : {}),
+          ...(op.group !== undefined ? { group: op.group || undefined } : {}),
         };
     }
     return i;
