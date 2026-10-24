@@ -2,6 +2,7 @@
  * Shared controls of oc and Shopping (my.design): the icon button (40 px), segmented tabs and the
  * app header. Sizes and radii come from the my.design tokens: buttons 40 / 48 / 56, radii 8 / 12 / 20.
  */
+import { appLogo } from './appLogo';
 import { L } from './lang';
 import type { ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
@@ -62,7 +63,7 @@ export function SearchHeader({ value, onChange, onCancel, placeholder = L('Searc
 }
 
 /** The header row of both apps: title and a status line, icon buttons, the person's initial (Settings). */
-export function AppHeader({ title, subtitle, actions, initial, onSettings, logo = '/logo-192.png' }: {
+export function AppHeader({ title, subtitle, actions, initial, onSettings, logo = appLogo() }: {
   title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; initial: string; onSettings: () => void;
   /** The app's own icon, top left, so each app is recognisable at a glance (Lucian, 2026-10-24). */
   logo?: string | null;

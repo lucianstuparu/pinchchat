@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RO } from '../ui/lang';
+import { appLogo } from '../ui/appLogo';
 import { Sparkles, Eye, EyeOff, Loader2, Key, Lock, ChevronDown } from 'lucide-react';
 import { useT } from '../hooks/useLocale';
 import { getStoredCredentials, type AuthMode } from '../lib/credentials';
@@ -62,7 +63,7 @@ export function LoginScreen({ onConnect, error, isConnecting }: Props) {
       <div className="w-full max-w-md mx-4">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <img src="/logo.png" alt="" className="h-20 w-20 rounded-[20px] drop-shadow-lg" />
+          <img src={appLogo()} alt="" className="h-20 w-20 rounded-[20px] drop-shadow-lg" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-pc-text tracking-wide">{import.meta.env.VITE_APP_NAME || t('login.title')}</h1>
             <Sparkles className="h-5 w-5 text-pc-accent-light/60" />
