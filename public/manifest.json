@@ -68,7 +68,7 @@
   },
   "shortcuts": [
     {
-      "name": "Add a task",
+      "name": "Task",
       "short_name": "Task",
       "description": "Straight to the box, ready for a task",
       "url": "/?quick=task",
@@ -81,20 +81,7 @@
       ]
     },
     {
-      "name": "Remind me",
-      "short_name": "Remind me",
-      "description": "Straight to the box, ready for a reminder",
-      "url": "/?quick=remind",
-      "icons": [
-        {
-          "src": "/shortcuts/remind.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "Something to buy",
+      "name": "Buy",
       "short_name": "Buy",
       "description": "Goes on the shopping list",
       "url": "/?quick=buy",
@@ -108,12 +95,25 @@
     },
     {
       "name": "Voice message",
-      "short_name": "Voice",
+      "short_name": "Voice message",
       "description": "Starts recording right away",
       "url": "/?quick=voice",
       "icons": [
         {
           "src": "/shortcuts/voice.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Remind me",
+      "short_name": "Remind me",
+      "description": "Straight to the box, ready for a reminder",
+      "url": "/?quick=remind",
+      "icons": [
+        {
+          "src": "/shortcuts/remind.png",
           "sizes": "192x192",
           "type": "image/png"
         }
