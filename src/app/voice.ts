@@ -138,6 +138,7 @@ export async function record(): Promise<Recorder> {
   let ctx: AudioContext | null = null, analyser: AnalyserNode | null = null, peakLevel = 0;
   try {
     ctx = new AudioContext();
+    void ctx.resume().catch(() => undefined);
     analyser = ctx.createAnalyser(); analyser.fftSize = 512;
     ctx.createMediaStreamSource(stream).connect(analyser);
   } catch { /* no meter: recording still works */ }
@@ -153,7 +154,9 @@ export async function record(): Promise<Recorder> {
   const started = Date.now();
   rec.start(250);
   return {
-    level, peak: () => { level(); return peakLevel; }, device: stream.getAudioTracks()[0]?.label ?? '',
+    // Started without a tap (the app icon's Voice shortcut), Chrome keeps the meter's audio paused:
+    // then the level is unknown, not silence.
+    level, peak: () => { if (ctx && ctx.state !== 'running') return 1; level(); return peakLevel; }, device: stream.getAudioTracks()[0]?.label ?? '',
     stop: () => new Promise(resolve => {
       rec.onstop = async () => {
         level();

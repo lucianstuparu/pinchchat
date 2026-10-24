@@ -28,6 +28,8 @@ export interface ComposerPrefill {
   text: string;
   attachments: OutgoingAttachment[];
   intent?: Intent;
+  /** Start a voice message right away (the "Voice message" shortcut on the app icon). */
+  voice?: boolean;
 }
 
 interface Props {
@@ -105,6 +107,13 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     return () => window.clearInterval(t);
   }, [vm]);
   useEffect(() => () => { void rec.current?.stop(); }, []);
+  const autoVoice = useRef(!!prefill?.voice);
+  useEffect(() => {
+    if (!autoVoice.current) return;
+    autoVoice.current = false;
+    void startVoiceMessage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when opened from the shortcut
+  }, []);
 
   // After a share/retry injection, focus with the cursor at the end, ready for a note
   useEffect(() => {

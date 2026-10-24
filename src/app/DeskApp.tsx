@@ -12,7 +12,7 @@
  */
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, CalendarClock, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
+import { ArrowDown, Bell, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -60,12 +60,14 @@ const has = (q: string, ...fields: Array<string | undefined>) => fields.some(f =
 /** Quick starts: they set the intent of the next message (app v2 §2), shown as a coloured label. */
 type Tone = { bg: string; ink: string; inkDark: string; rail: string };
 const VIOLET: Tone = { rail: '#7c5cd6', bg: '#efeafd', ink: '#5b3fb5', inkDark: '#b9a6f5' };
-const QUICK: Array<{ label: string; icon: LucideIcon; prefix: string; tone: Tone; placeholder: string }> = [
-  { label: 'Task', icon: ListChecks, prefix: 'Task: ', tone: TOPIC_COLORS.Admin, placeholder: 'What needs doing?' },
-  { label: 'Remind me', icon: Bell, prefix: 'Remind me ', tone: TOPIC_COLORS.People, placeholder: 'What, and when?' },
-  { label: 'Note', icon: StickyNote, prefix: 'Note: ', tone: TOPIC_COLORS.Money, placeholder: 'What to keep?' },
-  { label: 'Translate', icon: Languages, prefix: 'Translate: ', tone: VIOLET, placeholder: 'Text to translate' },
-  { label: 'Think through', icon: Lightbulb, prefix: 'Let’s think through: ', tone: TOPIC_COLORS.Errands, placeholder: 'What’s on your mind?' },
+const GOLD: Tone = { rail: '#c48a00', bg: '#fbf1d0', ink: '#7a5a00', inkDark: '#f0c94a' };
+const QUICK: Array<{ key: string; label: string; icon: LucideIcon; prefix: string; tone: Tone; placeholder: string }> = [
+  { key: 'task', label: 'Task', icon: ListChecks, prefix: 'Task: ', tone: TOPIC_COLORS.Admin, placeholder: 'What needs doing?' },
+  { key: 'remind', label: 'Remind me', icon: Bell, prefix: 'Remind me ', tone: TOPIC_COLORS.People, placeholder: 'What, and when?' },
+  { key: 'buy', label: 'Buy', icon: ShoppingCart, prefix: 'Buy ', tone: GOLD, placeholder: 'What to buy, and where?' },
+  { key: 'note', label: 'Note', icon: StickyNote, prefix: 'Note: ', tone: TOPIC_COLORS.Money, placeholder: 'What to keep?' },
+  { key: 'translate', label: 'Translate', icon: Languages, prefix: 'Translate: ', tone: VIOLET, placeholder: 'Text to translate' },
+  { key: 'think', label: 'Think through', icon: Lightbulb, prefix: 'Let’s think through: ', tone: TOPIC_COLORS.Errands, placeholder: 'What’s on your mind?' },
 ];
 const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { background: `${t.rail}33`, color: t.inkDark } : { background: t.bg, color: t.ink });
 
@@ -189,6 +191,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const { questions, answer, skip } = useQuestions({ status, activeSession, getClient, addEventListener });
   const { notify } = useNotifications();
   useEffect(() => setBaseTitle(), []);
+
+  // A shortcut on the app icon (manifest "shortcuts", long-press): ?quick=task|remind|buy|… opens
+  // straight into the box with that label; ?quick=voice starts a voice message.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const quick = url.searchParams.get('quick');
+    if (!quick) return;
+    url.searchParams.delete('quick');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    const q = QUICK.find(x => x.key === quick);
+    if (q) setPrefill({ nonce: Date.now(), text: '', attachments: [], intent: { label: q.label, prefix: q.prefix, icon: q.icon, style: toneStyle(q.tone, mode), placeholder: q.placeholder } });
+    else if (quick === 'voice') setPrefill({ nonce: Date.now(), text: '', attachments: [], voice: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at launch
+  }, []);
 
   useEffect(() => {
     const id = pendingShareId();
