@@ -1,4 +1,5 @@
 import type { PantryEntry, PantryOp } from './pantry';
+import type { OwnedEntry, OwnedOp } from './owned';
 
 /**
  * The shopping list's logic, shared by the app and its tests: the same rules as the server's
@@ -31,7 +32,7 @@ export interface Purchase { id: string; title: string; product?: string; qty?: s
 /** "Usually about now" (Phase E): bought regularly and due again, or a favourite not bought for a month. */
 export interface Usual { key: string; title: string; product?: string; tags: string[]; every: number | null; last: string | null; since: number | null; reason: 'usual' | 'favourite' }
 
-export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[]; usual?: Usual[] }
+export interface Snapshot { today: string; stores: Store[]; items: Item[]; known: Known[]; asks?: Ask[]; products?: Product[]; purchases?: Purchase[]; pantry?: PantryEntry[]; usual?: Usual[]; owned?: OwnedEntry[] }
 
 export type Op =
   | { op: 'add'; id: string; title: string; tags?: string[]; qty?: string; notes?: string; scope?: 'shared' | 'private'; kind?: 'buy' | 'return'; due_date?: string; link?: string; product?: string; group?: string }
@@ -39,6 +40,7 @@ export type Op =
   | { op: 'photo'; ref: string; data: string }
   | { op: 'favorite'; product: string; on: boolean }
   | PantryOp
+  | OwnedOp
   | { op: 'tick'; id: string; store?: string }
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
@@ -158,7 +160,7 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
-  if (op.op === 'ask' || op.op === 'photo' || op.op === 'favorite' || op.op === 'shop' || op.op.startsWith('pantry-')) return items;   // not list items
+  if (op.op === 'ask' || op.op === 'photo' || op.op === 'favorite' || op.op === 'shop' || op.op.startsWith('pantry-') || op.op.startsWith('owned-')) return items;   // not list items
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {

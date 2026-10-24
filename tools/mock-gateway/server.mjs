@@ -71,9 +71,21 @@ const shopPurchases = [
   { id: 'pur-2026-10-19-000001', title: 'Kefir nature', product: 'prd-2026-10-20-0a0a0a', price: 1.89, currency: 'EUR', store: 'lidl', date: '2026-10-19', by: 'ludmila', source: 'receipt' },
   { id: 'pur-2026-10-12-000002', title: 'Kefir nature', product: 'prd-2026-10-20-0a0a0a', price: 1.79, currency: 'EUR', store: 'lidl', date: '2026-10-12', by: 'lucian', source: 'receipt' },
 ];
+const shopOwned = [   // Things we own (owned.mjs), as the morning mail scan fills it
+  { id: 'own-2026-10-14-000001', kind: 'owned', title: 'Lampe de bureau HEKTAR', group: 'house', shop: 'IKEA', bought_on: '2026-10-12', price: 49.9, currency: 'EUR', order: '1384920012', mail: '18f0a1b2c3d4e5f6', return_by: '2027-10-12', status: 'owned', source: 'mail' },
+  { id: 'own-2026-10-20-000002', kind: 'owned', title: 'Încărcător USB-C 65 W Anker', group: 'tech', shop: 'eMAG', bought_on: '2026-10-20', price: 189.99, currency: 'RON', order: '448812', mail: '18f0a1b2c3d4e5f7', return_by: addD(2), warranty_until: '2028-10-20', status: 'owned', source: 'mail' },
+  { id: 'own-2026-09-02-000003', kind: 'owned', title: 'Furtun grădină 25 m Gardena', group: 'garden', shop: 'Hornbach', bought_on: '2026-09-02', price: 34.95, currency: 'EUR', status: 'owned', source: 'chat' },
+];
 function shopApply(op) {
   const nowIso = new Date().toISOString();
   if (String(op.op).startsWith('pantry-')) return pantryOp(op);
+  if (String(op.op).startsWith('owned-')) {
+    const e = shopOwned.find(x => x.id === op.id);
+    if (!e) return { error: 'not in Things we own' };
+    if (op.op === 'owned-close' && e.status === 'owned') Object.assign(e, { status: op.how, closed_on: addD(0) });
+    if (op.op === 'owned-reopen') Object.assign(e, { status: 'owned', closed_on: undefined });
+    return { ok: true, entry: e };
+  }
   if (op.op === 'shop') {   // a shop added from the app (shop.mjs addShop)
     const name = String(op.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     const tag = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -333,7 +345,7 @@ const server = http.createServer((req, res) => {
       const p = JSON.parse(body || '{}');
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL }));
+      res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL, owned: shopOwned }));
     });
     return;
   }

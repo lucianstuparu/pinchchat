@@ -8,12 +8,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_STORES, applyLocal, newStore, type Op, type Snapshot } from './logic';
 import { applyPantry, type PantryOp } from './pantry';
+import { applyOwned, type OwnedOp } from './owned';
 
 /** One change on the local copy: list items and the pantry. */
 const applyAll = (s: Snapshot, op: Op, person: string): Snapshot => ({
   ...s, items: applyLocal(s.items, op, person),
   stores: op.op === 'shop' && !s.stores.some(x => x.tag === newStore(op.name).tag) ? [...s.stores, newStore(op.name)] : s.stores,
   pantry: op.op.startsWith('pantry-') ? applyPantry(s.pantry ?? [], op as PantryOp, person) : s.pantry,
+  owned: op.op.startsWith('owned-') ? applyOwned(s.owned ?? [], op as OwnedOp, person) : s.owned,
   products: op.op === 'favorite' ? (s.products ?? []).map(p => p.id !== op.product ? p : {
     ...p, fav_by: op.on ? [...new Set([...(p.fav_by ?? []), person])] : (p.fav_by ?? []).filter(x => x !== person) }) : s.products,
 });
@@ -115,7 +117,7 @@ export function useShop(person: string) {
         : await post<Snapshot>('/shop/list', {});
       // Changes made while this was in flight stay queued and are re-applied on the new state.
       const rest = queueRef.current.slice(sending.length);
-      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [], pantry: r.pantry ?? [], usual: r.usual ?? [] };
+      const fresh: Snapshot = { today: r.today, stores: r.stores?.length ? r.stores : DEFAULT_STORES, items: r.items, known: r.known ?? [], asks: r.asks ?? [], products: r.products ?? [], purchases: r.purchases ?? [], pantry: r.pantry ?? [], usual: r.usual ?? [], owned: r.owned ?? [] };
       write(SNAP_KEY, fresh);
       setQueue(rest);
       setSnap(rest.reduce((acc, op) => applyAll(acc, op, person), fresh));

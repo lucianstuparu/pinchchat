@@ -9,7 +9,7 @@ import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2 } from 'lucide-react';
 import { WHERE, expiryLabel, groupOf, type PantryEntry, type PantryGroup, type PantryOp, type Where } from './pantry';
 import { plainReply, type Ask } from './logic';
-import { HomeTabs } from './Products';
+import { HomeTabs, type HomeTab } from './Products';
 import { WhereIcon } from './WhereIcon';
 import { transcribeShop } from './useShop';
 import { CloseButton, Sheet } from '../ui/Sheet';
@@ -21,10 +21,10 @@ const GROUPS: Array<[PantryGroup, string, string]> = [
   ['later', 'Later', 'text-pc-text-muted'], ['nodate', 'No date', 'text-pc-text-muted'],
 ];
 
-export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onProducts, productCount, footer }: {
+export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onTab, counts, footer }: {
   pantry: PantryEntry[]; today: string; onOp: (op: PantryOp) => void; onAsk: (text: string) => void; onClose: () => void; lastAsk?: Ask;
   /** The other tab of the same screen: the catalogue. */
-  onProducts: () => void; productCount: number;
+  onTab: (t: HomeTab) => void; counts: Record<HomeTab, number>;
   /** The undo bar, at the foot of the sheet. */
   footer?: ReactNode;
 }) {
@@ -43,7 +43,7 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onPr
     <>
       <Sheet label="At home and products" onClose={onClose} className="flex h-[88dvh] flex-col md:h-[80dvh]">
         <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
-          <HomeTabs tab="home" onTab={t => { if (t === 'products') onProducts(); }} homeCount={open.length} productCount={productCount} />
+          <HomeTabs tab="home" onTab={onTab} counts={counts} />
           <CloseButton onClick={onClose} />
         </div>
         <p className="shrink-0 px-4 pb-1 text-[13px] text-pc-text-muted">What is at home{open.length === 0 ? '' : ', soonest to expire first'}</p>

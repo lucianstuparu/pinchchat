@@ -29,6 +29,8 @@ import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plai
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
+import { OwnedSheet } from './OwnedSheet';
+import type { HomeTab } from './Products';
 import { daysUntil } from './pantry';
 import { useShop } from './useShop';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
@@ -79,9 +81,19 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     const from = pushState; setPushState('busy');
     try { setPushState(from === 'on' ? await disablePush() : await enablePush()); } catch { setPushState(from); }
   };
-  const [showProducts, setShowProducts] = useState(false);
+  // The home screen (header button): At home, Products, Things we own. A morning-scan notification opens Owned.
+  const [home, setHome] = useState<HomeTab | null>(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('owned')) return null;
+    url.searchParams.delete('owned');
+    window.history.replaceState(null, '', url.pathname + url.search);
+    return 'owned';
+  });
+  const showProducts = home === 'products';
+  const setShowProducts = (on: boolean) => setHome(on ? 'products' : null);
   const [productId, setProductId] = useState<string | null>(null);
-  const [showPantry, setShowPantry] = useState(false);
+  const showPantry = home === 'home';
+  const setShowPantry = (on: boolean) => setHome(on ? 'home' : null);
   const [showBought, setShowBought] = useState(false);
   const storeName = (tag: string) => stores.find(s => s.tag === tag)?.name ?? tag;
   const [picking, setPicking] = useState(false);
@@ -116,6 +128,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const productOf = (id?: string) => (id ? products.find(p => p.id === id) : undefined);
   const foundProducts = q.length >= 1 ? products.filter(p => fold([p.name, p.brand, ...(p.aliases ?? [])].join(' ')).includes(q)) : [];
   const pantry = snap.pantry ?? [];
+  const owned = snap.owned ?? [];
+  const homeCounts = { home: pantry.filter(e => e.status === 'open').length, products: products.length, owned: owned.filter(e => e.status === 'owned').length };
   const soon = pantry.filter(e => e.status === 'open' && e.due_date && daysUntil(e.due_date, snap.today || new Date().toISOString().slice(0, 10)) <= 2).length;
   // Undo (the bar at the bottom): a tick or a removal is reopened with untick, offline too.
   const [undo, setUndo] = useState<UndoInfo | null>(null);
@@ -151,7 +165,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               {(sync === 'offline' || sync === 'signed-out') && (
                 <IconButton label="Try again" onClick={() => (sync === 'signed-out' ? window.location.reload() : void refresh())}><RefreshCw size={20} /></IconButton>
               )}
-              <IconButton label={soon ? `At home and products: ${soon} expiring soon` : 'At home and products'} onClick={() => setShowPantry(true)}>
+              <IconButton label={soon ? `At home, products and things we own: ${soon} expiring soon` : 'At home, products and things we own'} onClick={() => setShowPantry(true)}>
                 <Refrigerator size={22} />
                 {soon > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{soon}</span>}
               </IconButton>
@@ -258,7 +272,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
             progress={upload.done ? null : upload.total ? upload.sent / upload.total : null} onCancel={upload.done ? undefined : cancelUpload} cancelLabel="Cancel the upload" />
         </div>
       )}
-      {search === null && !showPantry && <UndoBar info={undo} onClose={closeUndo} />}
+      {search === null && !home && <UndoBar info={undo} onClose={closeUndo} />}
       {search === null && (
         <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
           asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
@@ -279,15 +293,24 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               setUndo({ key: Date.now(), label: `${op.how === 'used' ? 'Used' : 'Thrown away'}: ${e?.title ?? ''}`, undo: () => apply({ op: 'pantry-reopen', id: op.id }) });
             }
           }}
-          onProducts={() => { setShowPantry(false); setShowProducts(true); }} productCount={products.length}
+          onTab={setHome} counts={homeCounts}
           onAsk={t => apply({ op: 'ask', id: newAskId(), text: `[Pantry] ${t}` })}
           lastAsk={[...(snap.asks ?? [])].reverse().find(a => a.text.startsWith('[Pantry]'))} />
       )}
       {showProducts && <ProductsSheet products={products} onOpen={setProductId} onClose={() => setShowProducts(false)} storeName={storeName}
-        onInventory={() => { setShowProducts(false); setShowPantry(true); }} homeCount={pantry.filter(e => e.status === 'open').length}
+        onTab={setHome} counts={homeCounts}
         atHome={id => { const e = pantry.find(x => x.status === 'open' && x.product === id); return e ? (e.qty ? `×${e.qty}` : 'some') : undefined; }}
         person={person || 'me'} onList={id => open.some(i => i.product === id)}
         onAdd={p => apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] })} />}
+      {home === 'owned' && (
+        <OwnedSheet owned={owned} today={snap.today || new Date().toISOString().slice(0, 10)} mode={mode} onTab={setHome} counts={homeCounts}
+          onClose={() => setHome(null)} footer={<UndoBar info={undo} onClose={closeUndo} />}
+          onOp={op => {
+            apply(op);
+            const e = owned.find(x => x.id === op.id);
+            if (op.op === 'owned-close') setUndo({ key: Date.now(), label: `${op.how === 'returned' ? 'Sent back' : 'No longer ours'}: ${e?.title ?? ''}`, undo: () => apply({ op: 'owned-reopen', id: op.id }) });
+          }} />
+      )}
       {productId && (() => {
         const p = productOf(productId);
         if (!p) return null;

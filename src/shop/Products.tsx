@@ -31,10 +31,12 @@ function Thumb({ p, size = 48 }: { p: Product; size?: number }) {
 
 
 /** One screen, two tabs (2026-10-23): what is at home, and the catalogue of products. */
-export function HomeTabs({ tab, onTab, homeCount, productCount }: { tab: 'home' | 'products'; onTab: (t: 'home' | 'products') => void; homeCount: number; productCount: number }) {
+/** The home screen's three tabs: what is at home (food, with dates), the products, Things we own. */
+export type HomeTab = 'home' | 'products' | 'owned';
+export function HomeTabs({ tab, onTab, counts }: { tab: HomeTab; onTab: (t: HomeTab) => void; counts: Record<HomeTab, number> }) {
   return (
-    <Segmented<'home' | 'products'> value={tab} onChange={onTab} label="At home and products"
-      options={[{ value: 'home', label: 'At home', count: homeCount }, { value: 'products', label: 'Products', count: productCount }]} />
+    <Segmented<HomeTab> value={tab} onChange={onTab} label="At home, products and things we own"
+      options={[{ value: 'home', label: 'At home', count: counts.home }, { value: 'products', label: 'Products', count: counts.products }, { value: 'owned', label: 'Owned', count: counts.owned }]} />
   );
 }
 
@@ -59,11 +61,11 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd, atHome }: { p: 
 }
 
 /** All products, searchable. */
-export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onInventory, homeCount, atHome }: {
+export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onTab, counts, atHome }: {
   products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string;
   person: string; onList: (id: string) => boolean; onAdd: (p: Product) => void;
-  /** The other tab of the same screen: what is at home. */
-  onInventory: () => void; homeCount: number;
+  /** The other tabs of the same screen. */
+  onTab: (t: HomeTab) => void; counts: Record<HomeTab, number>;
   /** How many of a product are at home ("x8"), from the inventory. */
   atHome: (id: string) => string | undefined;
 }) {
@@ -79,7 +81,7 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
   return (
     <Sheet label="Products" onClose={onClose} className="flex h-[88dvh] flex-col md:h-[80dvh] md:max-w-lg">
         <div className="flex shrink-0 items-center gap-3 px-4 pb-1 pt-2">
-          <HomeTabs tab="products" onTab={t => { if (t === 'home') onInventory(); }} homeCount={homeCount} productCount={products.length} />
+          <HomeTabs tab="products" onTab={onTab} counts={counts} />
           <CloseButton onClick={onClose} />
         </div>
         <p className="shrink-0 px-4 pb-2 text-[13px] text-pc-text-muted">What each product is: label, health note, prices, when you last bought it.</p>
