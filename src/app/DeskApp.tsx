@@ -29,6 +29,10 @@ import { disablePush, enablePush, getPushState, type PushState } from '../mobile
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { searchMessages, snippet } from '../mobile/searchMessages';
+import { useDeepSearch } from '../ui/useDeepSearch';
+import { AskRow, Marked, SearchGroup, SearchRow, SearchingLine } from '../ui/SearchParts';
+import { loadedMatch, markedParts, plainOf, wordParts } from '../ui/searchText';
+import { useDelayedFlag } from '../ui/progress';
 import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
@@ -309,6 +313,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const onScroll = () => { const el = scrollRef.current; if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); };
 
   // ---- search: To do, In progress and the conversation, together
+  useBackLayer(search !== null, () => setSearch(null));   // Back leaves search, like any overlay
+
   const q = (search ?? '').trim().toLowerCase();
   const searching = search !== null && q.length >= 2;
   const found = useMemo(() => {
@@ -319,12 +325,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       msgs: searchMessages(shown, search ?? ''),
     };
   }, [searching, q, now.items, loops, shown, search]);
-  const foundCount = found.todo.length + found.progress.length + found.msgs.length;
+  // Then further: the server (closed items too, and by meaning) and the whole conversation (gateway).
+  const deep = useDeepSearch(searching ? search : null, { path: '/reg/search', sessionKey: frontSession, getClient });
+  const moreItems = useMemo(() => deep.server.filter(h => !found.todo.some(i => i.id === h.ref) && !found.progress.some(l => l.id === h.ref)),
+    [deep.server, found.todo, found.progress]);
+  const olderMsgs = useMemo(() => deep.chat.filter(h => !loadedMatch(h, found.msgs)), [deep.chat, found.msgs]);
+  const [openHit, setOpenHit] = useState<string | null>(null);
+  const searchingFurther = useDelayedFlag(searching && deep.busy);
+  const foundCount = found.todo.length + found.progress.length + found.msgs.length + moreItems.length + olderMsgs.length;
   const jumpTo = (id: string) => {
     setSearch(null); setFlash(id);
     window.setTimeout(() => document.getElementById(`d-${id}`)?.scrollIntoView({ block: 'center' }), 50);
     window.setTimeout(() => setFlash(null), 1800);
   };
+  const askAssistant = () => { const text = (search ?? '').trim(); setSearch(null); setPrefill({ nonce: Date.now(), text, attachments: [] }); };
 
   const toggleSelect = useCallback((m: ChatMessage) => {
     setSelected(prev => { const n = new Set(prev ?? []); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; });
@@ -434,7 +448,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const searchResults = (
     <div className="px-3 pb-4 pt-2">
       {!searching && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Search your to-dos, what’s in progress and the conversation.</p>}
-      {searching && foundCount === 0 && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nothing matches “{search?.trim()}”</p>}
+      {searching && foundCount === 0 && !deep.busy && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nothing matches “{search?.trim()}”</p>}
       {found.todo.length > 0 && (
         <section className="mb-4">
           <h3 className="px-2 pb-1 text-[13px] font-semibold text-pc-text-muted">To do</h3>
@@ -475,6 +489,31 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           </div>
         </section>
       )}
+      {moreItems.length > 0 && (
+        <SearchGroup title={found.todo.length + found.progress.length > 0 ? 'More, including done' : 'To-dos, including done'}>
+          {moreItems.map(h => (
+            <SearchRow key={h.id} onOpen={() => setSheet(h.ref)} title={h.title} byMeaning={!h.via.includes('words')}
+              excerpt={h.snippet && plainOf(h.snippet) !== h.title ? <Marked parts={markedParts(h.snippet)} /> : undefined} />
+          ))}
+        </SearchGroup>
+      )}
+      {olderMsgs.length > 0 && (
+        <SearchGroup title={found.msgs.length > 0 ? 'Earlier in the conversation' : 'Conversation'}>
+          {olderMsgs.map(h => {
+            const onScreen = loadedMatch(h, shown);
+            const open = openHit === h.messageId;
+            return (
+              <button key={h.messageId} type="button" onClick={() => (onScreen ? jumpTo(onScreen.id) : setOpenHit(open ? null : h.messageId))}
+                className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+                <span className="mb-0.5 block text-[12px] text-pc-text-muted">{h.role === 'user' ? 'You' : 'Assistant'} · {dayLabel(h.timestamp)}</span>
+                <Marked parts={wordParts(h.snippet.trim(), search ?? '')} className={`text-[15px] leading-snug ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`} />
+              </button>
+            );
+          })}
+        </SearchGroup>
+      )}
+      {searching && <SearchingLine show={searchingFurther} />}
+      {searching && <AskRow query={(search ?? '').trim()} onAsk={askAssistant} />}
     </div>
   );
 

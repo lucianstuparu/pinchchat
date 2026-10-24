@@ -52,4 +52,8 @@ export function roError(e: unknown): string {
   return 'Nu s-a putut salva · încearcă din nou';
 }
 
+/** A Drive copy path as people know it: the file name (a PDF's text is the PDF), and its folders. */
+export const docName = (path: string) => (path.split('/').pop() ?? path).replace(/\.txt$/i, '');
+export const docFolder = (path: string) => path.split('/').slice(0, -1).join(' › ');
+
 export const fileUrl = (ref: string) => `/artlia/files/${encodeURIComponent(ref)}`;

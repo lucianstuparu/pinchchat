@@ -8,7 +8,7 @@
  * messages on the left with their name.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, ChevronRight, FolderSearch, HelpCircle, ListChecks, MessageSquare, Plus, RefreshCw, StickyNote, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BookOpen, ChevronRight, FileText, FolderSearch, HelpCircle, ListChecks, MessageSquare, Plus, RefreshCw, Search, StickyNote, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { useGateway } from '../hooks/useGateway';
 import { LoginScreen } from '../components/LoginScreen';
@@ -28,10 +28,15 @@ import { DueChip, Title } from '../app/Todo';
 import { ItemChips } from '../app/ItemChips';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
 import { Sheet, CloseButton } from '../ui/Sheet';
-import { AppHeader, IconButton, Segmented } from '../ui/Controls';
+import { AppHeader, IconButton, SearchHeader, Segmented } from '../ui/Controls';
+import { useDeepSearch } from '../ui/useDeepSearch';
+import { AskRow, Marked, SearchGroup, SearchRow, SearchingLine } from '../ui/SearchParts';
+import { excerpt, loadedMatch, markedParts, wordParts } from '../ui/searchText';
+import { searchMessages } from '../mobile/searchMessages';
+import { DocReader } from './DocReader';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
-import { actOn, cachedList, fetchList, roError, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
+import { actOn, cachedList, docFolder, docName, fetchList, roError, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
 import { CatsView, CategoryView, NowView, PlanView } from './Lists';
 import { ArtSheet } from './ArtSheet';
 import { toneOf, toneStyle, topOf, withSender } from './rules';
@@ -39,6 +44,7 @@ import { toneOf, toneStyle, topOf, withSender } from './rules';
 const SESSION = 'agent:artlia:main';
 const OUTBOX_KEY = 'artlia:outbox';
 const isLocal = () => ['127.0.0.1', 'localhost'].includes(window.location.hostname);
+const fold = (x?: string) => (x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\*\*/g, '').toLowerCase();
 
 interface OutboxItem { id: string; text: string; attachments: OutgoingAttachment[]; queuedAt: number }
 function loadOutbox(): OutboxItem[] {
@@ -275,11 +281,106 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const statusLine = status === 'connected' ? (allowed && gw.agents.length > 0 && !gw.agents.includes('artlia') ? 'Asistentul Casa Artlia nu e pornit încă' : null)
     : status === 'connecting' ? 'Se conectează…' : outbox.length > 0 ? `Fără conexiune · ${outbox.length} de trimis` : 'Fără conexiune';
   const today = list?.today ?? new Date().toISOString().slice(0, 10);
-  const items = list?.items ?? [];
+  const items = useMemo(() => list?.items ?? [], [list]);
   const cats = list?.categories ?? [];
   const { top, overdue, week } = topOf(items, today);
   const renderChips = useCallback((its: Array<{ id: string; label: string }>) => <ItemChips items={its} onOpen={openSheet} />, [openSheet]);
   useEffect(() => { if (!hint) return; const t = window.setTimeout(() => setHint(null), 6000); return () => window.clearTimeout(t); }, [hint]);
+
+  // ---- search: the list and the chat on the phone at once, then the server (documents, items and
+  // glossary by words and meaning) and the whole chat (gateway); the assistant is the last row.
+  const [search, setSearch] = useState<string | null>(null);
+  const [doc, setDoc] = useState<string | null>(null);
+  const [openHit, setOpenHit] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const sq = (search ?? '').trim();
+  useBackLayer(search !== null, () => setSearch(null));   // Back leaves search, like any overlay
+
+  const searching = search !== null && sq.length >= 2;
+  const local = useMemo(() => {
+    if (!searching) return { items: [] as ArtItem[], msgs: [] as ChatMessage[] };
+    const words = fold(sq).split(/\s+/).filter(w => w.length > 1);
+    return {
+      items: items.filter(i => { const hay = fold([i.title, i.what, i.todo, i.notes, i.src, i.evidence].join(' ')); return words.every(w => hay.includes(w)); }),
+      msgs: searchMessages(shown, sq),
+    };
+  }, [searching, sq, items, shown]);
+  const deep = useDeepSearch(searching ? sq : null, { path: '/artlia/search', sessionKey: onArtlia ? SESSION : null, getClient });
+  const moreItems = deep.server.filter(h => h.kind === 'item' && !local.items.some(i => i.id === h.ref));
+  const docs = deep.server.filter(h => h.kind === 'doc');
+  const terms = deep.server.filter(h => h.kind === 'term');
+  const olderMsgs = deep.chat.filter(h => !loadedMatch(h, local.msgs));
+  const searchingFurther = useDelayedFlag(searching && deep.busy);
+  const foundCount = local.items.length + local.msgs.length + moreItems.length + docs.length + terms.length + olderMsgs.length;
+  const jumpTo = (id: string) => {
+    setSearch(null); setFlash(id);
+    window.setTimeout(() => document.getElementById(`d-${id}`)?.scrollIntoView({ block: 'center' }), 50);
+    window.setTimeout(() => setFlash(null), 1800);
+  };
+  const askAssistant = () => { setSearch(null); setPrefill({ nonce: Date.now(), text: sq, attachments: [] }); };
+  const catLabel = (id: string) => cats.find(c => c.id === id)?.label ?? id;
+  const number = (n: number | undefined, cat: string | undefined) => (
+    <span className="inline-block w-5 text-right text-[15px] font-bold tabular-nums" style={{ color: cat ? toneOf(cat, cats).rail : undefined }}>{n ?? ''}</span>
+  );
+
+  const searchResults = (
+    <div className="px-3 pb-4 pt-2">
+      {!searching && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Caută în listă, în documentele din Drive și în conversație. Găsește și după sens, nu doar după cuvinte.</p>}
+      {searching && foundCount === 0 && !deep.busy && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nimic pentru „{sq}”</p>}
+      {(local.items.length > 0 || moreItems.length > 0) && (
+        <SearchGroup title="Din listă">
+          {local.items.map(i => (
+            <SearchRow key={i.id} onOpen={() => openSheet(i.id)} icon={number(i.n, i.cat)} title={<Title text={i.title} />}
+              meta={`${catLabel(i.cat)}${i.status === 'done' ? ' · făcut' : i.status === 'cancelled' ? ' · renunțat' : ''}`} />
+          ))}
+          {moreItems.map(h => {
+            const it = items.find(i => i.id === h.ref);
+            return <SearchRow key={h.id} onOpen={() => openSheet(h.ref)} byMeaning={!h.via.includes('words')} icon={number(it?.n, it?.cat)}
+              title={<Title text={it?.title ?? h.title} />} meta={it ? catLabel(it.cat) : 'închis de mult'} />;
+          })}
+        </SearchGroup>
+      )}
+      {docs.length > 0 && (
+        <SearchGroup title="Documente" note={deep.meaning ? undefined : '· după cuvinte'}>
+          {docs.map(h => (
+            <SearchRow key={h.id} onOpen={() => setDoc(h.ref)} icon={<FileText size={18} />} title={docName(h.ref)} byMeaning={!h.via.includes('words')}
+              excerpt={<Marked parts={markedParts(h.snippet)} />} meta={docFolder(h.ref)} />
+          ))}
+        </SearchGroup>
+      )}
+      {terms.length > 0 && (
+        <SearchGroup title="Glosar">
+          {terms.map(h => (
+            <SearchRow key={h.id} onOpen={() => setOpenHit(openHit === h.id ? null : h.id)} icon={<BookOpen size={18} />} title={h.ref}
+              excerpt={openHit === h.id ? list?.glossary[h.ref] : excerpt(list?.glossary[h.ref] ?? h.snippet, sq)} />
+          ))}
+        </SearchGroup>
+      )}
+      {(local.msgs.length > 0 || olderMsgs.length > 0) && (
+        <SearchGroup title="Conversație">
+          {local.msgs.map(m => { const s = m.role === 'user' ? senderOf(visibleText(m)) : { name: null, text: visibleText(m) }; return (
+            <button key={m.id} type="button" onClick={() => jumpTo(m.id)} className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+              <span className="mb-0.5 block text-[12px] text-pc-text-muted">{m.role === 'user' ? (s.name || 'Voi') : 'Asistentul'} · {dayLabel(m.timestamp)}</span>
+              <Marked parts={wordParts(excerpt(s.text, sq), sq)} className="line-clamp-2 text-[15px] leading-snug" />
+            </button>); })}
+          {olderMsgs.map(h => {
+            const onScreen = loadedMatch(h, shown);
+            const open = openHit === h.messageId;
+            const s = h.role === 'user' ? senderOf(h.snippet.trim()) : { name: null, text: h.snippet.trim() };
+            return (
+              <button key={h.messageId} type="button" onClick={() => (onScreen ? jumpTo(onScreen.id) : setOpenHit(open ? null : h.messageId))}
+                className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+                <span className="mb-0.5 block text-[12px] text-pc-text-muted">{h.role === 'user' ? (s.name || 'Voi') : 'Asistentul'} · {dayLabel(h.timestamp)}</span>
+                <Marked parts={wordParts(s.text, sq)} className={`text-[15px] leading-snug ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`} />
+              </button>
+            );
+          })}
+        </SearchGroup>
+      )}
+      {searching && <SearchingLine show={searchingFurther} />}
+      {searching && <AskRow query={sq} onAsk={askAssistant} />}
+    </div>
+  );
 
   // ---- the pinned card: the most pressing thing, on a band with a shadow edge
   const pinned = (
@@ -355,7 +456,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
         const firstOfRun = newDay || prev.role !== msg.role || (msg.role === 'user' && senderOf(visibleText(prev)).name !== senderOf(visibleText(msg)).name);
         return (
-          <div key={msg.id} className={firstOfRun && i > 0 ? 'pt-2' : ''}>
+          <div key={msg.id} id={`d-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-2' : ''} ${flash === msg.id ? 'rounded-[12px] bg-[rgba(var(--pc-accent-rgb),0.12)]' : ''}`}>
             {newDay && <div className="flex justify-center pb-2 pt-3"><span className="text-[12px] font-medium text-pc-text-muted">{dayLabel(msg.timestamp)}</span></div>}
             <MessageBubble msg={msg} shared me={name || undefined} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips} />
           </div>
@@ -372,27 +473,30 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border bg-[color-mix(in_srgb,var(--pc-bg-base)_88%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <AppHeader title="Casa Artlia" subtitle={top?.due_date || items.length ? `${items.filter(i => i.status !== 'done' && i.status !== 'cancelled' && i.kind !== 'milestone').length} deschise · deschidere sept. 2027` : 'Ferney-Voltaire'}
-          initial={name ? name[0] : '…'} onSettings={() => setSettings(true)} />
-        {statusLine && <div className="flex h-6 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
+        {search !== null
+          ? <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Caută în listă, documente, chat" />
+          : <AppHeader title="Casa Artlia" subtitle={top?.due_date || items.length ? `${items.filter(i => i.status !== 'done' && i.status !== 'cancelled' && i.kind !== 'milestone').length} deschise · deschidere sept. 2027` : 'Ferney-Voltaire'}
+              initial={name ? name[0] : '…'} onSettings={() => setSettings(true)}
+              actions={<IconButton label="Caută" onClick={() => setSearch('')}><Search size={22} /></IconButton>} />}
+        {statusLine && search === null && <div className="flex h-6 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
         {person === '' && !isLocal() && <div className="flex h-6 items-center justify-center bg-red-500/15 text-[12px] text-red-600" role="status">Neautentificat · <a href="/" className="ml-1 underline">intră</a></div>}
       </header>
 
       <div className="flex min-h-0 flex-1 md:flex-row">
         {wide && <aside className="flex w-[440px] shrink-0 flex-col border-r border-pc-border">{panel()}</aside>}
         <div className="relative flex min-w-0 flex-1 flex-col">
-          {pinned}
+          {search === null && pinned}
           <main ref={scrollRef} onScroll={onScroll} onTouchStart={swipeStart('chat')} onTouchMove={swipeMove} onTouchEnd={swipeEnd}
             className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2" role="log" aria-live="polite">
-            <div className="space-y-1 pt-1 md:px-2">{chat}</div>
+            {search !== null ? searchResults : <div className="space-y-1 pt-1 md:px-2">{chat}</div>}
           </main>
-          {!atBottom && (
+          {!atBottom && search === null && (
             <button type="button" onClick={() => scrollToBottom()} className="absolute bottom-3 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-pc-border bg-pc-elevated shadow-lg" aria-label="La ultimul mesaj"><ArrowDown size={18} /></button>
           )}
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-pc-border bg-pc-base">
+      {search === null && <div className="shrink-0 border-t border-pc-border bg-pc-base">
         {!sheetId && !panelOpen && undoBar}
         {hint && <button type="button" className="mx-3 mt-2 flex min-h-10 w-[calc(100%-1.5rem)] items-center text-left text-[13px] text-red-500" role="alert" onClick={() => setHint(null)}>{hint}</button>}
         <div className="flex gap-2 overflow-x-auto px-3 pt-2 [&::-webkit-scrollbar]:hidden" aria-label="Quick starts" style={{ scrollbarWidth: 'none' }}>
@@ -404,7 +508,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           ))}
         </div>
         <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={send} prefill={prefill} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Scrie sau spune" />
-      </div>
+      </div>}
 
       {!wide && (
         <div className="fixed inset-0 z-30 shadow-2xl md:hidden" role="dialog" aria-modal="true" aria-label="Lista Casa Artlia" inert={!panelOpen}
@@ -420,6 +524,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <ArtSheet key={sheetItem.id} item={sheetItem} list={list} mode={mode} footer={undo ? undoBar : null}
           onClose={() => setSheetId(null)} onAct={doAct} onAsk={askAbout} onUpload={upload} />
       )}
+      {doc && <DocReader path={doc} query={sq} onClose={() => setDoc(null)} />}
       {settings && (
         <Sheet label="Setări" onClose={() => setSettings(false)} className="px-4 pt-2">
           <div className="flex justify-end"><CloseButton onClick={() => setSettings(false)} label="Închide" /></div>

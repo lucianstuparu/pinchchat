@@ -85,6 +85,10 @@ const ro: Record<string, string> = {
   'Search': 'Caută',
   'Cancel': 'Renunță',
   'Settings': 'Setări',
+  'Similar meaning': 'Sens apropiat',
+  'Ask the assistant': 'Întreabă asistentul',
+  'Searching further…': 'Se caută mai departe…',
+  'Clear search': 'Golește căutarea',
 };
 
 export function L(en: string, vars?: Record<string, string | number>): string {

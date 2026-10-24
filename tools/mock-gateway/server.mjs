@@ -186,6 +186,30 @@ const waContacts = [
   { id: 'ct-3', name: 'Mama', label: 'Mama', aliases: ['mama', 'mamei'], phone: '', lang: 'ro', tone: 'informal', sent: 0 },
 ];
 const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
+// Search (register-api /artlia/search, /reg/search, /artlia/doc; gateway sessions.search).
+const sfold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const MEANING = [['arhitect', 'architecte', 'maitrise', 'oeuvre'], ['banca', 'banque', 'credit', 'pret', 'imprumut'], ['notar', 'notaire', 'promesse', 'vanzare']];
+const mark = (text, words) => text.replace(/[\p{L}\p{N}']+/gu, (w) => (words.some((q) => sfold(w).startsWith(q)) ? `\u0002${w}\u0003` : w));
+function mockSearch(docs, q) {
+  const words = sfold(q).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+  const near = MEANING.filter((g) => g.some((m) => words.some((w) => m.startsWith(w) || w.startsWith(m)))).flat();
+  return docs.flatMap((d) => {
+    const hay = sfold(`${d.title} ${d.text}`);
+    const byWords = words.some((w) => hay.includes(w)), byMeaning = near.some((m) => hay.includes(m));
+    if (!byWords && !byMeaning) return [];
+    const at = Math.max(0, words.map((w) => sfold(d.text).indexOf(w)).filter((i) => i >= 0).sort((a, b) => a - b)[0] ?? 0);
+    const snippet = mark(`${at > 40 ? '…' : ''}${d.text.slice(Math.max(0, at - 40), at + 140)}…`, words);
+    return [{ id: d.id, kind: d.kind, ref: d.ref, title: d.title, snippet, via: [...(byWords ? ['words'] : []), ...(byMeaning ? ['meaning'] : [])] }];
+  }).sort((a, b) => b.via.length - a.via.length);
+}
+const DRIVE_DOCS = [
+  { ref: '00 Knowledge base/KB 03 - ERP et sécurité.txt', text: "KB 03 — ERP 5e catégorie. Le PEI (poteau incendie) doit être à moins de 150 m. Option TVA: sans option, environ 18 k€ de TVA perdus sur les travaux. Maîtrise d'œuvre: néant (maîtrise d'ouvrage directe)." },
+  { ref: '04 Purchase - Notaire/Copie AAE PROMESSE DE VENTE SCI SODAMO.pdf.txt', text: 'PROMESSE DE VENTE à la requête de : PROMETTANT La Société dénommée SODAMO, Société civile immobilière. Prix : 640 000 €. Condition suspensive de prêt : Crédit Mutuel.' },
+  { ref: '03 Bank - Crédit Mutuel/Offre de prêt 2026-07.pdf.txt', text: "Offre de prêt immobilier n° 2026-117. Montant 480 000 €, durée 25 ans, taux 3,45 %. Assurance emprunteur. Accord de principe de la banque le 21 juillet 2026." },
+].map((d) => ({ ...d, id: `drive:${d.ref}`, kind: 'doc', title: d.ref.split('/').pop().replace(/\.txt$/, '') }));
+// One message too old to be loaded: only the gateway's search finds it.
+const ARCHIVED = { 'agent:artlia:main': [{ messageId: 'old-1', role: 'user', timestamp: Date.now() - 21 * 86400e3, snippet: '[Ludmila] Notarul a confirmat: semnăm promesse de vente pe 3 iulie, la 10:00, la Me Fouillet.' }] };
+
 const hist = (key) => { if (!sessions.has(key)) sessions.set(key, []); return sessions.get(key); };
 
 // Seed two days of history so date separators and scrolling can be checked
@@ -296,6 +320,15 @@ const handlers = {
   'agents.list': () => ({ agents: [...AGENTS, 'artlia'].map(id => ({ id, name: id })) }),
   'sessions.list': () => ({ sessions: [...sessions.keys()].map(key => ({ key, agentId: key.split(':')[1], label: key.split(':').pop(), updatedAt: now() })) }),
   'chat.history': (p) => ({ messages: hist(p.sessionKey) }),
+  'sessions.search': (p) => {
+    const words = sfold(p.query).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+    const results = (p.sessionKeys || []).flatMap((key) => [
+      ...hist(key).flatMap((m) => { const t = (m.content || []).filter((b) => b.type === 'text').map((b) => b.text).join(' ');
+        return words.some((w) => sfold(t).includes(w)) && (m.role === 'user' || m.role === 'assistant') ? [{ sessionKey: key, messageId: m.id, role: m.role, timestamp: m.timestamp, snippet: t.slice(0, 200) }] : []; }),
+      ...(ARCHIVED[key] || []).filter((h) => words.some((w) => sfold(h.snippet).includes(w))).map((h) => ({ ...h, sessionKey: key })),
+    ]);
+    return { results: results.slice(0, p.limit || 20) };
+  },
   'chat.send': (p) => {
     const blocks = [];
     for (const a of p.attachments || []) {
@@ -399,6 +432,17 @@ const server = http.createServer((req, res) => {
       res.setHeader('content-type', 'application/json');
       const find = () => artlia.items.find(i => i.id === p.item);
       if (url.pathname === '/artlia/list') { res.end(JSON.stringify({ today: '2026-10-24', ...artlia })); return; }
+      if (url.pathname === '/artlia/search') {
+        const docs = [...DRIVE_DOCS, ...artlia.items.map((i) => ({ id: `art:${i.id}`, kind: 'item', ref: i.id, title: i.title.replace(/\*\*/g, ''), text: [i.title, i.what, i.todo, i.notes].filter(Boolean).join(' ').replace(/\*\*/g, '') })),
+          ...Object.entries(artlia.glossary || {}).map(([k, v]) => ({ id: `term:${k}`, kind: 'term', ref: k, title: k, text: `${k}: ${v}` }))];
+        setTimeout(() => res.end(JSON.stringify({ results: mockSearch(docs, p.q), meaning: true })), 400); return;
+      }
+      if (url.pathname === '/artlia/doc') {
+        const d = DRIVE_DOCS.find((x) => x.ref === p.path);
+        if (!d) { res.statusCode = 400; res.end(JSON.stringify({ error: 'no file' })); return; }
+        const text = Array.from({ length: 30 }, (_, i) => `Ligne ${i + 1} du document.`).join('\n') + '\n' + d.text + '\n' + Array.from({ length: 40 }, (_, i) => `Suite ${i + 1}.`).join('\n');
+        res.end(JSON.stringify({ path: d.ref, total_lines: text.split('\n').length, from: 1, text })); return;
+      }
       if (url.pathname === '/artlia/add') {
         const item = { id: `art-2026-10-24-${(++seq).toString(16).padStart(6, '0')}`, n: 90 + seq, kind: p.kind || 'task', title: p.title, cat: p.cat, status: 'todo', due_date: p.due_date, phase: p.phase, notes: p.notes, source: 'app' };
         artlia.items.push(item); res.end(JSON.stringify({ ok: true, item })); return;
@@ -424,6 +468,18 @@ const server = http.createServer((req, res) => {
     return;
   }
   // ai.manager register items (what the Admin / General cards read and change). Fixed sample data.
+  if (url.pathname === '/reg/search') {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      const docs = [...Object.entries(regItems).map(([id, i]) => ({ id: `oc:lucian:${id}`, kind: 'task', ref: id, title: i.title.replace(/\*\*/g, ''), text: [i.title, i.notes, i.payee].filter(Boolean).join(' ').replace(/\*\*/g, '') })),
+        { id: 'oc:lucian:tsk-2026-09-02-0ld001', kind: 'task', ref: 'tsk-2026-09-02-0ld001', title: 'Renew the bank card PIN letter', text: 'Renew the bank card PIN letter (done in September)' }];
+      res.setHeader('content-type', 'application/json');
+      setTimeout(() => res.end(JSON.stringify({ results: mockSearch(docs, p.q), meaning: true })), 400);
+    });
+    return;
+  }
   if (['/reg/now', '/reg/loops', '/reg/item'].includes(url.pathname)) {
     let body = '';
     req.on('data', (c) => { body += c; });
