@@ -17,10 +17,13 @@ const SHOP_STORES = [
   { tag: 'carrefour', name: 'Carrefour', also: ['carrefour-market'] }, { tag: 'carrefour-market', name: 'Carrefour Market', also: ['carrefour'] },
   { tag: 'lidl', name: 'Lidl', also: [] }, { tag: 'grand-frais', name: 'Grand Frais', also: [] }, { tag: 'leclerc', name: 'Leclerc', also: [] },
   { tag: 'migros', name: 'Migros', also: [] }, { tag: 'paniere', name: 'La Panière', also: [] }, { tag: 'pharmacy', name: 'Pharmacy', also: [] },
+  { tag: 'ikea', name: 'IKEA', also: [] }, { tag: 'hornbach', name: 'Hornbach', also: [] },
 ];
 const SHOP_KNOWN = [{ title: 'Oat milk', tags: ['lidl'], n: 9 }, { title: 'Kefir', tags: [], n: 4 }, { title: 'Bananas', tags: [], n: 6 }, { title: 'Olive oil', tags: ['grand-frais'], n: 2 }];
 const si = (id, title, tags, extra = {}) => ({ id, kind: 'buy', title, tags, status: 'open', scope: 'shared', added_by: 'lucian', created: '2026-10-20T08:00:00Z', updated: '2026-10-20T08:00:00Z', ...extra });
 const shopItems = [
+  si('shp-2026-10-24-0340b0', 'Bec pentru lampă', ['ikea']),
+  si('shp-2026-10-24-bcbc8f', 'Radiateur soufflant Eurom', ['hornbach', 'wishlist']),
   si('shp-2026-10-22-c61037', 'Sare pentru mașina de spălat vase', ['carrefour'], { source: 'a-2026-10-22-001' }),
   si('shp-2026-10-21-a1b2c3', 'Oat milk', ['lidl'], { qty: '2' }),
   si('shp-2026-10-21-b2c3d4', 'Kefir', [], { shelf: 14 }),
@@ -66,6 +69,14 @@ const shopPurchases = [
 function shopApply(op) {
   const nowIso = new Date().toISOString();
   if (String(op.op).startsWith('pantry-')) return pantryOp(op);
+  if (op.op === 'shop') {   // a shop added from the app (shop.mjs addShop)
+    const name = String(op.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const tag = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!tag) return { error: 'shop name required' };
+    let st = SHOP_STORES.find(x => x.tag === tag);
+    if (!st) { st = { tag, name, also: [] }; SHOP_STORES.push(st); }
+    return { ok: true, store: st };
+  }
   if (op.op === 'favorite') {   // the app runs as 'me' against the mock (no Access identity)
     const prd = shopProducts.find(x => x.id === op.product); if (!prd) return { error: 'no product' };
     const f = new Set(prd.fav_by || []); if (op.on) f.add('me'); else f.delete('me'); prd.fav_by = [...f]; return { ok: true, product: prd };

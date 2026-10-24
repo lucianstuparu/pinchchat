@@ -6,12 +6,13 @@
  * local one, with the changes still waiting re-applied on top.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_STORES, applyLocal, type Op, type Snapshot } from './logic';
+import { DEFAULT_STORES, applyLocal, newStore, type Op, type Snapshot } from './logic';
 import { applyPantry, type PantryOp } from './pantry';
 
 /** One change on the local copy: list items and the pantry. */
 const applyAll = (s: Snapshot, op: Op, person: string): Snapshot => ({
   ...s, items: applyLocal(s.items, op, person),
+  stores: op.op === 'shop' && !s.stores.some(x => x.tag === newStore(op.name).tag) ? [...s.stores, newStore(op.name)] : s.stores,
   pantry: op.op.startsWith('pantry-') ? applyPantry(s.pantry ?? [], op as PantryOp, person) : s.pantry,
   products: op.op === 'favorite' ? (s.products ?? []).map(p => p.id !== op.product ? p : {
     ...p, fav_by: op.on ? [...new Set([...(p.fav_by ?? []), person])] : (p.fav_by ?? []).filter(x => x !== person) }) : s.products,

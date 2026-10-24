@@ -13,7 +13,7 @@ import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -22,7 +22,8 @@ import { speechPlaceholder, useSpeech } from '../app/speech';
 import { transcribeShop } from './useShop';
 import { whoami } from '../app/api';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
-import { atStore, fold, newAskId, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
+import { ShopPicker } from './ShopPicker';
+import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
@@ -84,10 +85,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [offer, setOffer] = useState<{ item: Item; days: number } | null>(null);
   const [showBought, setShowBought] = useState(false);
   const storeName = (tag: string) => stores.find(s => s.tag === tag)?.name ?? tag;
+  const [picking, setPicking] = useState(false);
+  const [showWish, setShowWish] = useState(false);
 
-  // ---- what to show
-  const open = snap.items.filter(i => i.status === 'open');
+  // ---- what to show (the wishlist, things wanted some day, stays out of the lists and counts)
+  const open = snap.items.filter(i => i.status === 'open' && !isWish(i));
   const here = open.filter(i => atStore(i, store, stores));
+  const wished = snap.items.filter(i => i.status === 'open' && isWish(i) && atStore(i, store, stores));
   // Phase E: what is usually bought about now; at a shop, that shop's usual things first.
   const openNow = new Set(snap.items.filter(i => i.status === 'open').flatMap(i => [fold(i.title), i.product ?? '']));
   const usual = (snap.usual ?? []).filter(u => !openNow.has(fold(u.title)) && !(u.product && openNow.has(u.product))).sort((a, b) => Number(!!store && b.tags.includes(store)) - Number(!!store && a.tags.includes(store)));
@@ -98,6 +102,11 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const bought = snap.items.filter(i => i.status === 'bought' || i.status === 'returned')
     .sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
   const countAt = (tag: string | null) => open.filter(i => atStore(i, tag, stores)).length;
+  // Shops: one button that searches them all, and quick chips only for shops with something to get.
+  const shopCounts = Object.fromEntries(stores.map(s => [s.tag, open.filter(i => storeTagsOf(i, stores).includes(s.tag)).length]));
+  const boughtAt: Record<string, string> = {};
+  for (const i of snap.items) if (i.bought_at && (i.bought_on ?? '') > (boughtAt[i.bought_at] ?? '')) boughtAt[i.bought_at] = i.bought_on ?? '';
+  const quick = stores.filter(s => shopCounts[s.tag] > 0 && s.tag !== store).sort((a, b) => shopCounts[b.tag] - shopCounts[a.tag]).slice(0, 6);
   const q = fold((search ?? '').trim());
   const found = q.length >= 1 ? snap.items.filter(i => i.status !== 'cancelled' && fold(`${i.title} ${i.notes ?? ''} ${i.tags.join(' ')}`).includes(q)) : [];
 
@@ -155,8 +164,12 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         )}
         {search === null && (
           <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 pt-0.5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Shops">
-            <Chip on={store === null} onClick={() => setStore(null)} label="All shops" n={open.length} />
-            {stores.map(s => <Chip key={s.tag} on={store === s.tag} onClick={() => setStore(s.tag)} label={s.name} n={countAt(s.tag)} />)}
+            <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog" aria-label={store ? `Shop: ${storeName(store)}. Change shop` : 'Choose a shop'}
+              className={`press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full pl-3 pr-2.5 text-[15px] font-medium ${store ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text active:bg-[var(--pc-hover-strong)]'}`}>
+              <StoreIcon size={15} aria-hidden />{store ? storeName(store) : 'All shops'}<ChevronDown size={15} aria-hidden className="opacity-70" />
+            </button>
+            {store && <Chip on={false} onClick={() => setStore(null)} label="All shops" n={open.length} />}
+            {quick.map(s => <Chip key={s.tag} on={false} onClick={() => setStore(s.tag)} label={s.name} n={shopCounts[s.tag]} />)}
           </div>
         )}
       </header>
@@ -225,6 +238,15 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               <section>
                 <h2 className="px-4 pb-0.5 pt-4 text-[13px] font-semibold text-pc-text-muted">Anywhere</h2>
                 <Rows items={anywhere} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />
+              </section>
+            )}
+
+            {wished.length > 0 && (
+              <section className="mt-3">
+                <button type="button" onClick={() => setShowWish(b => !b)} className="flex h-10 w-full items-center gap-1.5 px-4 text-left text-[13px] font-semibold text-pc-text-muted" aria-expanded={showWish}>
+                  {showWish ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Wishlist · {wished.length}
+                </button>
+                {showWish && <Rows items={wished} stores={stores} storeName={storeName} onTick={tick} onOpen={setEditing} today={snap.today} productOf={productOf} />}
               </section>
             )}
 
@@ -297,6 +319,12 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           onAdd={() => { apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] }); setProductId(null); setShowProducts(false); }}
           onAsk={(t) => { setPrefill(t); setProductId(null); setShowProducts(false); }} />;
       })()}
+      {picking && (
+        <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={store} allShops={open.length}
+          onPick={tag => { setStore(tag); setPicking(false); }}
+          onCreate={name => { apply({ op: 'shop', name }); setStore(newStore(name).tag); setPicking(false); }}
+          onClose={() => setPicking(false)} />
+      )}
       {settings && (
         <SettingsSheet fixedAccent person={person || null} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()} onLogout={() => { window.location.href = '/cdn-cgi/access/logout'; }} onClose={() => setSettings(false)} />
       )}
@@ -541,6 +569,8 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
   const [priv, setPriv] = useState(item.scope === 'private');
   const toggle = (t: string) => setTags(ts => (ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t]));
   const others = tags.filter(t => !stores.some(s => s.tag === t));
+  const chosen = tags.filter(t => stores.some(s => s.tag === t));
+  const [picking, setPicking] = useState(false);
 
   const save = () => {
     const kind = isReturn ? 'return' : 'buy';
@@ -571,14 +601,27 @@ function ItemSheet({ item, stores, today, onClose, apply, product, onProduct }: 
 
         <p className="mb-1.5 mt-4 px-1 text-[13px] text-pc-text-muted">{isReturn ? "Where to return it" : "Where to get it"} <span className="text-pc-text-faint">(none = anywhere)</span></p>
         <div className="flex flex-wrap gap-2">
-          {stores.map(s => (
-            <button key={s.tag} type="button" onClick={() => toggle(s.tag)} aria-pressed={tags.includes(s.tag)}
-              className={`h-8 rounded-full px-3.5 text-[15px] ${tags.includes(s.tag) ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary'}`}>{s.name}</button>
+          {chosen.map(t => (
+            <button key={t} type="button" onClick={() => toggle(t)} aria-label={`Remove ${stores.find(s => s.tag === t)?.name ?? t}`}
+              className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-accent pl-3.5 pr-2.5 text-[15px] text-[var(--pc-on-accent)]">
+              {stores.find(s => s.tag === t)?.name ?? t}<X size={14} aria-hidden />
+            </button>
           ))}
+          <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog"
+            className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-surface pl-2.5 pr-3.5 text-[15px] text-[var(--pc-accent-ink)]">
+            <Plus size={15} aria-hidden />{chosen.length ? 'Another shop' : 'Choose a shop'}
+          </button>
           {others.map(t => (
             <button key={t} type="button" onClick={() => toggle(t)} aria-label={`Remove tag ${t}`} className="press inline-flex h-8 items-center gap-1 rounded-full bg-pc-surface pl-3.5 pr-2.5 text-[15px] text-pc-text-secondary">#{t}<X size={14} aria-hidden /></button>
           ))}
         </div>
+
+        {picking && (
+          <ShopPicker stores={stores.filter(s => !chosen.includes(s.tag))} current={null} z={50}
+            onPick={tag => { if (tag) setTags(ts => [...ts, tag]); setPicking(false); }}
+            onCreate={name => { apply({ op: 'shop', name }); const t = newStore(name).tag; setTags(ts => (ts.includes(t) ? ts : [...ts, t])); setPicking(false); }}
+            onClose={() => setPicking(false)} />
+        )}
 
         <div className="mt-4 divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-surface">
           <Toggle label="Just me" hint="Only you will see it" on={priv} onChange={setPriv} />

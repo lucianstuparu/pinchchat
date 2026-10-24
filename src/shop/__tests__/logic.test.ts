@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STORES as S, applyLocal, atStore, newItemId, parseQuickAdd, suggest, tagOf, type Item } from '../logic';
+import { DEFAULT_STORES as S, applyLocal, atStore, newItemId, newStore, parseQuickAdd, rankShops, suggest, tagOf, type Item } from '../logic';
 
 describe('shopping logic', () => {
   it('tags like the server', () => {
@@ -51,5 +51,17 @@ describe('shopping logic', () => {
     const open: Item[] = [{ id: 'x', kind: 'buy', title: 'Oat milk', tags: [], status: 'open', scope: 'shared' }];
     expect(suggest('mil', known, open).map(k => k.title)).toEqual(['Milk']);
     expect(suggest('k', known, [])).toEqual([]);
+  });
+
+  it('finds shops by a few letters: start, a word, initials; nothing typed = most to get first', () => {
+    const all = [...S, newStore('IKEA Aubonne'), newStore('Hornbach')];
+    expect(rankShops(all, 'ik')[0].name).toBe('IKEA Aubonne');
+    expect(rankShops(all, 'aub')[0].name).toBe('IKEA Aubonne');
+    expect(rankShops(all, 'gf')[0].name).toBe('Grand Frais');
+    expect(rankShops(all, 'carr').map(s => s.tag)).toEqual(['carrefour', 'carrefour-market']);
+    expect(rankShops(all, 'zzz')).toEqual([]);
+    expect(rankShops([...S, newStore('IKEA')], 'IKEA Aubonne').map(s => s.name)).toEqual(['IKEA']);
+    expect(rankShops(all, '', { hornbach: 2, lidl: 1 }).slice(0, 2).map(s => s.tag)).toEqual(['hornbach', 'lidl']);
+    expect(newStore('  IKEA   Aubonne ')).toEqual({ tag: 'ikea-aubonne', name: 'IKEA Aubonne', also: [] });
   });
 });

@@ -43,9 +43,10 @@ export type Op =
   | { op: 'untick'; id: string }
   | { op: 'drop'; id: string }
   | { op: 'edit'; id: string; title?: string; tags?: string[]; qty?: string; notes?: string; due_date?: string; kind?: 'buy' | 'return' }
-  | { op: 'scope'; id: string; scope: 'shared' | 'private' };
+  | { op: 'scope'; id: string; scope: 'shared' | 'private' }
+  | { op: 'shop'; name: string; also?: string[] };
 
-/** The shops, used before the first sync (the server sends the same list). */
+/** The shops everyone starts with, used before the first sync (the server adds the shops added since). */
 export const DEFAULT_STORES: Store[] = [
   { tag: 'carrefour', name: 'Carrefour', also: ['carrefour-market'] },
   { tag: 'carrefour-market', name: 'Carrefour Market', also: ['carrefour'] },
@@ -60,6 +61,40 @@ export const DEFAULT_STORES: Store[] = [
 export function tagOf(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
     .replace(/^@/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
+}
+
+/** Labels that are never a shop (same list as the server). */
+export const NOT_SHOPS = new Set(['wishlist', 'bio', 'urgent', 'online', 'anywhere']);
+export const isWish = (i: Pick<Item, 'tags'>) => (i.tags || []).includes('wishlist');
+
+/** A shop from a typed name, made like the server makes it: the name keeps its spelling, the tag comes from it. */
+export function newStore(name: string): Store {
+  const n = name.replace(/\s+/g, ' ').trim().slice(0, 40);
+  return { tag: tagOf(n), name: n, also: [] };
+}
+
+/**
+ * The shop search: with nothing typed, shops with something on the list first (most first), then
+ * the ones bought at lately, then by name. Typed: names starting with it, then a word starting with
+ * it ("aub" finds "IKEA Aubonne"), then initials ("gf" finds Grand Frais), then anywhere in the name, or a
+ * shop whose name starts what is typed.
+ */
+export function rankShops(stores: Store[], typed: string, counts: Record<string, number> = {}, recent: Record<string, string> = {}): Store[] {
+  const q = fold(typed.trim());
+  const score = (s: Store) => {
+    if (!q) return 0;
+    const name = fold(s.name);
+    const words = name.split(/[^a-z0-9]+/).filter(Boolean);
+    if (name.startsWith(q) || s.tag.startsWith(q)) return 4;
+    if (words.some(w => w.startsWith(q))) return 3;
+    if (q.length > 1 && words.map(w => w[0]).join('').startsWith(q)) return 2;
+    if (name.includes(q) || q.startsWith(`${name} `)) return 1;   // "ikea aubonne" also shows IKEA: no second shop by mistake
+    return -1;
+  };
+  return stores.map(s => ({ s, k: score(s) })).filter(x => x.k >= 0)
+    .sort((a, b) => b.k - a.k || (counts[b.s.tag] ?? 0) - (counts[a.s.tag] ?? 0)
+      || (recent[b.s.tag] ?? '').localeCompare(recent[a.s.tag] ?? '') || a.s.name.localeCompare(b.s.name))
+    .map(x => x.s);
 }
 
 export const storeTagsOf = (item: Pick<Item, 'tags'>, stores: Store[]) => (item.tags || []).filter(t => stores.some(s => s.tag === t));
@@ -123,7 +158,7 @@ export function parseQuickAdd(text: string, stores: Store[]): { title: string; q
 /** Apply one operation to the local copy (the server does the same; see shop.mjs applyOp). */
 export function applyLocal(items: Item[], op: Op, person: string, now = new Date().toISOString()): Item[] {
   const today = now.slice(0, 10);
-  if (op.op === 'ask' || op.op === 'photo' || op.op === 'favorite' || op.op.startsWith('pantry-')) return items;   // not list items
+  if (op.op === 'ask' || op.op === 'photo' || op.op === 'favorite' || op.op === 'shop' || op.op.startsWith('pantry-')) return items;   // not list items
   if (op.op === 'add') {
     if (items.some(i => i.id === op.id)) return items;
     return [...items, {
