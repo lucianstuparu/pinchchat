@@ -62,11 +62,14 @@ export function SearchHeader({ value, onChange, onCancel, placeholder = L('Searc
 }
 
 /** The header row of both apps: title and a status line, icon buttons, the person's initial (Settings). */
-export function AppHeader({ title, subtitle, actions, initial, onSettings }: {
+export function AppHeader({ title, subtitle, actions, initial, onSettings, logo = '/logo-192.png' }: {
   title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; initial: string; onSettings: () => void;
+  /** The app's own icon, top left, so each app is recognisable at a glance (Lucian, 2026-10-24). */
+  logo?: string | null;
 }) {
   return (
     <div className="flex h-[52px] items-center gap-1 px-2">
+      {logo && <img src={logo} alt="" className="ml-1.5 h-8 w-8 shrink-0 rounded-[8px]" />}
       <div className="min-w-0 flex-1 px-2">
         <h1 className="truncate text-[17px] font-semibold leading-tight">{title}</h1>
         {subtitle && <p className="flex items-center gap-1 truncate text-[12px] leading-tight text-pc-text-muted">{subtitle}</p>}

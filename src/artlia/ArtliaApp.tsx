@@ -65,15 +65,15 @@ const QUICK: Array<{ key: string; label: string; icon: LucideIcon; prefix: strin
 const quickStyle = (t: Tone, mode: string) => (mode === 'dark' ? { background: `${t.rail}33`, color: t.inkDark } : { background: t.bg, color: t.ink });
 
 export default function ArtliaApp() {
-  // Casa Artlia's own colour (teal); the appearance (auto / light / dark) is kept per phone.
-  const [look, setLookState] = useState<Look>(() => ({ ...getLook(), accent: 'teal' }));
+  // Casa Artlia's own colour (coral); the appearance (auto / light / dark) is kept per phone.
+  const [look, setLookState] = useState<Look>(() => ({ ...getLook(), accent: 'coral' }));
   useExactSizes();
   const mode = useMode(look.appearance);
   useThemeChrome(mode);
   const gw = useGateway();
   const savedLogin = getStoredCredentials() !== null;
   const networkOnly = !gw.connectError || gw.connectError.startsWith('Connection failed');
-  const chooseLook = (l: Look) => { setLook(l); setLookState({ ...l, accent: 'teal' }); };
+  const chooseLook = (l: Look) => { setLook(l); setLookState({ ...l, accent: 'coral' }); };
   return (
     <div lang="ro" style={lookVars(mode, look.accent)} className="h-dvh bg-pc-base text-pc-text antialiased">
       {!gw.authenticated && !(savedLogin && networkOnly)
