@@ -12,8 +12,6 @@ export interface Item {
   added_by?: string; created?: string; updated?: string; bought_on?: string; bought_by?: string; bought_at?: string;
   /** The catalogue product this item is (prd-…). */
   product?: string;
-  /** Days it usually keeps (from the server): ticking it offers to put it in the pantry. */
-  shelf?: number;
 }
 export interface Known { title: string; tags: string[]; n: number }
 /** An instruction for the assistant, typed or said in the app, and its answer. */

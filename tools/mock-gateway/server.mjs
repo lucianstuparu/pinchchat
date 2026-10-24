@@ -26,7 +26,7 @@ const shopItems = [
   si('shp-2026-10-24-bcbc8f', 'Radiateur soufflant Eurom', ['hornbach', 'wishlist']),
   si('shp-2026-10-22-c61037', 'Sare pentru mașina de spălat vase', ['carrefour'], { source: 'a-2026-10-22-001' }),
   si('shp-2026-10-21-a1b2c3', 'Oat milk', ['lidl'], { qty: '2' }),
-  si('shp-2026-10-21-b2c3d4', 'Kefir', [], { shelf: 14 }),
+  si('shp-2026-10-21-b2c3d4', 'Kefir', []),
   si('shp-2026-10-21-c3d4e5', 'Vitamin D', ['pharmacy'], { scope: 'private' }),
   si('shp-2026-10-21-d4e5f6', 'Mangoes', ['grand-frais'], { added_by: 'ludmila' }),
   si('shp-2026-10-20-e5f6a7', 'Philips kettle', ['leclerc'], { kind: 'return', due_date: '2026-10-24', notes: 'receipt in the drawer' }),

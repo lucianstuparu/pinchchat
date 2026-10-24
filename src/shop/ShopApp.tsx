@@ -27,8 +27,7 @@ import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plai
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
-import { addDays, daysUntil, newPantryId } from './pantry';
-import { WhereIcon } from './WhereIcon';
+import { daysUntil } from './pantry';
 import { useShop } from './useShop';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
@@ -81,8 +80,6 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [showProducts, setShowProducts] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [showPantry, setShowPantry] = useState(false);
-  // After ticking something that keeps a few days: offer to note it in the pantry (8 s).
-  const [offer, setOffer] = useState<{ item: Item; days: number } | null>(null);
   const [showBought, setShowBought] = useState(false);
   const storeName = (tag: string) => stores.find(s => s.tag === tag)?.name ?? tag;
   const [picking, setPicking] = useState(false);
@@ -122,13 +119,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const tick = (i: Item) => {
     apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
     if (i.status === 'open') offerUndo(i, i.kind === 'return' ? 'Returned' : 'Bought');
-    if (i.status === 'open' && i.kind === 'buy' && i.shelf) setOffer({ item: i, days: i.shelf });
   };
-  useEffect(() => {
-    if (!offer) return;
-    const t = window.setTimeout(() => setOffer(null), 9000);
-    return () => window.clearTimeout(t);
-  }, [offer]);
 
   // ---- shared from another app (share sheet): the text becomes the new item
   const [prefill, setPrefill] = useState<string | null>(null);
@@ -262,15 +253,6 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         )}
       </main>
 
-      {offer && search === null && (
-        <div className="mx-3 mb-1 flex items-center gap-2 rounded-[12px] bg-pc-text px-3 py-2 text-[15px] text-pc-base shadow-lg" role="status">
-          <WhereIcon where="fridge" size={20} className="shrink-0 opacity-80" />
-          <span className="min-w-0 flex-1 leading-snug">At home until {new Date(`${addDays(snap.today || new Date().toISOString().slice(0, 10), offer.days)}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}? <span className="opacity-70">{offer.item.title}</span></span>
-          <button type="button" onClick={() => { apply({ op: 'pantry-add', id: newPantryId(), title: offer.item.title, product: offer.item.product, qty: offer.item.qty, in_days: offer.days }); setOffer(null); }}
-            className="h-8 shrink-0 rounded-full bg-pc-accent px-3 text-[13px] font-semibold text-[var(--pc-on-accent)]">Add</button>
-          <button type="button" onClick={() => setOffer(null)} className="-m-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full opacity-70" aria-label="No"><X size={15} /></button>
-        </div>
-      )}
       {search === null && upload && (
         <div className="shrink-0 px-3 pb-2">
           <ProgressRow tile={<img src={`data:image/jpeg;base64,${upload.thumb}`} alt="" className="h-full w-full object-cover" />}
