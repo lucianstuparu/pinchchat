@@ -9,7 +9,7 @@ import { post } from './api';
 import { useBusy } from '../ui/draft';
 import { L } from '../ui/lang';
 
-export interface WaDraft { name: string; text: string; back?: string; lang?: string; status: 'draft' | 'sent' | 'cancelled' | 'failed' | 'expired'; sent_at?: string; error?: string }
+export interface WaDraft { name: string; text: string; back?: string; lang?: string; status: 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed' | 'expired'; sent_at?: string; error?: string }
 
 const fetchDrafts = (ids: string[]) => post<{ drafts: Record<string, WaDraft> }>('/reg/wa/status', { ids });
 const actOnDraft = (draft: string, action: 'send' | 'cancel' | 'edit', text?: string) =>
@@ -56,6 +56,7 @@ function WaCard({ id, draft, onChange }: { id: string; draft?: WaDraft; onChange
       {(error || draft.status === 'failed') && <p className="mt-1.5 text-[13px] text-red-500" role="alert">{L('Not sent')}{draft.error || error ? ` · ${error ?? draft.error}` : ''}</p>}
 
       {draft.status === 'sent' && <p className="mt-2 flex items-center gap-1.5 text-[13px] font-semibold text-[#1d9e75]"><Check size={15} strokeWidth={3} /> {L('Sent {t}', { t: time(draft.sent_at) })}</p>}
+      {draft.status === 'sending' && <p className="mt-2 text-[13px] text-pc-text-muted">{L('Sending…')}</p>}
       {draft.status === 'cancelled' && <p className="mt-2 text-[13px] text-pc-text-muted">{L('Not sent')}</p>}
       {draft.status === 'expired' && <p className="mt-2 text-[13px] text-pc-text-muted">{L('Expired · ask again')}</p>}
 
