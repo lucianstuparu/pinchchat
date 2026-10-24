@@ -57,6 +57,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Files whose names never change (the manifest, the app's icons): network first, the cache only
+  // offline. Served stale they kept the old name and icon after a change (the PinchChat lobster on
+  // chat.stuparu.eu, 2026-10-24); hashed build files below can stay cache-first.
+  if (/^\/(manifest\.json|logo[^/]*\.png|favicon[^/]*\.png|apple-touch-icon\.png|shortcuts\/.+\.png)$/.test(url.pathname)) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then((response) => {
+          if (response.ok) { const clone = response.clone(); caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)); }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   // Static assets (JS, CSS, images, fonts): stale-while-revalidate
   if (
     url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|webp|svg|woff2?|ttf|ico|json)$/) ||
