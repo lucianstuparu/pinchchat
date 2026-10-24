@@ -63,3 +63,11 @@ describe('card helpers', () => {
     expect(formatAmount(undefined)).toBe('');
   });
 });
+
+describe('WhatsApp drafts', () => {
+  it('the line naming a draft gives way to its card; other prose stays', () => {
+    const r = extractItems('Pentru **Eugenia Gamurari**: „Am plecat acum de acasă.” ⟨wa-2026-10-24-0a0b0c⟩\nAltceva?');
+    expect(r.items.map(i => i.id)).toEqual(['wa-2026-10-24-0a0b0c']);
+    expect(r.text).toBe('Altceva?');
+  });
+});

@@ -74,6 +74,10 @@ const ro: Record<string, string> = {
   'Overdue ({d}d)': 'Întârziat ({d} z)',
   'Today': 'Azi',
   'Tomorrow': 'Mâine',
+  // WhatsApp card
+  'to': 'către', 'Message text': 'Textul mesajului', 'Not sent': 'Nu s-a trimis', 'Sent {t}': 'Trimis {t}',
+  'Expired · ask again': 'Expirat · cere-l din nou', 'Done': 'Gata', 'Sending…': 'Se trimite…',
+  'Edit the text': 'Editează textul', 'Do not send': 'Nu trimite', 'Could not send it': 'Nu s-a putut trimite',
   // sheets, undo, search
   'Undo': 'Anulează',
   'Close': 'Închide',

@@ -34,6 +34,7 @@ import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
+import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
@@ -314,7 +315,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   };
 
   const statusLine = status === 'connected' ? null : status === 'connecting' ? 'Connecting…' : status === 'pairing' ? 'Waiting for pairing approval' : outbox.length > 0 ? `Offline · ${outbox.length} waiting to send` : 'Offline';
-  const renderChips = useCallback((items: Array<{ id: string; label: string }>) => <ItemChips items={items} onOpen={setSheet} />, []);
+  // Items a message names become chips; a WhatsApp draft becomes its send card.
+  const renderChips = useCallback((items: Array<{ id: string; label: string }>) => {
+    const wa = items.filter(i => i.id.startsWith('wa-')), rest = items.filter(i => !i.id.startsWith('wa-'));
+    return <>{wa.length > 0 && <WaCards ids={wa.map(i => i.id)} />}{rest.length > 0 && <ItemChips items={rest} onOpen={setSheet} />}</>;
+  }, []);
   const name = person ? person[0].toUpperCase() + person.slice(1) : '';
   const dateTitle = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 

@@ -29,7 +29,7 @@ export interface ItemState {
 
 export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen';
 
-const MARKER = /\s*⟨((?:adm|tsk|lp|shp|pan|art)-\d{4}-\d{2}-\d{2}-[0-9a-f]{6})⟩/g;
+const MARKER = /\s*⟨((?:adm|tsk|lp|shp|pan|art|wa)-\d{4}-\d{2}-\d{2}-[0-9a-f]{6})⟩/g;
 const LIST_LINE = /^\s*(?:[-*•]|\d+[.)])\s+/;
 
 /**
@@ -47,7 +47,8 @@ export function extractItems(text: string): { text: string; items: MessageItem[]
     for (const m of marks) {
       if (!items.some(i => i.id === m[1])) items.push({ id: m[1], label: label.length > 90 ? `${label.slice(0, 89)}…` : label });
     }
-    if (!LIST_LINE.test(line)) kept.push(line.replace(MARKER, ''));
+    // A list line, or a line naming a WhatsApp draft (the card shows it all), gives way to the card.
+    if (!LIST_LINE.test(line) && !marks.some(m => m[1].startsWith('wa-'))) kept.push(line.replace(MARKER, ''));
   }
   return { text: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(), items };
 }

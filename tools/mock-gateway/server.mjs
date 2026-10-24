@@ -149,6 +149,7 @@ let seq = 0;
 const clients = new Set();
 
 const now = () => Date.now();
+const waDrafts = new Map();
 const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
 const hist = (key) => { if (!sessions.has(key)) sessions.set(key, []); return sessions.get(key); };
 
@@ -243,6 +244,14 @@ function reply(sessionKey, message, attachments) {
   if (shortcuts[first]) return streamReply(sessionKey, `✓ ${shortcuts[first]}: ${m.slice(first.length).trim()}`);
   if (first === 'ask') { const r = streamReply(sessionKey, 'Let me check one thing first.'); setTimeout(() => askQuestion(sessionKey), 900); return r; }
   if (first === 'long') return streamReply(sessionKey, LONG, 8);
+  // "scrie-i bunicii că …": a WhatsApp draft card (ai.manager whatsapp-send.md); nothing is ever sent here
+  const wa = m.match(/^scrie-i\s+(\S+)\s+(?:că|ca)\s+(.+)$/i);
+  if (wa) {
+    const id = `wa-2026-10-24-${(++seq).toString(16).padStart(6, '0')}`;
+    const said = wa[2].trim();
+    waDrafts.set(id, { name: 'Eugenia Gamurari', text: said[0].toUpperCase() + said.slice(1).replace(/[.!]?$/, '.'), lang: 'ro', status: 'draft' });
+    return streamReply(sessionKey, `Pentru **Eugenia Gamurari**: „${waDrafts.get(id).text}” ⟨${id}⟩`);
+  }
   const att = attachments?.length ? ` I received ${attachments.length} attachment(s): ${attachments.map(a => `${a.fileName} (${a.mimeType}, ${Math.round((a.content?.length || 0) * 0.75 / 1024)} KB)`).join(', ')}.` : '';
   return streamReply(sessionKey, `Got it: "${m || '(no text)'}".${att}`);
 }
@@ -304,6 +313,22 @@ const server = http.createServer((req, res) => {
       const results = (p.ops || []).map(shopApply);
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ results, today: '2026-10-22', stores: SHOP_STORES, items: shopItems.filter(i => i.status === 'open' || i.updated >= '2026-10-08'), known: SHOP_KNOWN, asks: shopAsks, products: shopProducts, purchases: shopPurchases, pantry: shopPantry, usual: SHOP_USUAL }));
+    });
+    return;
+  }
+  if (url.pathname === '/reg/wa/status' || url.pathname === '/reg/wa/act') {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      if (url.pathname === '/reg/wa/status') { res.end(JSON.stringify({ drafts: Object.fromEntries((p.ids || []).filter(i => waDrafts.has(i)).map(i => [i, waDrafts.get(i)])) })); return; }
+      const d = waDrafts.get(p.draft);
+      if (!d) { res.statusCode = 404; res.end(JSON.stringify({ error: 'no such draft' })); return; }
+      if (p.action === 'edit') d.text = p.text;
+      if (p.action === 'cancel' && d.status === 'draft') d.status = 'cancelled';
+      if (p.action === 'send' && (d.status === 'draft' || d.status === 'failed')) { if (p.text) d.text = p.text; d.status = 'sent'; d.sent_at = new Date().toISOString(); }
+      setTimeout(() => res.end(JSON.stringify({ ok: true, draft: d })), 600);
     });
     return;
   }
