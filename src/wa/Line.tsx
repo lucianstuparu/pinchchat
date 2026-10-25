@@ -184,6 +184,10 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
         if (r.status === 'sent') { done({ ...r, id: d.id }, `Sent ${timeOf(r.sent_at ?? new Date().toISOString())}`, said); void load(); }
         else setStage({ kind: 'draft', draft: { ...r, id: d.id }, said, error: r.error || 'Not sent' });
       } catch (e) {
+        // The send may have gone through and only the answer got lost (the phone changed network, 2026-10-25): ask
+        // the server before saying it failed. A second Send of a sent draft is refused there anyway.
+        const now = await post<{ drafts: Record<string, Draft> }>('/reg/wa/status', { ids: [d.id] }).then(r => r.drafts?.[d.id]).catch(() => undefined);
+        if (now?.status === 'sent') { done({ ...now, id: d.id }, `Sent ${timeOf(now.sent_at ?? new Date().toISOString())}`, said); void load(); return; }
         setStage({ kind: 'draft', draft: d, said, error: navigator.onLine ? (e instanceof Error ? e.message : 'Not sent') : 'No connection: not sent' });
       }
     }, SEND_DELAY);
