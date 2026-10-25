@@ -46,8 +46,8 @@ import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useNotice } from './notice';
 
 const OUTBOX_KEY = 'openclaw-pwa:outbox';
-/** The WhatsApp app (Relay): /wa/ on this host until whatsapp.stuparu.eu exists (VITE_WA_URL). */
-const WA_APP = import.meta.env.VITE_WA_URL || '/wa/';
+/** Relay, the messages app: msg.stuparu.eu since 2026-10-25 (VITE_WA_URL; /wa/ on this host redirects there). */
+const WA_APP = import.meta.env.VITE_WA_URL || 'https://msg.stuparu.eu/';
 interface OutboxItem { id: string; text: string; attachments: OutgoingAttachment[]; queuedAt: number }
 function loadOutbox(): OutboxItem[] {
   try { return (JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') as OutboxItem[]).map(r => ({ ...r, attachments: [] })); } catch { return []; }

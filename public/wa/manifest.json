@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Relay · WhatsApp",
+  "name": "Relay",
   "short_name": "Relay",
-  "description": "WhatsApp in their language: say it in yours, check the message in theirs, Send.",
+  "description": "Messages in their language: say it in yours, check it in theirs, Send.",
   "lang": "en",
   "start_url": "./",
   "scope": "./",

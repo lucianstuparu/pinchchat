@@ -17,7 +17,7 @@ const isShop = import.meta.env.VITE_APP === 'shop'
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const ArtliaApp = lazy(() => import('./artlia/ArtliaApp'))
 const isArtlia = import.meta.env.VITE_APP === 'artlia'
-// The WhatsApp app (Relay; whatsapp.stuparu.eu, for now chat.stuparu.eu/wa/): VITE_APP=wa, built with VITE_BASE.
+// Relay, the messages app (msg.stuparu.eu): VITE_APP=wa, built with VITE_BASE.
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const WaApp = lazy(() => import('./wa/WaApp'))
 const isWa = import.meta.env.VITE_APP === 'wa'

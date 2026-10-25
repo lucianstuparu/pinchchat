@@ -1,5 +1,5 @@
 // Relay's service worker (the WhatsApp app). Everything is relative to its own scope, so it works at
-// chat.stuparu.eu/wa/ now and at whatsapp.stuparu.eu/ later. Pages and the manifest network-first
+// msg.stuparu.eu/ (and at any base path). Pages and the manifest network-first
 // (a deploy reaches the phone at the next open), hashed assets cache-first, the API never cached.
 // VERSION is replaced at build time (tools/wa-dist.mjs); a new version drops the old cache.
 const VERSION = '__SW_VERSION__';

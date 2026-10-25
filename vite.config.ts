@@ -24,7 +24,7 @@ function swVersionPlugin(): Plugin {
 }
 
 export default defineConfig({
-  // The WhatsApp app is served under /wa/ until whatsapp.stuparu.eu exists (deploy-pinchchat.sh wa).
+  // Relay (VITE_APP=wa) is built for msg.stuparu.eu with VITE_BASE=/ (deploy-pinchchat.sh wa).
   base: process.env.VITE_BASE || '/',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
