@@ -9,6 +9,14 @@ export function MeAvatar({ className = 'h-7 w-7' }: { className?: string }) {
 }
 
 export function AgentAvatar({ className = 'h-7 w-7' }: { className?: string }) {
+  // Casa Artlia's assistant: the icon's house on the accent's pair (pink), never the chat app's orange face
+  // (Lucian 2026-10-25: it read like his own coral "ME").
+  if (import.meta.env.VITE_APP === 'artlia') return (
+    <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Asistent" role="img">
+      <circle cx="16" cy="16" r="16" fill="var(--pc-pair)" />
+      <path d="M16 7.5 7 15.5h2.6v8.5h4.4v-5h4v5h4.4v-8.5H25z" fill="#fff" />
+    </svg>
+  );
   // The assistant's face, as in the app icon (a smiling bubble on a sunrise gradient, Lucian 2026-10-24).
   return (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Assistant" role="img">

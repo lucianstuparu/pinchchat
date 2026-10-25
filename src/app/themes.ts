@@ -9,7 +9,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 
 export type Appearance = 'auto' | 'light' | 'dark';
-export type Accent = 'terracotta' | 'teal' | 'coral' | 'green' | 'blue' | 'graphite' | 'keep' | 'signal';
+export type Accent = 'terracotta' | 'teal' | 'azure' | 'green' | 'blue' | 'graphite' | 'keep' | 'signal';
 export interface Look { appearance: Appearance; accent: Accent }
 
 /** Accent per mode (dark needs lighter tones), and the agent's colour that goes with it. */
@@ -17,8 +17,9 @@ export const ACCENTS: Record<Accent, { name: string; light: string; dark: string
   terracotta: { name: 'Terracotta', light: '#c2593a', dark: '#e07a58', pairLight: '#2f6b55', pairDark: '#5aa889' },
   // The life-manager artifact's colour (Lucian, 2026-10-24: offered beside terracotta, not the default).
   teal:       { name: 'Teal',       light: '#0e9488', dark: '#2bb3a6', pairLight: '#c2593a', pairDark: '#e07a58', ink: ['#0b7268', '#5fd3c6'] },
-  // Casa Artlia's colour (Lucian, 2026-10-24: "more optimistic and fresh" than teal). Text in it is a deeper coral (ink).
-  coral:      { name: 'Coral',      light: '#f2545b', dark: '#ff8a8f', pairLight: '#2f6b55', pairDark: '#5aa889', ink: ['#b3262e', '#ff8a8f'] },
+  // Casa Artlia's colour (Lucian, 2026-10-25: coral "too close to red so it makes it look all critical"; chose azure
+  // over pinks and calmer blues). Its pair, pink, is the assistant's face (avatars.tsx) and the heart in the icon.
+  azure:      { name: 'Azure',      light: '#1e88e5', dark: '#4ea3f0', pairLight: '#ec5fa8', pairDark: '#f48cc0', ink: ['#1565c0', '#7cbcf5'] },
   green:      { name: 'Green',      light: '#2e7d5b', dark: '#4fb487', pairLight: '#c2593a', pairDark: '#e07a58' },
   blue:       { name: 'Blue',       light: '#1f6fd6', dark: '#4c9bff', pairLight: '#7a4fc2', pairDark: '#a983ff' },
   graphite:   { name: 'Graphite',   light: '#3d3d42', dark: '#c7c7cc', pairLight: '#c2593a', pairDark: '#e07a58' },
