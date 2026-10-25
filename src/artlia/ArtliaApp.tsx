@@ -169,10 +169,12 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     undo: () => { void actOn(item.id, 'undo').catch(e => setHint(roError(e))).finally(() => void refresh()); } });
   const doAct = async (item: ArtItem, action: ArtAction, extra?: Record<string, unknown>) => {
     if (action === 'done') swap(item.id, { ...item, status: 'done' });   // optimistic; put back if it fails
+    if (action === 'focus') swap(item.id, { ...item, focus: extra?.on === false ? undefined : new Date().toISOString().slice(0, 10) });
     try {
       const r = await actOn(item.id, action, extra);
       if (r.item) swap(item.id, r.item);
-      if (SAID[action]) offerUndo(item, SAID[action]!);
+      const said = action === 'focus' ? (extra?.on === false ? 'Scos din Acum' : 'Pus în Acum') : SAID[action];
+      if (said) offerUndo(item, said);
     } catch (e) {
       swap(item.id, item);
       setHint(roError(e));
@@ -434,7 +436,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6 pt-1">
         {!list ? <p className="py-16 text-center text-[15px] text-pc-text-muted">{spinning ? 'Se încarcă…' : ''}</p>
           : cat ? <CategoryView cat={cat} items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
-          : tab === 'now' ? <NowView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
+          : tab === 'now' ? <NowView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)}
+              onFocus={(i, on) => void doAct(i, 'focus', on ? {} : { on: false }).catch(() => undefined)} />
           : tab === 'plan' ? <PlanView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
           : <CatsView items={items} today={today} mode={mode} cats={cats} onPick={setCat} />}
       </div>

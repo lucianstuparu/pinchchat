@@ -18,11 +18,13 @@ export interface ArtItem {
   notes?: string; files?: ArtFile[]; source?: string; added_by?: string; updated?: string;
   /** The ERP checklist's own sections: first | proc | acc | fire | ops | other. */
   group?: string;
+  /** Put by hand into Acum's highlighted box (the day it was put there). */
+  focus?: string;
 }
 export interface Category { id: string; label: string; desc?: string; order?: number }
 export interface ArtList { today: string; categories: Category[]; items: ArtItem[]; glossary: Record<string, string> }
 
-export type ArtAction = 'done' | 'reopen' | 'snooze' | 'drop' | 'undo' | 'edit' | 'status' | 'note';
+export type ArtAction = 'done' | 'reopen' | 'snooze' | 'drop' | 'undo' | 'edit' | 'status' | 'note' | 'focus';
 
 const CACHE = 'artlia:list';
 

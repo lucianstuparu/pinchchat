@@ -5,7 +5,7 @@
  * Every change offers Undo (the bar in the footer).
  */
 import { useState } from 'react';
-import { Ban, Check, Clock, FileText, MessageSquare, Paperclip, Pencil, Undo2 } from 'lucide-react';
+import { Ban, Check, Clock, FileText, MessageSquare, Paperclip, Pencil, Pin, PinOff, Undo2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented } from '../ui/Controls';
 import { useBusy } from '../ui/draft';
@@ -151,6 +151,11 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
           <button type="button" disabled={busy} onClick={() => void run('done')}
             className="press flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-60">
             <Check size={19} strokeWidth={2.5} /> {kind === 'decision' ? 'Decis' : kind === 'milestone' ? 'Etapă atinsă' : 'Făcut'}
+          </button>
+          {/* The same as dragging the row into (or out of) the highlighted box on Acum. */}
+          <button type="button" disabled={busy} onClick={() => void run('focus', item.focus ? { on: false } : {})}
+            className="press mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
+            {item.focus ? <><PinOff size={18} className="text-pc-text-muted" /> Scoate din Acum</> : <><Pin size={18} className="text-[#d48a12]" /> Pune în Acum</>}
           </button>
           <div className="mt-2 grid grid-cols-4 gap-2">
             <button type="button" onClick={() => onAsk(item)} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Întreabă</button>

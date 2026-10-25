@@ -51,10 +51,10 @@ export function groupNow(items: ArtItem[], today: string): NowGroups {
   const g: NowGroups = { overdue: [], now: [], week: [], soon: [], check: [], priority: [], putOff: 0 };
   for (const i of items) {
     if (!isOpen(i)) continue;
-    if (isPutOff(i, today)) { g.putOff++; continue; }
     const d = i.due_date ? daysBetween(today, i.due_date) : null;
     if (d !== null && d < 0) g.overdue.push(i);
-    else if (d !== null && d <= NOW_DAYS) g.now.push(i);
+    else if (i.focus || (d !== null && d <= NOW_DAYS)) g.now.push(i);   // put in the box by hand: there, whatever its date
+    else if (isPutOff(i, today)) g.putOff++;
     else if (d !== null && d <= 7) g.week.push(i);
     else if (d !== null && d <= 28) g.soon.push(i);
     else if (i.status === 'check' && i.kind !== 'milestone') g.check.push(i);
