@@ -36,6 +36,7 @@ import { useDelayedFlag } from '../ui/progress';
 import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
+import { opsFor, type Move } from '../ui/dragRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
 import { WaCards } from './WaCard';
@@ -177,6 +178,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     setNow(n => ({ ...n, items: n.items.map(i => (i.id === item.id ? { ...i, priority } : i)) }));
     try { await act(item.id, 'priority', { priority }); offerUndo(item.id, `${priority === 'P1' ? 'Priority' : 'No longer a priority'}: ${short(item)}`); }
     catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
+  };
+
+  // A drag in To do: into or out of the Now box, or a new order. One Undo puts everything back.
+  const move = async (m: Move<NowItem>) => {
+    const { ops, undo: back, patch } = opsFor(m, now.items, now.today);
+    if (!ops.length) return;
+    setNow(n => ({ ...n, items: patch(n.items) }));
+    const run = (o: typeof ops) => Promise.all(o.map(x => act(x.id, x.action, x.extra)));
+    try {
+      await run(ops);
+      const label = m.focus === true ? 'Put in Now' : m.focus === false ? 'Taken out of Now' : 'Order changed';
+      setUndo({ key: Date.now(), label: `${label}: ${short(m.item)}`, undo: () => { void run(back).catch(e => setHint(e instanceof Error ? e.message : 'Could not undo')).finally(() => void refresh()); } });
+    } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
 
@@ -395,7 +410,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const panel = (onClose?: () => void) => (
     <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} loops={loops} today={now.today}
       loaded={loaded} expired={expired} refreshing={refreshing} onRefresh={() => void refresh()}
-      onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet}
+      onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet} onMove={m => void move(m)}
       onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}
       onAdd={addTask} transcribe={transcribeAudio} reply={taskReply} onDismissReply={() => setAsked(null)} onClose={onClose}
       footer={onClose && todoOpen && !sheet && undo ? undoBar : null} />

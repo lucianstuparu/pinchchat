@@ -5,6 +5,7 @@
  */
 import type { NowItem } from './api';
 import { L, RO } from '../ui/lang';
+import { byRank } from '../ui/dragRules';
 
 /** Topic colours (the artifact's palette): rail = the number, bg/ink = the pill. */
 export const TOPIC_COLORS: Record<string, { rail: string; bg: string; ink: string; inkDark: string }> = {
@@ -65,19 +66,23 @@ export interface TodoGroups {
   areas: Array<{ area: (typeof AREAS)[number]; items: NowItem[] }>;
   waiting: NowItem[];
 }
-/** Each item appears once: due first, then starred, then its area; waiting on others last. */
+/**
+ * Each item appears once: the box first (due within 3 days, or put there by hand), then starred, then its area;
+ * waiting on others last. Within each, the order set by dragging comes first (byRank is a stable sort).
+ */
 export function groupTodo(items: NowItem[], today: string): TodoGroups {
   const due: NowItem[] = [], priority: NowItem[] = [], waiting: NowItem[] = [];
   const byArea = new Map<Area, NowItem[]>();
   for (const i of items) {
     if (i.section === 'waiting') waiting.push(i);
-    else if (isDue(i, today)) due.push(i);
+    else if (isDue(i, today) || i.focus) due.push(i);
     else if (isStarred(i)) priority.push(i);
     else { const a = areaOf(i); byArea.set(a, [...(byArea.get(a) ?? []), i]); }
   }
   const when = (i: NowItem) => i.due_date || i.scheduled || '9999';
-  due.sort((a, b) => when(a).localeCompare(when(b)) || b.weight - a.weight);
-  return { due, priority, waiting, areas: AREAS.map(area => ({ area, items: byArea.get(area.id) ?? [] })).filter(g => g.items.length > 0) };
+  due.sort((a, b) => when(a).localeCompare(when(b)) || b.weight - a.weight).sort(byRank);
+  priority.sort(byRank); waiting.sort(byRank);
+  return { due, priority, waiting, areas: AREAS.map(area => ({ area, items: [...(byArea.get(area.id) ?? [])].sort(byRank) })).filter(g => g.items.length > 0) };
 }
 
 /** Titles may mark the key person or place as **bold**; split into plain and bold runs. */

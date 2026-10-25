@@ -15,6 +15,9 @@ export interface NowItem {
   /** Put off until this day ("Remind in 3 days"); hidden from To do until then unless overdue or due today. */
   snoozed_until?: string;
   hidden?: boolean;
+  /** Put in the highlighted box by hand (the day); and its place within its group, set by dragging. */
+  focus?: string;
+  rank?: number;
   title: string;
   kind: string;
   store: 'admin' | 'tasks' | 'loops' | 'shopping' | 'pantry';
@@ -53,7 +56,7 @@ export interface Sheet {
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
 }
 
-export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close';
+export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order';
 
 export class SessionExpired extends Error {}
 

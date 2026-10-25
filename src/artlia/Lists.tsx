@@ -4,11 +4,14 @@
  * a category opens its items by phase). Rows are oc's task row (my.design patterns/task-row.md):
  * tick, number in the category's colour, title with the key name bold, due chip and category pill.
  */
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Flag, HelpCircle, Pin, Search, Star, X } from 'lucide-react';
 import { DueChip, Title } from '../app/Todo';
 import { dueChip } from '../app/todoRules';
 import type { ArtItem, Category } from './api';
+import { useDragDrop, useLift } from '../ui/dragOrder';
+import { DragGhost, DropLine } from '../ui/DragParts';
+import { BOX, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { catStats, groupNow, isOpen, matchesArt, plan, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
 
 type Mode = 'light' | 'dark';
@@ -21,38 +24,15 @@ export function CatPill({ cat, cats, mode }: { cat: string; cats: Category[]; mo
 
 interface RowProps {
   item: ArtItem; today: string; mode: Mode; cats: Category[]; showCat?: boolean; onDone: (i: ArtItem) => void; onOpen: (i: ArtItem) => void;
-  /** Long press (finger or mouse) lifts the row to drag it (Acum: into or out of the highlighted box). */
+  /** Long press (finger or mouse) lifts the row to drag it (Acum: into or out of the box, or to a new place). */
   onLift?: (i: ArtItem, x: number, y: number) => void; lifted?: boolean;
 }
-const LIFT_MS = 380;
 
 export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen, onLift, lifted }: RowProps) {
   const [ticked, setTicked] = useState(false);
   const [dx, setDx] = useState(0);
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
-  const lift = useRef<{ timer: number; x: number; y: number; up: boolean } | null>(null);
-  const holdStart = (x: number, y: number) => {
-    if (!onLift || !isOpen(item)) return;
-    const l = { x, y, up: false, timer: 0 };
-    l.timer = window.setTimeout(() => {
-      l.up = true; navigator.vibrate?.(15); onLift(item, l.x, l.y);
-      // The release may happen anywhere (over the box): end the hold there too.
-      const off = () => { holdEnd(); document.removeEventListener('mouseup', off); document.removeEventListener('touchend', off); };
-      document.addEventListener('mouseup', off); document.addEventListener('touchend', off);
-    }, LIFT_MS);
-    lift.current = l;
-  };
-  const holdMove = (x: number, y: number) => {
-    const l = lift.current; if (!l || l.up) return;
-    if (Math.abs(x - l.x) > 8 || Math.abs(y - l.y) > 8) { window.clearTimeout(l.timer); lift.current = null; }
-  };
-  const suppressClick = useRef(false);   // the click a mouse release sends after a drag
-  const holdEnd = () => {
-    const l = lift.current; if (l) window.clearTimeout(l.timer);
-    if (l?.up) { suppressClick.current = true; window.setTimeout(() => { suppressClick.current = false; }, 300); }
-    lift.current = null;
-  };
-  const liftedNow = () => !!lift.current?.up;
+  const hold = useLift(onLift && isOpen(item) ? (x, y) => onLift(item, x, y) : undefined);
   const done = !isOpen(item) || ticked;
   const tone = toneOf(item.cat, cats);
   const milestone = item.kind === 'milestone';
@@ -63,23 +43,17 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
   };
   const extra = item.kind === 'check' || item.status === 'check' ? 'De verificat' : item.kind === 'decision' ? 'De decis' : item.status === 'waiting' ? 'În așteptare' : null;
   return (
-    <div className={`relative select-none overflow-hidden rounded-[12px] ${lifted ? 'opacity-30' : ''}`}
-      onContextMenu={e => { if (onLift) e.preventDefault(); }}
-      onMouseDown={e => { if (e.button === 0) holdStart(e.clientX, e.clientY); }}
-      onMouseMove={e => holdMove(e.clientX, e.clientY)}
-      onMouseUp={holdEnd} onMouseLeave={() => { if (!liftedNow()) holdEnd(); }}
-      onClickCapture={e => { if (liftedNow() || suppressClick.current) { e.preventDefault(); e.stopPropagation(); } }}
-      onTouchStart={e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null }; holdStart(e.touches[0].clientX, e.touches[0].clientY); }}
+    <div data-row={item.id} className={`relative select-none overflow-hidden rounded-[12px] ${lifted ? 'opacity-30' : ''}`} {...hold.mouse}
+      onTouchStart={e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null }; hold.touchStart(e.touches[0].clientX, e.touches[0].clientY); }}
       onTouchMove={e => {
-        holdMove(e.touches[0].clientX, e.touches[0].clientY);
-        const t = touch.current; if (!t || done || liftedNow()) return;
+        hold.touchMove(e.touches[0].clientX, e.touches[0].clientY);
+        const t = touch.current; if (!t || done || hold.lifted()) return;
         const mx = e.touches[0].clientX - t.x, my = e.touches[0].clientY - t.y;
         if (t.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) t.horizontal = Math.abs(mx) > Math.abs(my) && mx > 0;
         if (t.horizontal) { e.stopPropagation(); setDx(Math.max(0, Math.min(120, mx))); }
       }}
       onTouchEnd={e => {
-        if (liftedNow()) e.preventDefault();   // no click after a lift
-        holdEnd();
+        hold.touchEnd(e);
         if (touch.current?.horizontal) e.stopPropagation(); if (dx >= 90) tick(); setDx(0); touch.current = null;
       }}
       style={{ touchAction: 'pan-y' }}>
@@ -137,17 +111,6 @@ const GLOW: Record<'red' | 'amber', Record<Mode, CSSProperties>> = {
     dark: { background: 'rgba(245,166,35,0.17)', border: '1.5px solid rgba(245,166,35,0.6)', boxShadow: '0 0 26px rgba(245,166,35,0.24)' },
   },
 };
-const DROP: CSSProperties = { outline: '2.5px dashed #d48a12', outlineOffset: 3 };
-
-/** The nearest scrolling ancestor (the list pane), for scrolling while dragging near an edge. */
-function scrollerOf(el: HTMLElement | null): HTMLElement | null {
-  for (let p = el?.parentElement ?? null; p; p = p.parentElement) {
-    const o = getComputedStyle(p).overflowY;
-    if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight) return p;
-  }
-  return null;
-}
-
 export function GroupHead({ mark, label, count, color, sub }: { mark?: ReactNode; label: string; count?: number; color?: string; sub?: string }) {
   return (
     <h3 className="flex items-center gap-2 px-2 pb-0.5 pt-1 text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: color ?? 'var(--pc-text-secondary)' }}>
@@ -162,77 +125,54 @@ export function GroupHead({ mark, label, count, color, sub }: { mark?: ReactNode
 type ListProps = { items: ArtItem[]; today: string; mode: Mode; cats: Category[]; onDone: (i: ArtItem) => void; onOpen: (i: ArtItem) => void };
 
 // ---- Acum
-type Drag = { item: ArtItem; x: number; y: number; over: boolean };
-
-export function NowView({ items, today, mode, cats, onDone, onOpen, onFocus }: ListProps & { onFocus?: (i: ArtItem, on: boolean) => void }) {
+export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: ListProps & { onMove?: (m: Move<ArtItem>) => void }) {
   const g = groupNow(items, today);
-  const box = useRef<HTMLElement>(null);
-  const [drag, setDrag] = useState<Drag | null>(null);
-  const dragRef = useRef<Drag | null>(null);
-  const dragging = drag !== null;
-  const lift = (item: ArtItem, x: number, y: number) => { const d = { item, x, y, over: false }; dragRef.current = d; setDrag(d); };
-  const inBoxIds = [...g.overdue, ...g.now].map(i => i.id).join(',');
-
-  // While a row is lifted: follow the finger or the mouse, scroll near the edges, drop on release.
-  useEffect(() => {
-    if (!dragging) return;
-    const scroller = scrollerOf(box.current);
-    const move = (x: number, y: number) => {
-      const r = box.current?.getBoundingClientRect();
-      const over = !!r && y >= r.top - 16 && y <= r.bottom + 16;
-      if (y < 110) scroller?.scrollBy(0, -14); else if (y > window.innerHeight - 110) scroller?.scrollBy(0, 14);
-      const d = dragRef.current && { ...dragRef.current, x, y, over };
-      dragRef.current = d; setDrag(d);
-    };
-    const end = () => {
-      const d = dragRef.current;
-      dragRef.current = null; setDrag(null);
-      if (!d || !onFocus) return;
-      const inBox = inBoxIds.split(',').includes(d.item.id);
-      if (d.over && !inBox) onFocus(d.item, true);
-      else if (!d.over && d.item.focus) onFocus(d.item, false);   // dated ones stay: their date keeps them there
-    };
-    const onTouchMove = (e: TouchEvent) => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY); };
-    const onMouseMove = (e: MouseEvent) => move(e.clientX, e.clientY);
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
-    document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', end);
-    return () => {
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', end); document.removeEventListener('touchcancel', end);
-      document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', end);
-    };
-  }, [dragging, inBoxIds, onFocus]);
-
-  const rows = (list: ArtItem[]) => list.map(i => <ArtRow key={i.id} item={i} today={today} mode={mode} cats={cats} onDone={onDone} onOpen={onOpen}
-    onLift={onFocus ? lift : undefined} lifted={drag?.item.id === i.id} />);
-  const hot = g.overdue.length > 0 || g.now.length > 0;
+  const box = [...g.overdue, ...g.now];
+  const zones: Record<string, ArtItem[]> = { [BOX]: box, week: g.week, priority: g.priority, soon: g.soon, check: g.check };
+  const { drag, lift } = useDragDrop<ArtItem>((item, from, over) => {
+    const m = moveFor(item, from, over, z => (zones[z] ?? []).map(i => i.id));
+    if (m) onMove?.(m);
+  });
+  const rows = (zone: string, list: ArtItem[]) => (
+    <>
+      {list.map(i => (
+        <div key={i.id}>
+          <DropLine show={drag?.over?.zone === zone && drag.over.before === i.id} />
+          <ArtRow item={i} today={today} mode={mode} cats={cats} onDone={onDone} onOpen={onOpen}
+            onLift={onMove ? (it, x, y) => lift(it, zone, x, y) : undefined} lifted={drag?.item.id === i.id} />
+        </div>
+      ))}
+      <DropLine show={drag?.over?.zone === zone && drag.over.before === null && drag.item.id !== list[list.length - 1]?.id} />
+    </>
+  );
+  const plain = (zone: string, head: ReactNode, list: ArtItem[]) => list.length > 0 && (
+    <section data-zone={zone} className="rounded-[16px] pb-1" style={drag && drag.from === zone && drag.over?.zone === zone ? DROP_OUTLINE : undefined}>{head}{rows(zone, list)}</section>
+  );
+  const hot = box.length > 0;
   const empty = !hot && !g.week.length && !g.soon.length && !g.check.length && !g.priority.length;
   return (
     <div className="space-y-6">
-      {(hot || dragging) && (
-        <section ref={box} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5"
-          style={{ ...GLOW[g.overdue.length ? 'red' : 'amber'][mode], ...(drag?.over ? DROP : null) }}>
+      {(hot || drag) && (
+        <section data-zone={BOX} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5"
+          style={{ ...GLOW[g.overdue.length ? 'red' : 'amber'][mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
           {g.overdue.length > 0 && <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Întârziate" count={g.overdue.length} color="#dc4c4c" />}
-          {rows(g.overdue)}
-          {g.now.length > 0 && <GroupHead label="Acum" count={g.now.length} color="#b8740c" sub="azi – poimâine și ce pui tu aici" />}
-          {rows(g.now)}
+          {g.overdue.length === 0 && <GroupHead label="Acum" count={box.length} color="#b8740c" sub="azi – poimâine și ce pui tu aici" />}
+          {rows(BOX, box)}
           {!hot && <p className="px-3 py-6 text-center text-[15px] font-medium text-[#b8740c]">Lasă aici ce faci acum</p>}
         </section>
       )}
-      {g.week.length > 0 && <section><GroupHead label="Săptămâna asta" count={g.week.length} />{rows(g.week)}</section>}
-      {g.priority.length > 0 && <section><GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Prioritare" count={g.priority.length} />{rows(g.priority)}</section>}
-      {g.soon.length > 0 && <section><GroupHead label="Următoarele 4 săptămâni" count={g.soon.length} />{rows(g.soon)}</section>}
-      {g.check.length > 0 && <section><GroupHead mark={<HelpCircle size={13} strokeWidth={2.5} aria-hidden />} label="De verificat" count={g.check.length} />{rows(g.check)}</section>}
-      {empty && !dragging && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nimic urgent acum. Restul e în Plan și în Categorii.</p>}
+      {plain('week', <GroupHead label="Săptămâna asta" count={g.week.length} />, g.week)}
+      {plain('priority', <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Prioritare" count={g.priority.length} />, g.priority)}
+      {plain('soon', <GroupHead label="Următoarele 4 săptămâni" count={g.soon.length} />, g.soon)}
+      {plain('check', <GroupHead mark={<HelpCircle size={13} strokeWidth={2.5} aria-hidden />} label="De verificat" count={g.check.length} />, g.check)}
+      {empty && !drag && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nimic urgent acum. Restul e în Plan și în Categorii.</p>}
       {g.putOff > 0 && <p className="px-2 text-[13px] text-pc-text-muted">{g.putOff} amânat{g.putOff === 1 ? '' : 'e'} pentru mai târziu</p>}
-      {onFocus && <p className="px-2 text-[13px] text-pc-text-muted">Ține apăsat un rând și trage-l în căsuța de sus ca să-l pui în Acum, sau afară ca să-l scoți.</p>}
+      {onMove && <p className="px-2 text-[13px] text-pc-text-muted">Ține apăsat un rând și trage-l: în căsuța de sus ca să-l pui în Acum, afară ca să-l scoți, sau mai sus ori mai jos ca să schimbi ordinea.</p>}
       {drag && (
-        <div className="pointer-events-none fixed z-50 w-[min(340px,80vw)] -translate-x-1/2 -translate-y-[70%] rounded-[12px] bg-pc-elevated px-3 py-2.5 text-[15px] shadow-2xl ring-1 ring-[var(--pc-border)]"
-          style={{ left: drag.x, top: drag.y }} aria-hidden>
+        <DragGhost x={drag.x} y={drag.y}>
           <span className="mr-1.5 font-bold tabular-nums" style={{ color: toneOf(drag.item.cat, cats).rail }}>{drag.item.n}</span>
           <Title text={drag.item.title} className="text-pc-text-primary" />
-        </div>
+        </DragGhost>
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 /**
  * To do, full screen (ai.manager oc-app-design.md): built on Lucian's life-manager artifact.
  * A short number in the colour of the task's topic, the title with the key person or place in bold,
- * due chips and topic pills; a "Due & overdue" box with a red glow, a ★ Priority box with an amber
- * one, then the areas, each with a dot and a count. Every task shows once.
+ * due chips and topic pills; one highlighted "Now" box (due within 3 days, or dragged in by hand; red when
+ * anything is late), then ★ Priority, then the areas, each with a dot and a count. Every task shows once.
+ * Hold a row and drag it into the box, out of it, or up and down to reorder (ui/dragOrder.ts).
  *
  * On the phone it slides in from the left over the chat (swipe right on the chat); a swipe left,
  * Chat or the phone's Back closes it. On a laptop the same panel is the side column.
@@ -12,8 +13,11 @@ import { useDelayedFlag, useNow } from '../ui/progress';
 import { useBusy, useDraft } from '../ui/draft';
 import { Segmented } from '../ui/Controls';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronRight, Clock, Flag, RefreshCw, Repeat, Search, Sparkles, Star, X } from 'lucide-react';
+import { Check, ChevronRight, Clock, Flag, Pin, RefreshCw, Repeat, Search, Sparkles, Star, X } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
+import { useDragDrop, useLift } from '../ui/dragOrder';
+import { DragGhost, DropLine } from '../ui/DragParts';
+import { BOX, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { LoopsList } from './LoopsList';
 import { FieldControls, PrimaryButton } from './MicButton';
 import { speechPlaceholder, useSpeech } from './speech';
@@ -66,11 +70,14 @@ export function TopicPill({ topic, mode }: { topic: string; mode: Mode }) {
 interface RowProps {
   item: NowItem; today: string; mode: Mode;
   onDone: (i: NowItem) => void; onStar: (i: NowItem) => void; onOpen: (i: NowItem) => void;
+  /** Long press lifts the row to drag it (into or out of the box, or to a new place). */
+  onLift?: (i: NowItem, x: number, y: number) => void; lifted?: boolean;
 }
-function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
+function Row({ item, today, mode, onDone, onStar, onOpen, onLift, lifted }: RowProps) {
   const [ticked, setTicked] = useState(false);
   const [dx, setDx] = useState(0);
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
+  const hold = useLift(onLift ? (x, y) => onLift(item, x, y) : undefined);
   const starred = item.priority === 'P1';
   const amount = formatAmount(item.amount, item.currency);
   const tick = () => {
@@ -79,15 +86,16 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
     window.setTimeout(() => onDone(item), 380);   // the check shows before the row goes
   };
   return (
-    <div className="relative overflow-hidden rounded-[12px]"
-      onTouchStart={e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null }; }}
+    <div data-row={item.id} className={`relative select-none overflow-hidden rounded-[12px] ${lifted ? 'opacity-30' : ''}`} {...hold.mouse}
+      onTouchStart={e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null }; hold.touchStart(e.touches[0].clientX, e.touches[0].clientY); }}
       onTouchMove={e => {
-        const t = touch.current; if (!t) return;
+        hold.touchMove(e.touches[0].clientX, e.touches[0].clientY);
+        const t = touch.current; if (!t || hold.lifted()) return;
         const mx = e.touches[0].clientX - t.x, my = e.touches[0].clientY - t.y;
         if (t.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) t.horizontal = Math.abs(mx) > Math.abs(my) && mx > 0;
         if (t.horizontal) { e.stopPropagation(); setDx(Math.max(0, Math.min(120, mx))); }
       }}
-      onTouchEnd={e => { if (touch.current?.horizontal) e.stopPropagation(); if (dx >= 90) tick(); setDx(0); touch.current = null; }}
+      onTouchEnd={e => { hold.touchEnd(e); if (touch.current?.horizontal) e.stopPropagation(); if (dx >= 90) tick(); setDx(0); touch.current = null; }}
       style={{ touchAction: 'pan-y' }}>
       {dx > 0 && (
         <div className={`absolute inset-y-0 left-0 flex items-center gap-1.5 pl-4 text-[15px] font-semibold text-white ${dx >= 90 ? 'bg-[#1d9e75]' : 'bg-[#1d9e75]/60'}`} style={{ width: dx }} aria-hidden>
@@ -113,8 +121,9 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
         </span>
         <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 py-[9px] text-left">
           <Title text={item.title} className={`block text-[16px] leading-[22px] ${ticked ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`} />
-          {(dueChip(item, today) || item.topics?.length || amount || item.repeat) && (
+          {(dueChip(item, today) || item.topics?.length || amount || item.repeat || item.focus) && (
             <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {item.focus && <Pin size={14} className="text-[#d48a12]" fill="currentColor" aria-label="Put in Now" />}
               <DueChip item={item} today={today} mode={mode} />
               {item.repeat && <span className="inline-flex h-[22px] items-center gap-1 text-[12px] font-medium text-pc-text-muted"><Repeat size={12} aria-hidden />{item.repeat}</span>}
               {item.topics?.map(t => <TopicPill key={t} topic={t} mode={mode} />)}
@@ -128,14 +137,16 @@ function Row({ item, today, mode, onDone, onStar, onOpen }: RowProps) {
 }
 
 // ---- the boxes and groups
+// The one highlighted box: a filled tint, a clear border and the glow (my.design 06; the same as Casa Artlia's
+// Acum, Lucian 2026-10-25: "Good colors in artlia todo now. Same with chat to do").
 const GLOW: Record<'red' | 'amber', Record<Mode, CSSProperties>> = {
   red: {
-    light: { background: 'linear-gradient(180deg, rgba(220,76,76,0.09), rgba(220,76,76,0.02))', border: '1px solid rgba(220,76,76,0.30)', boxShadow: '0 0 0 1px rgba(220,76,76,0.12), 0 0 24px 2px rgba(220,76,76,0.20), 0 6px 20px rgba(220,76,76,0.14)' },
-    dark: { background: 'rgba(220,76,76,0.10)', border: '1px solid rgba(220,76,76,0.40)', boxShadow: '0 0 22px rgba(220,76,76,0.22)' },
+    light: { background: '#fde9e7', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 0 4px rgba(220,76,76,0.08), 0 0 28px 4px rgba(220,76,76,0.22), 0 8px 22px rgba(220,76,76,0.16)' },
+    dark: { background: 'rgba(220,76,76,0.18)', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 26px rgba(220,76,76,0.28)' },
   },
   amber: {
-    light: { background: 'linear-gradient(180deg, rgba(245,166,35,0.09), rgba(245,166,35,0.02))', border: '1px solid rgba(245,166,35,0.28)', boxShadow: '0 0 0 1px rgba(245,166,35,0.12), 0 0 24px 2px rgba(245,166,35,0.22), 0 6px 20px rgba(245,166,35,0.14)' },
-    dark: { background: 'rgba(245,166,35,0.09)', border: '1px solid rgba(245,166,35,0.38)', boxShadow: '0 0 22px rgba(245,166,35,0.18)' },
+    light: { background: '#fff1dc', border: '1.5px solid rgba(212,138,18,0.6)', boxShadow: '0 0 0 4px rgba(245,166,35,0.08), 0 0 28px 4px rgba(245,166,35,0.24), 0 8px 22px rgba(245,166,35,0.16)' },
+    dark: { background: 'rgba(245,166,35,0.17)', border: '1.5px solid rgba(245,166,35,0.6)', boxShadow: '0 0 26px rgba(245,166,35,0.24)' },
   },
 };
 
@@ -150,41 +161,65 @@ function GroupHead({ dot, mark, label, count, color }: { dot?: string; mark?: Re
   );
 }
 
-function TodoList({ items, today, mode, filter, onDone, onStar, onOpen }: {
-  items: NowItem[]; today: string; mode: Mode; filter: 'priority' | 'deadlines' | null;
+function TodoList({ items, today, mode, filter, onDone, onStar, onOpen, onMove }: {
+  items: NowItem[]; today: string; mode: Mode; filter: 'priority' | 'deadlines' | null; onMove?: (m: Move<NowItem>) => void;
 } & Omit<RowProps, 'item' | 'today' | 'mode'>) {
   const shown = filter === 'priority' ? items.filter(i => i.priority === 'P1') : filter === 'deadlines' ? items.filter(i => i.due_date || i.scheduled) : items;
   const g = groupTodo(shown, today);
-  const rows = (list: NowItem[]) => list.map(i => <Row key={i.id} item={i} today={today} mode={mode} onDone={onDone} onStar={onStar} onOpen={onOpen} />);
+  const zones: Record<string, NowItem[]> = { [BOX]: g.due, priority: g.priority, waiting: g.waiting, ...Object.fromEntries(g.areas.map(a => [a.area.id, a.items])) };
+  const { drag, lift } = useDragDrop<NowItem>((item, from, over) => {
+    const m = moveFor(item, from, over, z => (zones[z] ?? []).map(i => i.id));
+    if (m) onMove?.(m);
+  });
+  const rows = (zone: string, list: NowItem[]) => (
+    <>
+      {list.map(i => (
+        <div key={i.id}>
+          <DropLine show={drag?.over?.zone === zone && drag.over.before === i.id} />
+          <Row item={i} today={today} mode={mode} onDone={onDone} onStar={onStar} onOpen={onOpen}
+            onLift={onMove ? (it, x, y) => lift(it, zone, x, y) : undefined} lifted={drag?.item.id === i.id} />
+        </div>
+      ))}
+      <DropLine show={drag?.over?.zone === zone && drag.over.before === null && drag.item.id !== list[list.length - 1]?.id} />
+    </>
+  );
+  const outline = (zone: string) => (drag && drag.from === zone && drag.over?.zone === zone ? DROP_OUTLINE : undefined);
   const red = g.due.some(i => dueChip(i, today)?.kind === 'overdue');
   return (
     <div className="space-y-5">
-      {g.due.length > 0 && (
-        <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW[red ? 'red' : 'amber'][mode]}>
-          <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Due & overdue" count={g.due.length} color={red ? '#dc4c4c' : '#d48a12'} />
-          {rows(g.due)}
+      {(g.due.length > 0 || drag) && (
+        <section data-zone={BOX} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={{ ...GLOW[red ? 'red' : 'amber'][mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
+          <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Now" count={g.due.length} color={red ? '#dc4c4c' : '#b8740c'} />
+          {rows(BOX, g.due)}
+          {g.due.length === 0 && <p className="px-3 py-6 text-center text-[15px] font-medium text-[#b8740c]">Drop here what you do now</p>}
         </section>
       )}
       {g.priority.length > 0 && (
-        <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW.amber[mode]}>
-          <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Priority" count={g.priority.length} color="#d48a12" />
-          {rows(g.priority)}
+        <section data-zone="priority" className="rounded-[16px] px-1.5" style={outline('priority')}>
+          <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Priority" count={g.priority.length} />
+          {rows('priority', g.priority)}
         </section>
       )}
       {g.areas.map(({ area, items: list }) => (
-        <section key={area.id} className="px-1.5">
+        <section key={area.id} data-zone={area.id} className="rounded-[16px] px-1.5" style={outline(area.id)}>
           <GroupHead dot={area.dot} label={area.label} count={list.length} />
-          {rows(list)}
+          {rows(area.id, list)}
         </section>
       ))}
       {g.waiting.length > 0 && (
-        <section className="px-1.5 opacity-80">
+        <section data-zone="waiting" className="rounded-[16px] px-1.5 opacity-80" style={outline('waiting')}>
           <GroupHead dot="var(--pc-text-faint)" label="Waiting on others" count={g.waiting.length} />
-          {rows(g.waiting)}
+          {rows('waiting', g.waiting)}
         </section>
       )}
       {shown.length === 0 && (
         <p className="px-4 py-10 text-center text-[15px] text-pc-text-muted">{filter === 'priority' ? 'No priorities. Tap the star on a task to make it one.' : 'Nothing with a date.'}</p>
+      )}
+      {drag && (
+        <DragGhost x={drag.x} y={drag.y}>
+          <span className="mr-1.5 font-bold tabular-nums" style={{ color: railOf(drag.item) }}>{drag.item.n}</span>
+          <Title text={drag.item.title} className="text-pc-text-primary" />
+        </DragGhost>
       )}
     </div>
   );
@@ -242,6 +277,8 @@ export interface TodoPanelProps {
   items: NowItem[]; loops: Loop[]; today: string;
   loaded: boolean; expired: boolean; refreshing: boolean; onRefresh: () => void;
   onDone: (i: NowItem) => void; onStar: (i: NowItem) => void; onOpen: (id: string) => void;
+  /** A drag: into or out of the box, or a new order. */
+  onMove?: (m: Move<NowItem>) => void;
   onContinue: (l: Loop) => void;
   onAdd: (text: string) => void; transcribe: (a: OutgoingAttachment) => Promise<string>;
   reply: { text: string | null; asked: string; since: number } | null; onDismissReply: () => void;
@@ -316,13 +353,13 @@ export function TodoPanel(p: TodoPanelProps) {
                 </div>
               ) : items.length === 0 && q.trim() ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
               : items.length === 0 ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
-              : <TodoList items={items} today={p.today} mode={p.mode} filter={filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} />}
+              : <TodoList items={items} today={p.today} mode={p.mode} filter={filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} onMove={p.onMove} />}
             {putOff.length > 0 && !q.trim() && (
               <button type="button" onClick={() => setShowPutOff(v => !v)} className="press flex h-10 w-full items-center gap-2 px-2 text-left text-[15px] text-pc-text-muted" aria-expanded={showPutOff}>
                 <Clock size={16} aria-hidden /> {putOff.length} put off until later · <span className="font-medium text-[var(--pc-accent-ink)]">{showPutOff ? 'Hide' : 'Show'}</span>
               </button>
             )}
-            {p.items.length > 0 && <p className="px-2 text-[12px] text-pc-text-faint">Swipe a task right to finish it. Say “22 done” in the chat to finish one by number.</p>}
+            {p.items.length > 0 && <p className="px-2 text-[12px] text-pc-text-faint">Swipe a task right to finish it. Hold one and drag it: into the box to put it in Now, out to take it out, up or down to reorder. Say “22 done” in the chat to finish one by number.</p>}
           </div>
         )}
       </div>

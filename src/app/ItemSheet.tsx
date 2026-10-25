@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useDelayedFlag } from '../ui/progress';
 import { useBusy } from '../ui/draft';
 import { CloseButton, Sheet } from '../ui/Sheet';
-import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
+import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Pin, PinOff, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
 import { act, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet as ItemData } from './api';
 import { Title } from './Todo';
 import { TOPIC_COLORS, railOf } from './todoRules';
@@ -192,6 +192,12 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   className="press mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-60">
                   <Check size={19} strokeWidth={2.5} /> {kind === 'bill' ? 'Mark as paid' : isTopic ? 'It’s settled' : 'Done'}
                 </button>
+                {!isTopic && (   /* the same as dragging the row into (or out of) the Now box */
+                  <button type="button" disabled={busy} onClick={() => void run('focus', str('focus') ? { on: false } : {})}
+                    className="press mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
+                    {str('focus') ? <><PinOff size={18} className="text-pc-text-muted" /> Take out of Now</> : <><Pin size={18} className="text-[#d48a12]" /> Put in Now</>}
+                  </button>
+                )}
                 <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
                   {isTopic
                     ? <button type="button" onClick={() => { onAsk(`Continue: ${it.title} ⟨${id}⟩`, true); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Continue</button>

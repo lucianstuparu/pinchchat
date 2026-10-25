@@ -38,6 +38,7 @@ import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
 import { actOn, cachedList, docFolder, docName, fetchList, roError, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
 import { CatsView, CategoryView, NowView, PlanView } from './Lists';
+import { opsFor, type Move } from '../ui/dragRules';
 import { ArtSheet } from './ArtSheet';
 import { toneOf, toneStyle, topOf, withSender } from './rules';
 
@@ -180,6 +181,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       setHint(roError(e));
       throw e;
     } finally { void refresh(); }
+  };
+  // A drag on Acum: into or out of the box, or a new order. One Undo puts everything back.
+  const move = async (m: Move<ArtItem>) => {
+    if (!list) return;
+    const { ops, undo: back, patch } = opsFor(m, list.items, list.today);
+    if (!ops.length) return;
+    setList(l => (l ? { ...l, items: patch(l.items) } : l));
+    const run = (o: typeof ops) => Promise.all(o.map(x => actOn(x.id, x.action, x.extra)));
+    try {
+      await run(ops);
+      const label = m.focus === true ? 'Pus în Acum' : m.focus === false ? 'Scos din Acum' : 'Ordine schimbată';
+      setUndo({ key: Date.now(), label: `${label}: ${short(m.item)}`, undo: () => { void run(back).catch(e => setHint(roError(e))).finally(() => void refresh()); } });
+    } catch (e) { setHint(roError(e)); }
+    finally { void refresh(); }
   };
   const upload = async (item: ArtItem, f: File) => {
     const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = () => rej(new Error('read')); r.readAsDataURL(f); });
@@ -437,7 +452,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         {!list ? <p className="py-16 text-center text-[15px] text-pc-text-muted">{spinning ? 'Se încarcă…' : ''}</p>
           : cat ? <CategoryView cat={cat} items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
           : tab === 'now' ? <NowView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)}
-              onFocus={(i, on) => void doAct(i, 'focus', on ? {} : { on: false }).catch(() => undefined)} />
+              onMove={m => void move(m)} />
           : tab === 'plan' ? <PlanView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
           : <CatsView items={items} today={today} mode={mode} cats={cats} onPick={setCat} />}
       </div>

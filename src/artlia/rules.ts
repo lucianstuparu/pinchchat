@@ -42,6 +42,8 @@ export const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { backgro
 // ---- Acum: what needs attention, each item once. Only overdue and `now` (due by the day after tomorrow) are
 // highlighted: the highlight is for what cannot wait (Lucian 2026-10-25: "2 areas defeat the purpose. Even main
 // one should have less items"); the rest of the week and the priorities are plain lists below.
+import { byRank } from '../ui/dragRules';
+
 export const NOW_DAYS = 2;
 export interface NowGroups { overdue: ArtItem[]; now: ArtItem[]; week: ArtItem[]; soon: ArtItem[]; check: ArtItem[]; priority: ArtItem[]; putOff: number }
 
@@ -60,7 +62,8 @@ export function groupNow(items: ArtItem[], today: string): NowGroups {
     else if (i.status === 'check' && i.kind !== 'milestone') g.check.push(i);
     else if (i.priority === 'P1' && i.kind !== 'milestone') g.priority.push(i);
   }
-  for (const k of ['overdue', 'now', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue);
+  // Each group by date, then the order set by dragging on top of it (byRank is a stable sort).
+  for (const k of ['overdue', 'now', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue).sort(byRank);
   return g;
 }
 

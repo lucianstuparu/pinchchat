@@ -20,11 +20,13 @@ export interface ArtItem {
   group?: string;
   /** Put by hand into Acum's highlighted box (the day it was put there). */
   focus?: string;
+  /** Its place within its group on Acum, set by dragging (lower first). */
+  rank?: number;
 }
 export interface Category { id: string; label: string; desc?: string; order?: number }
 export interface ArtList { today: string; categories: Category[]; items: ArtItem[]; glossary: Record<string, string> }
 
-export type ArtAction = 'done' | 'reopen' | 'snooze' | 'drop' | 'undo' | 'edit' | 'status' | 'note' | 'focus';
+export type ArtAction = 'done' | 'reopen' | 'snooze' | 'drop' | 'undo' | 'edit' | 'status' | 'note' | 'focus' | 'order';
 
 const CACHE = 'artlia:list';
 
