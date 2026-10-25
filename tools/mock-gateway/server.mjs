@@ -181,10 +181,12 @@ const clients = new Set();
 const now = () => Date.now();
 const waDrafts = new Map();
 const waTranslations = new Map();
+const relayAgents = {};
 const waContacts = [
   { id: 'ct-1', name: 'Eugenia Gamurari', label: 'Bunica', aliases: ['bunica', 'bunicii', 'buni'], phone: '+33600000000', lang: 'ro', tone: 'informal', sent: 3, last_sent: '2026-10-24T08:00:00Z', listen: true, unread: 2, last_in: { text: 'Ai ajuns cu bine?', ts: '2026-10-24T11:40:00Z' } },
   { id: 'ct-2', name: 'Fleur Guillemot', label: 'Fleur', aliases: [], phone: '+33600000001', lang: 'fr', tone: 'formal', sent: 0, listen: true, unread: 1, last_in: { text: 'Bonjour, les documents sont-ils prêts pour lundi ?', ts: '2026-10-24T17:10:00Z' } },
   { id: 'ct-3', name: 'Mama', label: 'Mama', aliases: ['mama', 'mamei'], phone: '', lang: 'ro', tone: 'informal', sent: 0 },
+  { id: 'ct-2026-10-25-0000e1', name: 'Me Cécile Fouillet', label: 'Notaire', aliases: ['notara'], phone: '', email: 'etude@example.fr', lang: 'fr', tone: 'formal', channel: 'email', sent: 0 },
 ];
 const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
 // Search (register-api /artlia/search, /reg/search, /artlia/doc; gateway sessions.search).
@@ -391,7 +393,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       const p = JSON.parse(body || '{}');
       res.setHeader('content-type', 'application/json');
-      if (url.pathname === '/reg/wa/contacts') { res.end(JSON.stringify({ contacts: waContacts })); return; }
+      if (url.pathname === '/reg/wa/contacts') { res.end(JSON.stringify({ contacts: waContacts, wa: true })); return; }
       if (url.pathname === '/reg/wa/inbox') {
         const c = waContacts.find(x => x.id === p.contact); if (c) c.unread = 0;
         res.end(JSON.stringify({ messages: p.contact === 'ct-1' ? [
@@ -405,13 +407,50 @@ const server = http.createServer((req, res) => {
       }
       let c = waContacts.find(x => x.id === p.id);
       if (!c) { c = { id: `ct-${++seq}`, sent: 0 }; waContacts.push(c); }
-      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone, lang: p.lang, tone: p.tone, listen: p.listen });
+      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone ?? c.phone ?? '', email: p.email, lang: p.lang, tone: p.tone, listen: p.listen, channel: p.channel });
       res.end(JSON.stringify({ ok: true, contact: c }));
     });
     return;
   }
   // The WhatsApp app (Relay): compose writes the message in the contact's language (a stand-in for
   // the model: French gets a fixed sentence), translate gives the Romanian of a message.
+  // Relay's agents (CT 113 relay-api in production): a stand-in model with fixed French answers.
+  if (url.pathname.startsWith('/relay/') || url.pathname === '/reg/wa/draft') {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      const what = url.pathname.split('/').pop();
+      const cid = p.contact?.id ?? p.contact;
+      const agent = (relayAgents[cid] ??= { style: '', memory: '', samples: [], history: [] });
+      const later = (obj, ms = 1500) => setTimeout(() => res.end(JSON.stringify(obj)), ms);
+      if (url.pathname === '/reg/wa/draft') {
+        const c = waContacts.find((x) => x.id === p.contact);
+        const id = `wa-2026-10-25-${(++seq).toString(16).padStart(6, '0')}`;
+        const d = { id, name: c?.name ?? '?', lang: c?.lang ?? 'ro', text: p.text, back: p.back, status: 'draft' };
+        waDrafts.set(id, d); return later({ ok: true, draft: d }, 200);
+      }
+      if (what === 'compose') {
+        const fr = p.contact.lang === 'fr';
+        return later(fr ? { text: `Bonjour Maître,\nJe vous confirme que je signerai l’acte jeudi.\nBien à vous,\nLucian`, back: 'Bună ziua, vă confirm că voi semna actul joi.' }
+          : { text: String(p.said).replace(/^spune-i (că )?/i, '').replace(/^./, (x) => x.toUpperCase()) });
+      }
+      if (what === 'translate') {
+        const t = String(p.text);
+        const lang = /[а-яіїє]/i.test(t) ? (/[іїє]/i.test(t) ? 'uk' : 'ru') : /[àâçéèêëîïôûùüÿœ]|bonjour|merci/i.test(t) ? 'fr' : 'en';
+        return later({ translation: lang === 'fr' ? 'Bună ziua, vă rugăm să ne trimiteți actul semnat până vineri.' : 'Bună ziua, puteți trimite factura până vineri?', lang });
+      }
+      if (what === 'learn') { agent.history.push({ ts: new Date().toISOString(), kind: 'mine', text: p.sent }); agent.memory ||= '- dossier: acte signé jeudi'; return later({ ok: true }, 100); }
+      if (what === 'they') { agent.history.push({ ts: new Date().toISOString(), kind: 'theirs', text: p.text, src: 'pasted' }); return later({ ok: true }, 100); }
+      if (what === 'profile') return later(agent, 200);
+      if (what === 'style') { agent.style = p.style; return later({ ok: true }, 100); }
+      if (what === 'sample') { const file = `2026-10-25 ${p.name}`; agent.samples.push({ name: file, size: p.text.length, added: '2026-10-25' }); agent.style = '- vouvoie, phrases courtes\n- signe « Bien à vous, Lucian »'; return later({ file, style: agent.style }, 2500); }
+      if (what === 'sample-delete') { agent.samples = agent.samples.filter((x) => x.name !== p.name); return later({ ok: true }, 100); }
+      res.statusCode = 404; res.end('{}');
+    });
+    return;
+  }
   if (url.pathname === '/reg/wa/compose' || url.pathname === '/reg/wa/translate') {
     let body = '';
     req.on('data', (c) => { body += c; });
