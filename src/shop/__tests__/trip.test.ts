@@ -24,11 +24,11 @@ describe('a trip to a shop', () => {
       item('h', 'Ouă', ['grand-frais']),
       item('x', 'Ouă', ['carrefour'], { status: 'bought', bought_at: 'carrefour' }),
     ];
-    const { here, maybe } = tripLists(items, 'carrefour', S, [], [], t => (t === 'lidl' ? 'Lidl' : t));
+    const { here, maybe } = tripLists(items, 'carrefour', S);
     expect(here.map(i => i.id)).toEqual(['a', 'b']);
     // Eggs were bought here, bread is for any shop, kefir is groceries (what Carrefour sold us);
     // the bulb (house) was never bought here, returns and the wishlist never show.
-    expect(maybe.map(m => [m.item.id, m.why])).toEqual([['h', 'bought here before'], ['c', 'any shop'], ['d', 'for Lidl']]);
+    expect(maybe.map(m => [m.item.id, m.why, m.shops])).toEqual([['h', 'bought here before', undefined], ['c', 'any shop', undefined], ['d', '', ['lidl']]]);
   });
 
   it('a shop with no history counts as a supermarket, unless known for one kind', () => {

@@ -25,7 +25,8 @@ export function shopTagOf(name: string | undefined, stores: Store[]): string | n
   return tags.find(t => slug === t || slug.startsWith(`${t}-`)) ?? null;
 }
 
-export interface Maybe { item: Item; why: string }
+/** Why it may be here; `shops` = the shops it is meant for (shown as their logos). */
+export interface Maybe { item: Item; why: string; shops?: string[] }
 
 /**
  * What to look for in this shop. `here`: open things meant for it (or a related shop: Carrefour and
@@ -34,7 +35,7 @@ export interface Maybe { item: Item; why: string }
  * (groceries at a supermarket), from the history; a shop with no history counts as a supermarket
  * unless it is known for one kind (IKEA: house). Returns stay with their own shop; the wishlist stays out.
  */
-export function tripLists(items: Item[], store: string, stores: Store[], purchases: Purchase[] = [], products: Product[] = [], storeName: (t: string) => string = t => t): { here: Item[]; maybe: Maybe[] } {
+export function tripLists(items: Item[], store: string, stores: Store[], purchases: Purchase[] = [], products: Product[] = []): { here: Item[]; maybe: Maybe[] } {
   const shop = stores.find(s => s.tag === store);
   const sameShop = new Set([store, ...(shop?.also ?? [])]);
   const open = items.filter(i => i.status === 'open' && !isWish(i));
@@ -57,15 +58,16 @@ export function tripLists(items: Item[], store: string, stores: Store[], purchas
   for (const pr of products) { const t = shopTagOf(pr.stats?.last_store, stores); if (t && sameShop.has(t)) boughtHere.add(pr.id); }
   if (groups.size === 0) { const g = shopGroup(store); if (g) groups.add(g); else { groups.add('groceries'); groups.add('house'); } }
 
-  const rank = (m: Maybe & { k: number }) => m.k;
-  const maybe = open.filter(i => i.kind === 'buy' && !hereIds.has(i.id)).flatMap(i => {
+  type Ranked = Maybe & { k: number };
+  const rank = (m: Ranked) => m.k;
+  const maybe = open.filter(i => i.kind === 'buy' && !hereIds.has(i.id)).flatMap((i): Ranked[] => {
     const own = storeTagsOf(i, stores);
     if (boughtHere.has(fold(i.title)) || (i.product && boughtHere.has(i.product))) return [{ item: i, why: 'bought here before', k: 0 }];
     if (own.length === 0) return [{ item: i, why: 'any shop', k: 1 }];
-    if (groups.has(groupOf(i))) return [{ item: i, why: `for ${own.map(storeName).join(', ')}`, k: 2 }];
+    if (groups.has(groupOf(i))) return [{ item: i, why: '', shops: own, k: 2 }];
     return [];
   }).sort((a, b) => rank(a) - rank(b));
-  return { here, maybe: maybe.map(({ item, why }) => ({ item, why })) };
+  return { here, maybe: maybe.map(({ item, why, shops }) => ({ item, why, ...(shops ? { shops } : {}) })) };
 }
 
 /** A small preview of a photo for the basket (the full one goes to the server). */

@@ -4,9 +4,10 @@
  * and an item's "where to get it". Type a few letters; a shop that is not known yet is one tap away.
  */
 import { useState } from 'react';
-import { Check, Plus, Store as StoreIcon } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { SearchHeader } from '../ui/Controls';
+import { ShopLogo } from './ShopLogo';
 import { NOT_SHOPS, fold, newStore, rankShops, type Store } from './logic';
 
 export function ShopPicker({ stores, counts = {}, recent = {}, current, allShops, onPick, onCreate, onClose, z = 40 }: {
@@ -43,7 +44,7 @@ export function ShopPicker({ stores, counts = {}, recent = {}, current, allShops
         )}
         {shown.map(s => (
           <button key={s.tag} type="button" onClick={() => onPick(s.tag)} className={row}>
-            <StoreIcon size={18} className="shrink-0 text-pc-text-faint" aria-hidden />
+            <ShopLogo tag={s.tag} name="" size={28} />
             <span className="min-w-0 flex-1 truncate text-[16px]">{s.name}</span>
             {(counts[s.tag] ?? 0) > 0 && <span className="text-[15px] text-pc-text-muted">{counts[s.tag]}</span>}
             {current === s.tag && <Check size={18} className="text-[var(--pc-accent-ink)]" aria-label="chosen" />}

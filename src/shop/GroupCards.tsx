@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf, type Group } from './groups';
 import { storeTagsOf, type Item, type Store } from './logic';
+import { ShopLogos } from './ShopLogo';
 
 function useColumns() {
   const q = '(min-width: 900px)';
@@ -91,7 +92,8 @@ function CardRow({ item, ink, card, stores, storeName, hideStore, onTick, onOpen
     setFlash(true);
     window.setTimeout(() => { onTick(item); setFlash(false); }, 320);   // let the tick show first
   };
-  const sub = [item.qty ? `×${item.qty}` : '', ...storeTagsOf(item, stores).filter(t => t !== hideStore).map(storeName)].filter(Boolean);
+  const sub = item.qty ? [`×${item.qty}`] : [];
+  const shops = storeTagsOf(item, stores).filter(t => t !== hideStore);
   return (
     <div className="flex items-start">
       <button type="button" onClick={tap} className="flex h-10 w-10 shrink-0 items-center justify-center"
@@ -103,10 +105,11 @@ function CardRow({ item, ink, card, stores, storeName, hideStore, onTick, onOpen
       </button>
       <button type="button" onClick={() => onOpen(item.id)} className="min-w-0 flex-1 py-[9px] pr-3 text-left">
         <span className={`line-clamp-3 break-words text-[16px] leading-[21px] ${on ? 'line-through opacity-60' : 'text-pc-text-primary'}`}>{item.title}</span>
-        {(sub.length > 0 || item.scope === 'private') && (
+        {(sub.length > 0 || shops.length > 0 || item.scope === 'private') && (
           <span className="mt-0.5 flex items-center gap-1 truncate text-[12px] leading-tight" style={{ color: ink }}>
             {item.scope === 'private' && <Lock size={10} aria-label="just me" className="shrink-0" />}
-            <span className="truncate">{sub.join(' · ')}</span>
+            {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
+            <ShopLogos tags={shops} storeName={storeName} size={18} />
           </span>
         )}
       </button>

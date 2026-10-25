@@ -11,6 +11,7 @@ import { GROUPS, GROUP_NAMES, groupColours, groupOf } from './groups';
 import { newPhotoRef, type Item, type Op, type Product, type Purchase, type Store } from './logic';
 import { photoUrl, shrinkPhoto } from './photos';
 import { thumbOf, tripLists, type Trip } from './trip';
+import { ShopLogo, ShopLogos } from './ShopLogo';
 
 export function InStore({ trip, onTrip, items, stores, purchases, products, storeName, mode, apply, onPaid, onLeave, onChangeShop }: {
   trip: Trip; onTrip: (t: Trip) => void;
@@ -18,7 +19,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
   storeName: (t: string) => string; mode: 'light' | 'dark';
   apply: (op: Op) => void; onPaid: () => void; onLeave: () => void; onChangeShop: () => void;
 }) {
-  const { here, maybe } = tripLists(items, trip.store, stores, purchases, products, storeName);
+  const { here, maybe } = tripLists(items, trip.store, stores, purchases, products);
   const picked = new Set(trip.picked);
   // In the basket: what was picked and is still open (bought meanwhile by someone else: gone).
   const basket = items.filter(i => picked.has(i.id) && i.status === 'open');
@@ -57,7 +58,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             <X size={22} />
           </button>
           <button type="button" onClick={onChangeShop} aria-haspopup="dialog" aria-label={`In ${storeName(trip.store)}. Change shop`} className="min-w-0 flex-1 px-1 text-left">
-            <span className="flex items-center gap-1 text-[17px] font-semibold leading-tight"><span className="truncate">In {storeName(trip.store)}</span><ChevronDown size={16} className="shrink-0 opacity-60" /></span>
+            <span className="flex items-center gap-1.5 text-[17px] font-semibold leading-tight"><ShopLogo tag={trip.store} name="" size={22} /><span className="truncate">{storeName(trip.store)}</span><ChevronDown size={16} className="shrink-0 opacity-60" /></span>
             <span className="block truncate text-[12px] leading-tight text-pc-text-muted">
               {toFind.length ? `${toFind.length} to find` : 'All found'}{n ? ` · ${n} in the basket` : ''}
             </span>
@@ -76,7 +77,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
 
         {toFind.length > 0 && (
           <section className="mt-2">
-            <h2 className="px-4 pb-1 pt-2 text-[13px] font-semibold text-pc-text-muted">For {storeName(trip.store)} · {toFind.length}</h2>
+            <h2 className="px-4 pb-1 pt-2 text-[13px] font-semibold text-pc-text-muted">For this shop · {toFind.length}</h2>
             {byGroup(toFind).map(({ g, list }) => (
               <div key={g}>
                 {byGroup(toFind).length > 1 && <h3 className="px-4 pb-0.5 pt-2 text-[12px] font-semibold uppercase tracking-wide" style={{ color: groupColours(g, mode).ink }}>{GROUP_NAMES[g]}</h3>}
@@ -99,7 +100,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             </button>
             {showMaybe && (
               <div className="divide-y divide-[var(--pc-separator)]">
-                {maybeLeft.map(m => <TripRow key={m.item.id} item={m.item} product={productOf(m.item.product)} why={m.why} onTap={() => toggle(m.item.id)} />)}
+                {maybeLeft.map(m => <TripRow key={m.item.id} item={m.item} product={productOf(m.item.product)} why={m.why} shops={m.shops} storeName={storeName} onTap={() => toggle(m.item.id)} />)}
               </div>
             )}
           </section>
@@ -161,7 +162,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
   );
 }
 
-function TripRow({ item, product, why, inBasket, onTap }: { item: Item; product?: Product; why?: string; inBasket?: boolean; onTap: () => void }) {
+function TripRow({ item, product, why, shops = [], storeName = t => t, inBasket, onTap }: { item: Item; product?: Product; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean; onTap: () => void }) {
   const sub = [item.qty ? `×${item.qty}` : '', item.notes ?? '', why ?? ''].filter(Boolean);
   return (
     <button type="button" onClick={onTap} aria-pressed={!!inBasket}
@@ -174,9 +175,10 @@ function TripRow({ item, product, why, inBasket, onTap }: { item: Item; product?
       </span>
       <span className="min-w-0 flex-1 py-2">
         <span className={`block truncate text-[17px] leading-snug ${inBasket ? 'text-pc-text-muted' : ''}`}>{item.title}</span>
-        {(sub.length > 0 || item.scope === 'private') && (
+        {(sub.length > 0 || shops.length > 0 || item.scope === 'private') && (
           <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-pc-text-muted">
-            <span className="truncate">{sub.join(' · ')}</span>
+            {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
+            <ShopLogos tags={shops} storeName={storeName} size={18} />
             {item.scope === 'private' && <span className="inline-flex shrink-0 items-center gap-0.5"><Lock size={11} /> just me</span>}
           </span>
         )}

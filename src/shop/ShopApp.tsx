@@ -12,7 +12,7 @@ import { useBusy, useDraft } from '../ui/draft';
 import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
@@ -34,6 +34,7 @@ import type { HomeTab } from './Products';
 import { daysUntil } from './pantry';
 import { useShop } from './useShop';
 import { InStore } from './InStore';
+import { ShopLogo, ShopLogos } from './ShopLogo';
 import { extrasAsk, newTrip, readTrip, writeTrip, type Trip } from './trip';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
@@ -255,10 +256,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
             </button>
             <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog" aria-label={store ? `Shop: ${storeName(store)}. Change shop` : 'Choose a shop'}
               className={`press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full pl-3 pr-2.5 text-[15px] font-medium ${store ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text active:bg-[var(--pc-hover-strong)]'}`}>
-              <StoreIcon size={15} aria-hidden />{store ? storeName(store) : 'All shops'}<ChevronDown size={15} aria-hidden className="opacity-70" />
+              {store ? <ShopLogo tag={store} name={storeName(store)} size={20} /> : <><StoreIcon size={15} aria-hidden />All shops</>}<ChevronDown size={15} aria-hidden className="opacity-70" />
             </button>
             {store && <Chip on={false} onClick={() => setStore(null)} label="All shops" n={open.length} />}
-            {quick.map(s => <Chip key={s.tag} on={false} onClick={() => setStore(s.tag)} label={s.name} n={shopCounts[s.tag]} />)}
+            {quick.map(s => <Chip key={s.tag} on={false} onClick={() => setStore(s.tag)} label={s.name} logo={<ShopLogo tag={s.tag} name="" size={20} />} n={shopCounts[s.tag]} />)}
           </div>
         )}
       </header>
@@ -419,11 +420,11 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   );
 }
 
-function Chip({ on, onClick, label, n }: { on: boolean; onClick: () => void; label: string; n: number }) {
+function Chip({ on, onClick, label, n, logo }: { on: boolean; onClick: () => void; label: string; n: number; logo?: ReactNode }) {
   return (
-    <button type="button" role="tab" aria-selected={on} onClick={onClick}
+    <button type="button" role="tab" aria-selected={on} onClick={onClick} aria-label={`${label}${n ? `, ${n}` : ''}`}
       className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-medium transition-colors ${on ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text-secondary active:bg-[var(--pc-hover-strong)]'}`}>
-      {label}{n > 0 && <span className={on ? 'opacity-70' : 'text-pc-text-muted'}>{n}</span>}
+      {logo ?? label}{n > 0 && <span className={on ? 'opacity-70' : 'text-pc-text-muted'}>{n}</span>}
     </button>
   );
 }
@@ -445,7 +446,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
 }) {
   const [flash, setFlash] = useState(false);
   const done = item.status !== 'open';
-  const shops = storeTagsOf(item, stores).filter(t => t !== hideStore).map(storeName);
+  const shops = storeTagsOf(item, stores).filter(t => t !== hideStore);
   const other = item.tags.filter(t => !stores.some(s => s.tag === t));
   const due = item.kind === 'return' && item.due_date ? daysTo(item.due_date, today) : null;
   const tap = () => {
@@ -455,7 +456,6 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
   };
   const sub = [
     item.qty ? `×${item.qty}` : '',
-    ...shops,
     ...other.map(t => `#${t}`),
     done && item.bought_on ? `${item.status === 'returned' ? 'returned' : 'bought'} ${item.bought_on === today ? 'today' : fmtDay(item.bought_on)}${item.bought_by ? ` · ${item.bought_by}` : ''}` : '',
   ].filter(Boolean);
@@ -470,10 +470,11 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
       <button type="button" onClick={() => onOpen(item.id)} className="flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left">
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[17px] leading-snug ${done || flash ? 'text-pc-text-muted line-through' : 'text-pc-text-primary'}`}>{item.title}</span>
-          {(sub.length > 0 || item.scope === 'private' || due !== null || product?.health?.nova) && (
+          {(sub.length > 0 || shops.length > 0 || item.scope === 'private' || due !== null || product?.health?.nova) && (
             <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-pc-text-muted">
               {product?.health?.nova && <NovaBadge nova={product.health.nova} small />}
               {due !== null && !done && <span className={due <= 2 ? 'font-medium text-red-500' : 'text-amber-700 dark:text-amber-400'}>{due < 0 ? 'Overdue' : due === 0 ? 'Last day' : `by ${fmtDay(item.due_date!)}`}</span>}
+              <ShopLogos tags={shops} storeName={storeName} size={18} />
               {sub.length > 0 && <span className="truncate">{sub.join(' · ')}</span>}
               {item.scope === 'private' && <span className="inline-flex shrink-0 items-center gap-0.5"><Lock size={11} /> just me</span>}
             </span>
