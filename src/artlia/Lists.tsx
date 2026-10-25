@@ -114,23 +114,19 @@ type ListProps = { items: ArtItem[]; today: string; mode: Mode; cats: Category[]
 export function NowView({ items, today, mode, cats, onDone, onOpen }: ListProps) {
   const g = groupNow(items, today);
   const rows = (list: ArtItem[]) => list.map(i => <ArtRow key={i.id} item={i} today={today} mode={mode} cats={cats} onDone={onDone} onOpen={onOpen} />);
-  const empty = !g.overdue.length && !g.week.length && !g.soon.length && !g.check.length && !g.priority.length;
+  const empty = !g.overdue.length && !g.now.length && !g.week.length && !g.soon.length && !g.check.length && !g.priority.length;
   return (
     <div className="space-y-5">
-      {(g.overdue.length > 0 || g.week.length > 0) && (
+      {(g.overdue.length > 0 || g.now.length > 0) && (
         <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW[g.overdue.length ? 'red' : 'amber'][mode]}>
           {g.overdue.length > 0 && <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Întârziate" count={g.overdue.length} color="#dc4c4c" />}
           {rows(g.overdue)}
-          {g.week.length > 0 && <GroupHead label="Săptămâna asta" count={g.week.length} color="#d48a12" />}
-          {rows(g.week)}
+          {g.now.length > 0 && <GroupHead label="Azi, mâine, poimâine" count={g.now.length} color="#d48a12" />}
+          {rows(g.now)}
         </section>
       )}
-      {g.priority.length > 0 && (
-        <section className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={GLOW.amber[mode]}>
-          <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Prioritare" count={g.priority.length} color="#d48a12" />
-          {rows(g.priority)}
-        </section>
-      )}
+      {g.week.length > 0 && <section><GroupHead label="Săptămâna asta" count={g.week.length} />{rows(g.week)}</section>}
+      {g.priority.length > 0 && <section><GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Prioritare" count={g.priority.length} />{rows(g.priority)}</section>}
       {g.soon.length > 0 && <section><GroupHead label="Următoarele 4 săptămâni" count={g.soon.length} />{rows(g.soon)}</section>}
       {g.check.length > 0 && <section><GroupHead mark={<HelpCircle size={13} strokeWidth={2.5} aria-hidden />} label="De verificat" count={g.check.length} />{rows(g.check)}</section>}
       {empty && <p className="px-2 py-10 text-center text-[15px] text-pc-text-muted">Nimic urgent acum. Restul e în Plan și în Categorii.</p>}

@@ -11,6 +11,7 @@ describe('Acum', () => {
   it('puts each open item in one group, by due date, then de verificat, then priority', () => {
     const items = [
       it_({ title: 'late', due_date: '2026-10-20' }),
+      it_({ title: 'day after tomorrow', due_date: '2026-10-26' }),
       it_({ title: 'this week', due_date: '2026-10-29' }),
       it_({ title: 'in three weeks', due_date: '2026-11-12' }),
       it_({ title: 'far', due_date: '2027-03-01' }),
@@ -21,6 +22,7 @@ describe('Acum', () => {
     ];
     const g = groupNow(items, T);
     expect(g.overdue.map(i => i.title)).toEqual(['late']);
+    expect(g.now.map(i => i.title)).toEqual(['day after tomorrow']);
     expect(g.week.map(i => i.title)).toEqual(['this week']);
     expect(g.soon.map(i => i.title)).toEqual(['in three weeks']);
     expect(g.check.map(i => i.title)).toEqual(['to check']);

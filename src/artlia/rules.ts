@@ -39,32 +39,36 @@ export function toneOf(cat: string, cats: Category[]): Tone {
 }
 export const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { background: `${t.rail}33`, color: t.inkDark } : { background: t.bg, color: t.ink });
 
-// ---- Acum: what needs attention, each item once
-export interface NowGroups { overdue: ArtItem[]; week: ArtItem[]; soon: ArtItem[]; check: ArtItem[]; priority: ArtItem[]; putOff: number }
+// ---- Acum: what needs attention, each item once. Only overdue and `now` (due by the day after tomorrow) are
+// highlighted: the highlight is for what cannot wait (Lucian 2026-10-25: "2 areas defeat the purpose. Even main
+// one should have less items"); the rest of the week and the priorities are plain lists below.
+export const NOW_DAYS = 2;
+export interface NowGroups { overdue: ArtItem[]; now: ArtItem[]; week: ArtItem[]; soon: ArtItem[]; check: ArtItem[]; priority: ArtItem[]; putOff: number }
 
 const byDue = (a: ArtItem, b: ArtItem) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || (a.n ?? 0) - (b.n ?? 0);
 
 export function groupNow(items: ArtItem[], today: string): NowGroups {
-  const g: NowGroups = { overdue: [], week: [], soon: [], check: [], priority: [], putOff: 0 };
+  const g: NowGroups = { overdue: [], now: [], week: [], soon: [], check: [], priority: [], putOff: 0 };
   for (const i of items) {
     if (!isOpen(i)) continue;
     if (isPutOff(i, today)) { g.putOff++; continue; }
     const d = i.due_date ? daysBetween(today, i.due_date) : null;
     if (d !== null && d < 0) g.overdue.push(i);
+    else if (d !== null && d <= NOW_DAYS) g.now.push(i);
     else if (d !== null && d <= 7) g.week.push(i);
     else if (d !== null && d <= 28) g.soon.push(i);
     else if (i.status === 'check' && i.kind !== 'milestone') g.check.push(i);
     else if (i.priority === 'P1' && i.kind !== 'milestone') g.priority.push(i);
   }
-  for (const k of ['overdue', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue);
+  for (const k of ['overdue', 'now', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue);
   return g;
 }
 
 /** The pinned card: the most pressing thing, and how much else waits. */
 export function topOf(items: ArtItem[], today: string): { top: ArtItem | null; overdue: number; week: number } {
   const g = groupNow(items, today);
-  const top = g.overdue[0] ?? g.week[0] ?? g.priority[0] ?? g.soon[0] ?? g.check[0] ?? null;
-  return { top, overdue: g.overdue.length, week: g.week.length };
+  const top = g.overdue[0] ?? g.now[0] ?? g.week[0] ?? g.priority[0] ?? g.soon[0] ?? g.check[0] ?? null;
+  return { top, overdue: g.overdue.length, week: g.now.length + g.week.length };
 }
 
 // ---- Plan: the road to opening, one section per milestone
