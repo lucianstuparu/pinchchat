@@ -13,7 +13,7 @@ import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -33,14 +33,18 @@ import { OwnedSheet } from './OwnedSheet';
 import type { HomeTab } from './Products';
 import { daysUntil } from './pantry';
 import { useShop } from './useShop';
+import { InStore } from './InStore';
+import { extrasAsk, newTrip, readTrip, writeTrip, type Trip } from './trip';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
 const STORE_KEY = 'shop:store';
+// An arrival notification opens the app on /?store=<tag>: that shop, in the shop view (trip.ts).
+let arrivedAt: string | null = null;
 const readStore = () => {
-  // An arrival notification opens the app on /?store=<tag>: that shop, remembered from then on.
   const url = new URL(window.location.href);
   const fromUrl = url.searchParams.get('store');
   if (fromUrl) {
+    arrivedAt = fromUrl;
     url.searchParams.delete('store'); url.searchParams.delete('notice');
     window.history.replaceState(null, '', url.pathname + url.search);
     try { localStorage.setItem(STORE_KEY, fromUrl); } catch { /* fine */ }
@@ -71,6 +75,32 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const stores = snap.stores;
   const [store, setStoreState] = useState<string | null>(readStore);
   const setStore = (s: string | null) => { setStoreState(s); try { if (s) localStorage.setItem(STORE_KEY, s); else localStorage.removeItem(STORE_KEY); } catch { /* fine */ } };
+  // In the shop (trip.ts): started by "In the shop" or by tapping an arrival notification.
+  const [trip, setTripState] = useState<Trip | null>(() => {
+    const t = readTrip();
+    if (arrivedAt && !(t && t.store !== arrivedAt && (t.picked.length || t.extras.length))) { const n = t?.store === arrivedAt ? t : newTrip(arrivedAt); writeTrip(n); return n; }
+    return t;
+  });
+  const setTrip = useCallback((t: Trip | null) => { setTripState(t); writeTrip(t); }, []);
+  const startTrip = (tag: string) => { setStore(tag); setTrip(trip && trip.store === tag ? trip : { ...(trip ?? newTrip(tag)), store: tag }); };
+  const [tripPicking, setTripPicking] = useState(false);
+  // A notification tapped while the app is open: the service worker focuses it and says which page.
+  useEffect(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw) return;
+    const on = (e: MessageEvent) => {
+      if (e.data?.type !== 'notice' || !e.data.url) return;
+      const tag = new URL(e.data.url, window.location.origin).searchParams.get('store');
+      if (!tag) return;
+      setStoreState(tag); try { localStorage.setItem(STORE_KEY, tag); } catch { /* fine */ }
+      setTripState(t => {
+        if (t && t.store !== tag && (t.picked.length || t.extras.length)) return t;   // already shopping elsewhere: left alone
+        const n = t?.store === tag ? t : newTrip(tag); writeTrip(n); return n;
+      });
+    };
+    sw.addEventListener('message', on);
+    return () => sw.removeEventListener('message', on);
+  }, []);
   const [search, setSearch] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
@@ -135,6 +165,36 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [undo, setUndo] = useState<UndoInfo | null>(null);
   const closeUndo = useCallback(() => setUndo(null), [setUndo]);
   const offerUndo = (i: Item, label: string) => setUndo({ key: Date.now(), label: `${label}: ${i.title}`, undo: () => apply({ op: 'untick', id: i.id }) });
+  // Paid: the basket is bought at this shop; photos of things not on the list go to the assistant
+  // once Undo has passed (or when the app is put away), so Undo puts everything back as it was.
+  const pendingAsk = useRef<{ timer: number; op: Op } | null>(null);
+  const sendPending = useCallback(() => {
+    const p = pendingAsk.current; if (!p) return;
+    window.clearTimeout(p.timer); pendingAsk.current = null; apply(p.op);
+  }, [apply]);
+  useEffect(() => {
+    const hide = () => { if (document.visibilityState === 'hidden') sendPending(); };
+    document.addEventListener('visibilitychange', hide);
+    return () => document.removeEventListener('visibilitychange', hide);
+  }, [sendPending]);
+  const pay = () => {
+    if (!trip) return;
+    const t = trip;
+    const paid = snap.items.filter(i => t.picked.includes(i.id) && i.status === 'open');
+    for (const i of paid) apply({ op: 'tick', id: i.id, store: t.store });
+    sendPending();
+    if (t.extras.length) {
+      const op: Op = { op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), t.extras.length), store: t.store, photos: t.extras.map(e => e.ref) };
+      pendingAsk.current = { op, timer: window.setTimeout(sendPending, 6500) };
+    }
+    setTrip(null);
+    const extra = t.extras.length ? ` + ${t.extras.length} not on the list` : '';
+    setUndo({ key: Date.now(), label: `Paid at ${storeName(t.store)}: ${paid.length} bought${extra}`, undo: () => {
+      if (pendingAsk.current) { window.clearTimeout(pendingAsk.current.timer); pendingAsk.current = null; }
+      for (const i of paid) apply({ op: 'untick', id: i.id });
+      setTrip(t);
+    } });
+  };
   const tick = (i: Item) => {
     apply(i.status === 'open' ? { op: 'tick', id: i.id, store: store ?? undefined } : { op: 'untick', id: i.id });
     if (i.status === 'open') offerUndo(i, i.kind === 'return' ? 'Returned' : 'Bought');
@@ -152,6 +212,21 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
 
   const syncLabel = sync === 'offline' ? (queue.length ? `Offline · ${queue.length} to send` : 'Offline')
     : sync === 'signed-out' ? 'Signed out' : queue.length ? `Sending ${queue.length}…` : null;
+
+  if (trip) {
+    return (
+      <>
+        <InStore trip={trip} onTrip={setTrip} items={snap.items} stores={stores} purchases={snap.purchases ?? []} products={products}
+          storeName={storeName} mode={mode} apply={apply} onPaid={pay} onLeave={() => setTrip(null)} onChangeShop={() => setTripPicking(true)} />
+        {tripPicking && (
+          <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={trip.store}
+            onPick={tag => { if (tag) startTrip(tag); setTripPicking(false); }}
+            onCreate={name => { apply({ op: 'shop', name }); startTrip(newStore(name).tag); setTripPicking(false); }}
+            onClose={() => setTripPicking(false)} />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
@@ -174,6 +249,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         )}
         {search === null && (
           <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 pt-0.5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Shops">
+            <button type="button" onClick={() => (store ? startTrip(store) : setTripPicking(true))}
+              className="press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[rgba(var(--pc-accent-rgb),0.5)] pl-3 pr-3.5 text-[15px] font-medium text-[var(--pc-accent-ink)]">
+              <ShoppingCart size={15} aria-hidden />In the shop
+            </button>
             <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog" aria-label={store ? `Shop: ${storeName(store)}. Change shop` : 'Choose a shop'}
               className={`press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full pl-3 pr-2.5 text-[15px] font-medium ${store ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text active:bg-[var(--pc-hover-strong)]'}`}>
               <StoreIcon size={15} aria-hidden />{store ? storeName(store) : 'All shops'}<ChevronDown size={15} aria-hidden className="opacity-70" />
@@ -321,6 +400,12 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
           onAdd={() => { apply({ op: 'add', id: newItemId(), title: p.name, product: p.id, tags: store ? [store] : [] }); setProductId(null); setShowProducts(false); }}
           onAsk={(t) => { setPrefill(t); setProductId(null); setShowProducts(false); }} />;
       })()}
+      {tripPicking && (
+        <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={null}
+          onPick={tag => { if (tag) startTrip(tag); setTripPicking(false); }}
+          onCreate={name => { apply({ op: 'shop', name }); startTrip(newStore(name).tag); setTripPicking(false); }}
+          onClose={() => setTripPicking(false)} />
+      )}
       {picking && (
         <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={store} allShops={open.length}
           onPick={tag => { setStore(tag); setPicking(false); }}

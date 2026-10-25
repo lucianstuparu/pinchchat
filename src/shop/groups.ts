@@ -49,6 +49,8 @@ const SHOP_GROUP: Record<string, Group> = {
   jardiland: 'garden', truffaut: 'garden', botanic: 'garden', darty: 'tech', fnac: 'tech', boulanger: 'tech', 'media-markt': 'tech',
   pharmacy: 'other', decathlon: 'other',
 };
+/** The kind of thing a shop is known for (IKEA: house), or null for a shop of everything. */
+export const shopGroup = (tag: string): Group | null => SHOP_GROUP[tag] ?? null;
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const RULES = (['garden', 'tech', 'house'] as Group[]).map(g => [g, new RegExp(

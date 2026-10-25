@@ -199,7 +199,9 @@ self.addEventListener('notificationclick', (event) => {
     for (const w of windows) {
       if (new URL(w.url).origin === self.location.origin) {
         await w.focus();
-        w.postMessage({ type: 'notice', notice });
+        // The page the notification is about (Shopping: ?store=<tag>, the shop just arrived at),
+        // which focus() alone would lose (2026-10-25: a Carrefour arrival opened the app as it was).
+        w.postMessage({ type: 'notice', notice, url: target.pathname + target.search });
         return;
       }
     }
