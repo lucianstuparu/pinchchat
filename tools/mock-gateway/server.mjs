@@ -443,7 +443,15 @@ const server = http.createServer((req, res) => {
         return later({ translation: lang === 'fr' ? 'Bună ziua, vă rugăm să ne trimiteți actul semnat până vineri.' : 'Bună ziua, puteți trimite factura până vineri?', lang });
       }
       if (what === 'learn') { agent.history.push({ ts: new Date().toISOString(), kind: 'mine', text: p.sent }); agent.memory ||= '- dossier: acte signé jeudi'; return later({ ok: true }, 100); }
-      if (what === 'they') { agent.history.push({ ts: new Date().toISOString(), kind: 'theirs', text: p.text, src: 'pasted' }); return later({ ok: true }, 100); }
+      if (what === 'they') {
+        // A copied WhatsApp chat ("[15:56, 9/24/2026] Name: text") becomes its messages (relay-api splitChat, simplified: month first).
+        const parts = String(p.text).split(/\n(?=\[\d{1,2}:\d{2}, )/).map((l) => /^\[(\d{1,2}):(\d{2}), (\d{1,2})\/(\d{1,2})\/(\d{4})\] ([^:]+): ([\s\S]*)$/.exec(l));
+        if (parts.length > 1 && parts.every(Boolean)) {
+          parts.forEach((m, i) => agent.history.push({ ts: new Date(Date.UTC(+m[5], +m[3] - 1, +m[4], +m[1] - 2, +m[2], 0, i)).toISOString(), kind: /^lucian/i.test(m[6]) ? 'mine' : 'theirs', text: m[7].trim(), src: 'pasted' }));
+          return later({ ok: true, added: parts.length }, 100);
+        }
+        agent.history.push({ ts: new Date().toISOString(), kind: 'theirs', text: p.text, src: 'pasted' }); return later({ ok: true, added: 1 }, 100);
+      }
       if (what === 'profile') return later(agent, 200);
       if (what === 'style') { agent.style = p.style; return later({ ok: true }, 100); }
       if (what === 'sample') { const file = `2026-10-25 ${p.name}`; agent.samples.push({ name: file, size: p.text.length, added: '2026-10-25' }); agent.style = '- vouvoie, phrases courtes\n- signe « Bien à vous, Lucian »'; return later({ file, style: agent.style }, 2500); }

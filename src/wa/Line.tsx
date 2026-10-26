@@ -38,6 +38,14 @@ const keep = (k: string, v: string | null) => { try { if (v) localStorage.setIte
 const kept = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const isLocal = (d: Draft) => d.id.startsWith('local-');
 const localId = () => `local-${Date.now()}`;
+const clockOf = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+/** "Today", "Yesterday", else the date: one divider where the day changes. */
+function dayOf(iso: string): string {
+  const d = new Date(iso), now = new Date(), y = new Date(); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+}
 
 type Stage =
   | { kind: 'idle' }
@@ -82,12 +90,18 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
   const foreign = contact.lang !== MY_LANG;
   useBusy(`wa-line-${contact.id}`, stage.kind === 'preparing' || stage.kind === 'sending' || edit !== null || paste !== null);
 
+  // ---- their words in mine: the newest five not yet translated, one after the other. Made once: those
+  // made before come with the history and are kept on the phone, so they show at once on every load.
+  const trKey = `wa:tr:${contact.id}`;
+  const [translations, setTranslations] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(trKey) || '{}') as Record<string, string>; } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem(trKey, JSON.stringify(translations)); } catch { /* not kept */ } }, [trKey, translations]);
   // ---- the conversation: WhatsApp's inbox, and what was pasted or sent elsewhere (the agent's history)
   const load = useCallback(async () => {
     try {
       const [msgs, prof] = await Promise.all([wa && contact.listen ? fetchConversation(contact.id) : Promise.resolve([] as WaMessage[]), agentProfile(contact)]);
       setInbox(msgs);
       // From the agent's history: pasted messages always; for other channels also what was sent.
+      if (prof.translations) setTranslations(t => ({ ...prof.translations, ...t }));
       setPasted(prof.history.filter(e => e.src === 'pasted' || (!wa && e.kind === 'mine'))
         .map(e => ({ id: `h-${e.ts}`, from: e.kind === 'mine' ? 'me' : 'them', text: e.text, ts: e.ts })));
       setLoadError(null);
@@ -113,12 +127,10 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
     void theyWrote(contact, replyTo).then(load).catch(() => undefined);
   }, [replyTo, contact, load]);
 
-  // ---- their words in mine: the newest five not yet translated, one after the other
-  const [translations, setTranslations] = useState<Record<string, string>>({});
   const asked = useRef(new Set<string>());
   useEffect(() => {
     if (!foreign || !msgs) return;
-    const todo = msgs.filter(m => m.from === 'them' && !m.translation && !asked.current.has(m.id)).slice(-5);
+    const todo = msgs.filter(m => m.from === 'them' && !m.translation && !translations[m.id] && !asked.current.has(m.id)).slice(-5);
     if (!todo.length) return;
     todo.forEach(m => asked.current.add(m.id));
     void (async () => {
@@ -127,7 +139,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
         catch { asked.current.delete(m.id); }
       }
     })();
-  }, [msgs, foreign, contact]);
+  }, [msgs, foreign, contact, translations]);
 
   // ---- a draft left from before (the app was closed): shown again while it is still a draft
   useEffect(() => {
@@ -304,7 +316,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border pt-[env(safe-area-inset-top)]">
-        <div className="flex h-[64px] items-center gap-2 px-2">
+        <div className="mx-auto flex h-[64px] w-full max-w-[760px] items-center gap-2 px-2">
           <IconButton label="All people" onClick={onBack}><ChevronLeft size={24} /></IconButton>
           <Face contact={contact} size={40} />
           <div className="min-w-0 flex-1 pl-1">
@@ -317,6 +329,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 pt-3" aria-live="polite">
+        <div className="mx-auto w-full max-w-[760px]">
         {wa && !contact.listen && (
           <button type="button" onClick={onProfile} className="mb-3 block w-full rounded-[12px] bg-pc-surface px-4 py-3 text-left text-[15px] text-pc-text-secondary">
             Their WhatsApp messages are not kept here. Turn on <b className="font-semibold text-pc-text">Keep their messages here</b> in their profile to read and hear them.
@@ -333,26 +346,29 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
           </div>
         )}
         <div className="space-y-2.5">
-          {msgs?.map(m => {
+          {msgs?.map((m, i) => {
             const tr = m.translation ?? translations[m.id];
+            const day = dayOf(m.ts);
+            const divider = i === 0 || dayOf(msgs[i - 1].ts) !== day
+              ? <p className="pb-1 pt-3 text-center text-[12px] font-semibold text-pc-text-muted">{day}</p> : null;
             const own = m.transcript || m.text;
             const key = `m-${m.id}`;
             return m.from === 'me' ? (
-              <div key={m.id} className="flex justify-end">
+              <div key={m.id}>{divider}<div className="flex justify-end">
                 <div className="max-w-[85%] rounded-[20px] rounded-tr-[8px] bg-[rgba(var(--pc-accent-rgb),0.18)] px-3.5 py-2">
                   <p className="whitespace-pre-wrap text-[17px] leading-snug">{m.text}</p>
-                  <p className="mt-0.5 text-right text-[12px] text-pc-text-muted">{timeOf(m.ts)}</p>
+                  <p className="mt-0.5 text-right text-[12px] text-pc-text-muted">{clockOf(m.ts)}{m.id.startsWith('h-') ? ' · pasted' : ''}</p>
                 </div>
-              </div>
+              </div></div>
             ) : (
-              <div key={m.id} className="flex items-end gap-1.5">
+              <div key={m.id}>{divider}<div className="flex items-end gap-1.5">
                 <div className="max-w-[80%] rounded-[20px] rounded-tl-[8px] bg-pc-surface px-3.5 py-2">
                   {m.media && !m.transcript && <p className="text-[13px] text-pc-text-muted">{m.media === 'audio' ? 'Voice message' : m.media}</p>}
                   <p className="whitespace-pre-wrap text-[17px] leading-snug">{own}</p>
                   {foreign && (tr
                     ? <p className="mt-1.5 whitespace-pre-wrap border-t border-pc-border pt-1.5 text-[15px] leading-snug text-pc-text-secondary">{tr}</p>
                     : <p className="mt-1.5 border-t border-pc-border pt-1.5 text-[13px] text-pc-text-muted">Translating…</p>)}
-                  <p className="mt-0.5 text-[12px] text-pc-text-muted">{timeOf(m.ts)}{m.id.startsWith('h-') ? ' · pasted' : ''}</p>
+                  <p className="mt-0.5 text-[12px] text-pc-text-muted">{clockOf(m.ts)}{m.id.startsWith('h-') ? ' · pasted' : ''}</p>
                 </div>
                 {canSpeak() && (
                   <button type="button" onClick={() => say([tr ?? own], tr ? MY_LANG : contact.lang, key)} aria-label={speaking === key ? 'Stop' : 'Read aloud'}
@@ -360,14 +376,16 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
                     {speaking === key ? <Square size={16} /> : <Volume2 size={19} />}
                   </button>
                 )}
-              </div>
+              </div></div>
             );
           })}
         </div>
         <div ref={endRef} />
+        </div>
       </main>
 
       <div className="shrink-0 border-t border-pc-border bg-pc-base pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto w-full max-w-[760px]">
         {hint && <p className="mx-4 mt-2 text-[13px] text-red-500" role="alert">{hint}</p>}
         {showPreparing && stage.kind === 'preparing' && (
           <div className="px-3 pt-3">
@@ -476,6 +494,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
             draftKey={`wa:${contact.id}`} attach={false} sendLabel="Prepare the message"
             placeholder={stage.kind === 'draft' ? 'Say it differently' : lastTheirs ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
         )}
+        </div>
       </div>
 
       {paste !== null && (
@@ -484,7 +503,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
             <h2 className="text-[17px] font-semibold">{contact.label} wrote</h2>
             <CloseButton onClick={() => setPaste(null)} />
           </div>
-          <p className="mb-2 text-[13px] text-pc-text-muted">Paste their message from email or another app. It is translated here, and your next answer follows it.</p>
+          <p className="mb-2 text-[13px] text-pc-text-muted">Paste their message from email or another app, or messages copied from a WhatsApp chat (both sides: each becomes its own message, at its own time). It is translated here, and your next answer follows it.</p>
           <textarea value={paste} onChange={e => setPaste(e.target.value)} rows={6} autoFocus aria-label="What they wrote"
             className="w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] leading-snug outline-none focus:border-pc-accent" />
           <button type="button" disabled={!paste.trim()} onClick={() => void savePaste()}

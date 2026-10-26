@@ -19,7 +19,7 @@ export interface WaMessage { id: string; from: 'them' | 'me'; text: string; tran
 export type DraftStatus = 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed' | 'expired';
 export interface Draft { id: string; name: string; lang?: string; text: string; back?: string; status: DraftStatus; sent_at?: string; error?: string }
 export interface HistoryEntry { ts: string; kind: 'theirs' | 'mine'; text: string; src?: string }
-export interface AgentProfile { style: string; memory: string; samples: Array<{ name: string; size: number; added: string }>; history: HistoryEntry[] }
+export interface AgentProfile { style: string; memory: string; samples: Array<{ name: string; size: number; added: string }>; history: HistoryEntry[]; translations?: Record<string, string> }
 
 export const LANGS: Array<[string, string]> = [['ro', 'Romanian'], ['fr', 'French'], ['en', 'English'], ['ru', 'Russian'], ['uk', 'Ukrainian'], ['de', 'German'], ['it', 'Italian'], ['es', 'Spanish']];
 export const langName = (code: string) => LANGS.find(l => l[0] === code)?.[1] ?? code.toUpperCase();
