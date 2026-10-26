@@ -3,7 +3,16 @@ import type { CSSProperties } from 'react';
 
 /** The highlighted box's zone name. */
 export const BOX = 'box';
-export const DROP_OUTLINE: CSSProperties = { outline: '2.5px dashed #d48a12', outlineOffset: 3 };
+export const DROP_OUTLINE: CSSProperties = { outline: '2.5px dashed var(--pc-accent)', outlineOffset: 3 };
+
+/** The one highlighted box (my.design 06): a filled tint, a clear border and the glow, in the app's own accent
+ *  (Lucian 2026-10-26: Casa Artlia and Chat must differ, each close to its theme; red is only the overdue label). */
+const acc = (a: number) => `rgba(var(--pc-accent-rgb),${a})`;
+export const BOX_GLOW: Record<'light' | 'dark', CSSProperties> = {
+  light: { background: acc(0.1), border: `1.5px solid ${acc(0.55)}`, boxShadow: `0 0 0 4px ${acc(0.07)}, 0 0 28px 4px ${acc(0.2)}, 0 8px 22px ${acc(0.14)}` },
+  dark: { background: acc(0.17), border: `1.5px solid ${acc(0.6)}`, boxShadow: `0 0 26px ${acc(0.26)}` },
+};
+export const BOX_INK = 'var(--pc-accent-ink)';
 /** Where a lifted row would land: a section, before a row (null = at its end). */
 export interface Over { zone: string; before: string | null }
 

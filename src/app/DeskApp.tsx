@@ -189,7 +189,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const run = (o: typeof ops) => Promise.all(o.map(x => act(x.id, x.action, x.extra)));
     try {
       await run(ops);
-      const label = m.focus === true ? 'Put in Now' : m.focus === false ? 'Taken out of Now' : 'Order changed';
+      if (m.focus === undefined) return;   // a new order needs no Undo (Lucian 2026-10-26)
+      const label = m.focus ? 'Put in Now' : 'Taken out of Now';
       setUndo({ key: Date.now(), label: `${label}: ${short(m.item)}`, undo: () => { void run(back).catch(e => setHint(e instanceof Error ? e.message : 'Could not undo')).finally(() => void refresh()); } });
     } catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }

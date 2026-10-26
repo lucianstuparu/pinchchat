@@ -191,7 +191,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const run = (o: typeof ops) => Promise.all(o.map(x => actOn(x.id, x.action, x.extra)));
     try {
       await run(ops);
-      const label = m.focus === true ? 'Pus în Acum' : m.focus === false ? 'Scos din Acum' : 'Ordine schimbată';
+      if (m.focus === undefined) return;   // a new order needs no Undo (Lucian 2026-10-26)
+      const label = m.focus ? 'Pus în Acum' : 'Scos din Acum';
       setUndo({ key: Date.now(), label: `${label}: ${short(m.item)}`, undo: () => { void run(back).catch(e => setHint(roError(e))).finally(() => void refresh()); } });
     } catch (e) { setHint(roError(e)); }
     finally { void refresh(); }

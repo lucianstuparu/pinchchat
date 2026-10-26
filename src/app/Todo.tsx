@@ -17,7 +17,7 @@ import { Check, ChevronRight, Clock, Flag, Pin, RefreshCw, Repeat, Search, Spark
 import { formatAmount, type Loop, type NowItem } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
-import { BOX, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
+import { BOX, BOX_GLOW, BOX_INK, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { LoopsList } from './LoopsList';
 import { FieldControls, PrimaryButton } from './MicButton';
 import { speechPlaceholder, useSpeech } from './speech';
@@ -136,19 +136,6 @@ function Row({ item, today, mode, onDone, onStar, onOpen, onLift, lifted }: RowP
   );
 }
 
-// ---- the boxes and groups
-// The one highlighted box: a filled tint, a clear border and the glow (my.design 06; the same as Casa Artlia's
-// Acum, Lucian 2026-10-25: "Good colors in artlia todo now. Same with chat to do").
-const GLOW: Record<'red' | 'amber', Record<Mode, CSSProperties>> = {
-  red: {
-    light: { background: '#fde9e7', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 0 4px rgba(220,76,76,0.08), 0 0 28px 4px rgba(220,76,76,0.22), 0 8px 22px rgba(220,76,76,0.16)' },
-    dark: { background: 'rgba(220,76,76,0.18)', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 26px rgba(220,76,76,0.28)' },
-  },
-  amber: {
-    light: { background: '#fff1dc', border: '1.5px solid rgba(212,138,18,0.6)', boxShadow: '0 0 0 4px rgba(245,166,35,0.08), 0 0 28px 4px rgba(245,166,35,0.24), 0 8px 22px rgba(245,166,35,0.16)' },
-    dark: { background: 'rgba(245,166,35,0.17)', border: '1.5px solid rgba(245,166,35,0.6)', boxShadow: '0 0 26px rgba(245,166,35,0.24)' },
-  },
-};
 
 function GroupHead({ dot, mark, label, count, color }: { dot?: string; mark?: ReactNode; label: string; count: number; color?: string }) {
   return (
@@ -188,10 +175,10 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen, onMove }
   return (
     <div className="space-y-5">
       {(g.due.length > 0 || drag) && (
-        <section data-zone={BOX} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={{ ...GLOW[red ? 'red' : 'amber'][mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
-          <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Now" count={g.due.length} color={red ? '#dc4c4c' : '#b8740c'} />
+        <section data-zone={BOX} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5" style={{ ...BOX_GLOW[mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
+          <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Now" count={g.due.length} color={red ? '#dc4c4c' : BOX_INK} />
           {rows(BOX, g.due)}
-          {g.due.length === 0 && <p className="px-3 py-6 text-center text-[15px] font-medium text-[#b8740c]">Drop here what you do now</p>}
+          {g.due.length === 0 && <p className="px-3 py-6 text-center text-[15px] font-medium" style={{ color: BOX_INK }}>Drop here what you do now</p>}
         </section>
       )}
       {g.priority.length > 0 && (

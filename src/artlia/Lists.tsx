@@ -4,14 +4,14 @@
  * a category opens its items by phase). Rows are oc's task row (my.design patterns/task-row.md):
  * tick, number in the category's colour, title with the key name bold, due chip and category pill.
  */
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Flag, HelpCircle, Pin, Search, Star, X } from 'lucide-react';
 import { DueChip, Title } from '../app/Todo';
 import { dueChip } from '../app/todoRules';
 import type { ArtItem, Category } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
-import { BOX, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
+import { BOX, BOX_GLOW, BOX_INK, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { catStats, groupNow, isOpen, matchesArt, plan, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
 
 type Mode = 'light' | 'dark';
@@ -99,18 +99,6 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
   );
 }
 
-// The one highlighted box on Acum: a filled tint, a clear border and the glow (my.design 06), so it never reads
-// as part of the plain lists below (Lucian 2026-10-25: "pare o singură listă").
-const GLOW: Record<'red' | 'amber', Record<Mode, CSSProperties>> = {
-  red: {
-    light: { background: '#fde9e7', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 0 4px rgba(220,76,76,0.08), 0 0 28px 4px rgba(220,76,76,0.22), 0 8px 22px rgba(220,76,76,0.16)' },
-    dark: { background: 'rgba(220,76,76,0.18)', border: '1.5px solid rgba(220,76,76,0.6)', boxShadow: '0 0 26px rgba(220,76,76,0.28)' },
-  },
-  amber: {
-    light: { background: '#fff1dc', border: '1.5px solid rgba(212,138,18,0.6)', boxShadow: '0 0 0 4px rgba(245,166,35,0.08), 0 0 28px 4px rgba(245,166,35,0.24), 0 8px 22px rgba(245,166,35,0.16)' },
-    dark: { background: 'rgba(245,166,35,0.17)', border: '1.5px solid rgba(245,166,35,0.6)', boxShadow: '0 0 26px rgba(245,166,35,0.24)' },
-  },
-};
 export function GroupHead({ mark, label, count, color, sub }: { mark?: ReactNode; label: string; count?: number; color?: string; sub?: string }) {
   return (
     <h3 className="flex items-center gap-2 px-2 pb-0.5 pt-1 text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: color ?? 'var(--pc-text-secondary)' }}>
@@ -154,11 +142,11 @@ export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: Li
     <div className="space-y-6">
       {(hot || drag) && (
         <section data-zone={BOX} className="rounded-[20px] px-1.5 pb-1.5 pt-2.5"
-          style={{ ...GLOW[g.overdue.length ? 'red' : 'amber'][mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
+          style={{ ...BOX_GLOW[mode], ...(drag?.over?.zone === BOX ? DROP_OUTLINE : null) }}>
           {g.overdue.length > 0 && <GroupHead mark={<Flag size={13} strokeWidth={2.75} fill="currentColor" aria-hidden />} label="Întârziate" count={g.overdue.length} color="#dc4c4c" />}
-          {g.overdue.length === 0 && <GroupHead label="Acum" count={box.length} color="#b8740c" sub="azi – poimâine și ce pui tu aici" />}
+          {g.overdue.length === 0 && <GroupHead label="Acum" count={box.length} color={BOX_INK} sub="azi – poimâine și ce pui tu aici" />}
           {rows(BOX, box)}
-          {!hot && <p className="px-3 py-6 text-center text-[15px] font-medium text-[#b8740c]">Lasă aici ce faci acum</p>}
+          {!hot && <p className="px-3 py-6 text-center text-[15px] font-medium" style={{ color: BOX_INK }}>Lasă aici ce faci acum</p>}
         </section>
       )}
       {plain('week', <GroupHead label="Săptămâna asta" count={g.week.length} />, g.week)}
