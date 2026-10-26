@@ -6,16 +6,20 @@
  * yours, may hear it, change it or drop it. WhatsApp: Send, which waits 5 s with Undo (a sent message
  * cannot be taken back). Other channels: Copy or Share, and you paste it where they read.
  * After a message goes, the agent keeps the exchange and updates its memory.
+ *
+ * Said by voice (Lucian 2026-10-26: "from the car without looking too much at the phone"): the message is
+ * read back aloud (to whom, the message, what it means) and the card turns into big buttons, Send the
+ * biggest, at the bottom. Opened by holding a face, the mic starts at once and stops when you pause.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ClipboardPaste, Copy, Pencil, RotateCcw, Send, Share2, Square, Trash2, Volume2 } from 'lucide-react';
+import { ChevronLeft, ClipboardPaste, Copy, Mic, Pencil, RotateCcw, Send, Share2, Square, Trash2, Volume2 } from 'lucide-react';
 import { Composer, type ComposerPrefill } from '../mobile/Composer';
 import { post, transcribeAudio } from '../app/api';
 import { IconButton } from '../ui/Controls';
 import { ProgressRow } from '../ui/ProgressRow';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { useBusy } from '../ui/draft';
-import { canSpeak, speak } from '../ui/speak';
+import { canSpeak, speak, speakParts } from '../ui/speak';
 import { useDelayedFlag } from '../ui/progress';
 import { Face } from './Face';
 import {
@@ -31,14 +35,16 @@ const isLocal = (d: Draft) => d.id.startsWith('local-');
 
 type Stage =
   | { kind: 'idle' }
-  | { kind: 'preparing'; said: string }
-  | { kind: 'failed'; said: string; error: string }
-  | { kind: 'draft'; draft: Draft; said?: string; error?: string }
-  | { kind: 'sending'; draft: Draft; said?: string }
-  | { kind: 'sent'; draft: Draft; how: string };
+  | { kind: 'preparing'; said: string; voice?: boolean }
+  | { kind: 'failed'; said: string; error: string; voice?: boolean }
+  | { kind: 'draft'; draft: Draft; said?: string; error?: string; voice?: boolean }
+  | { kind: 'sending'; draft: Draft; said?: string; voice?: boolean }
+  | { kind: 'sent'; draft: Draft; how: string; voice?: boolean };
 
-export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
+export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile, onSent }: {
   contact: Contact; waOwner: boolean;
+  /** Opened by holding their face: the mic listens at once, hands-free. */
+  startVoice?: boolean;
   /** Text pasted in Translate and answered from there: it opens as "they wrote". */
   replyTo?: string | null;
   onBack: () => void; onProfile: () => void; onSent: () => void;
@@ -53,7 +59,8 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
     if (saved?.startsWith('{')) { try { return { kind: 'draft', draft: JSON.parse(saved) as Draft }; } catch { /* broken: dropped */ } }
     return { kind: 'idle' };
   });
-  const [prefill, setPrefill] = useState<ComposerPrefill | null>(null);
+  const [prefill, setPrefill] = useState<ComposerPrefill | null>(() => (startVoice ? { nonce: Date.now(), text: '', attachments: [], dictate: true } : null));
+  const [handsFree, setHandsFree] = useState(!!startVoice);
   const [edit, setEdit] = useState<string | null>(null);
   const [paste, setPaste] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState<string | null>(null);
@@ -128,17 +135,33 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
   };
 
   // ---- what you said -> the message in their language, by their agent
-  const prepare = async (said: string) => {
+  // Read back aloud: to whom (in my language), the message (in theirs), what it means (in mine).
+  const readBack = (d: Draft) => {
+    stopSpeech.current?.();
+    setSpeaking('draft');
+    const lang = d.lang ?? contact.lang;
+    stopSpeech.current = speakParts([
+      { text: `Pentru ${contact.label}:`, lang: MY_LANG },
+      { text: d.text, lang },
+      ...(lang !== MY_LANG && d.back ? [{ text: `Adică: ${d.back}`, lang: MY_LANG }] : []),
+    ], () => setSpeaking(s => (s === 'draft' ? null : s)));
+  };
+  const sayAgain = () => { setHandsFree(true); setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate: true }); };
+
+  const prepare = async (said: string, voice = false) => {
     if (stage.kind === 'draft' && !isLocal(stage.draft)) void act(stage.draft.id, 'cancel').catch(() => undefined);   // a new message replaces the old draft
-    setStage({ kind: 'preparing', said });
+    setStage({ kind: 'preparing', said, voice });
     try {
       const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined);
       const d: Draft = wa ? await waDraft(contact.id, w.text, w.back)
         : { id: `local-${Date.now()}`, name: contact.name, lang: contact.lang, text: w.text, back: w.back, status: 'draft' };
       keepDraft(d);
-      setStage({ kind: 'draft', draft: d, said });
+      setStage({ kind: 'draft', draft: d, said, voice });
+      if (voice) readBack(d);
     } catch (e) {
-      setStage({ kind: 'failed', said, error: navigator.onLine ? (e instanceof Error ? e.message : 'Could not write it') : 'No connection' });
+      const error = navigator.onLine ? (e instanceof Error ? e.message : 'Could not write it') : 'No connection';
+      setStage({ kind: 'failed', said, error, voice });
+      if (voice) speak(['Nu am reușit să scriu mesajul.'], MY_LANG);
     }
   };
   const putBack = (said: string) => { setStage({ kind: 'idle' }); setPrefill({ nonce: Date.now(), text: said.trim(), attachments: [] }); };
@@ -155,9 +178,10 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
     try { const n = await act(d.id, 'edit', t); setStage({ kind: 'draft', draft: { ...n, id: d.id }, said }); setEdit(null); }
     catch (e) { setStage({ kind: 'draft', draft: d, said, error: e instanceof Error ? e.message : 'Could not change it' }); }
   };
-  const done = (d: Draft, how: string, said?: string) => {
+  const done = (d: Draft, how: string, said?: string, voice?: boolean) => {
     keepDraft(null);
-    setStage({ kind: 'sent', draft: d, how });
+    setStage({ kind: 'sent', draft: d, how, voice });
+    if (voice) speak([wa ? 'Trimis.' : 'Copiat.'], MY_LANG);
     void learn(contact, d.text, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined).then(load).catch(() => undefined);
     onSent();
   };
@@ -172,32 +196,33 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
     timer.current = ticker.current = null;
   };
   useEffect(() => stopTimers, []);   // leaving the screen keeps it a draft
-  const send = (d: Draft, said?: string) => {
+  const send = (d: Draft, said?: string, voice?: boolean) => {
     stopSpeech.current?.();
-    setStage({ kind: 'sending', draft: d, said });
+    setStage({ kind: 'sending', draft: d, said, voice });
     setLeft(SEND_DELAY / 1000);
     ticker.current = window.setInterval(() => setLeft(n => Math.max(1, n - 1)), 1000);
     timer.current = window.setTimeout(async () => {
       stopTimers();
       try {
         const r = await act(d.id, 'send');
-        if (r.status === 'sent') { done({ ...r, id: d.id }, `Sent ${timeOf(r.sent_at ?? new Date().toISOString())}`, said); void load(); }
-        else setStage({ kind: 'draft', draft: { ...r, id: d.id }, said, error: r.error || 'Not sent' });
+        if (r.status === 'sent') { done({ ...r, id: d.id }, `Sent ${timeOf(r.sent_at ?? new Date().toISOString())}`, said, voice); void load(); }
+        else { setStage({ kind: 'draft', draft: { ...r, id: d.id }, said, voice, error: r.error || 'Not sent' }); if (voice) speak(['Nu s-a trimis.'], MY_LANG); }
       } catch (e) {
         // The send may have gone through and only the answer got lost (the phone changed network, 2026-10-25): ask
         // the server before saying it failed. A second Send of a sent draft is refused there anyway.
         const now = await post<{ drafts: Record<string, Draft> }>('/reg/wa/status', { ids: [d.id] }).then(r => r.drafts?.[d.id]).catch(() => undefined);
-        if (now?.status === 'sent') { done({ ...now, id: d.id }, `Sent ${timeOf(now.sent_at ?? new Date().toISOString())}`, said); void load(); return; }
-        setStage({ kind: 'draft', draft: d, said, error: navigator.onLine ? (e instanceof Error ? e.message : 'Not sent') : 'No connection: not sent' });
+        if (now?.status === 'sent') { done({ ...now, id: d.id }, `Sent ${timeOf(now.sent_at ?? new Date().toISOString())}`, said, voice); void load(); return; }
+        setStage({ kind: 'draft', draft: d, said, voice, error: navigator.onLine ? (e instanceof Error ? e.message : 'Not sent') : 'No connection: not sent' });
+        if (voice) speak(['Nu s-a trimis.'], MY_LANG);
       }
     }, SEND_DELAY);
   };
-  const undoSend = (d: Draft, said?: string) => { stopTimers(); setStage({ kind: 'draft', draft: d, said }); };
+  const undoSend = (d: Draft, said?: string, voice?: boolean) => { stopTimers(); setStage({ kind: 'draft', draft: d, said, voice }); };
 
   // ---- other channels: Copy or Share, then paste it where they read
   const where = contact.channel === 'email' ? 'your email' : contact.channel === 'sms' ? 'Messages' : contact.channel === 'whatsapp' ? 'WhatsApp' : 'the app you use with them';
   const copy = async (d: Draft, said?: string) => {
-    try { await navigator.clipboard.writeText(d.text); done(d, `Copied · paste it in ${where}`, said); }
+    try { await navigator.clipboard.writeText(d.text); done(d, `Copied · paste it in ${where}`, said, stage.kind === 'draft' && stage.voice); }
     catch { setHint('Could not copy: select the text and copy it'); }
   };
   const share = async (d: Draft, said?: string) => {
@@ -225,6 +250,9 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
   const toneWord = contact.tone === 'formal' ? 'formal' : 'informal';
   const draft = stage.kind === 'draft' || stage.kind === 'sending' || stage.kind === 'sent' ? stage.draft : null;
   const said = stage.kind === 'draft' || stage.kind === 'sending' ? stage.said : undefined;
+  // Said by voice: big buttons, Send the biggest and last, for a glance from the car.
+  const big = (stage.kind === 'draft' || stage.kind === 'sending') && !!stage.voice && edit === null;
+  const voiceOf = stage.kind === 'draft' || stage.kind === 'sending' ? stage.voice : undefined;
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
@@ -317,12 +345,32 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
               <textarea value={edit} onChange={e => setEdit(e.target.value)} rows={4} autoFocus aria-label="Message text"
                 className="mt-1.5 w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[17px] leading-snug outline-none focus:border-pc-accent" />
             ) : (
-              <p className="mt-1 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap text-[19px] font-medium leading-snug">{draft.text}</p>
+              <p className={`mt-1 overflow-y-auto whitespace-pre-wrap font-medium leading-snug ${big ? 'max-h-[22dvh] text-[17px]' : 'max-h-[40dvh] text-[19px]'}`}>{draft.text}</p>
             )}
             {draft.back && edit === null && <p className="mt-1.5 text-[15px] leading-snug text-pc-text-muted">Means: “{draft.back}”</p>}
             {stage.kind === 'draft' && stage.error && <p className="mt-1.5 text-[13px] text-red-500" role="alert">{stage.error}</p>}
 
-            {stage.kind === 'draft' && (edit !== null ? (
+            {stage.kind === 'draft' && big && (
+              <div className="mt-3">
+                <div className="grid grid-cols-4 gap-2">
+                  <button type="button" onClick={() => { stopSpeech.current?.(); discard(stage.draft); }} aria-label="Drop this message" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-pc-text-muted"><Trash2 size={22} /></button>
+                  <button type="button" onClick={() => setEdit(stage.draft.text)} aria-label="Change the text" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface"><Pencil size={22} /></button>
+                  <button type="button" onClick={() => (speaking === 'draft' ? stopSpeech.current?.() : readBack(stage.draft))} aria-label={speaking === 'draft' ? 'Stop' : 'Hear it again'}
+                    className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface">{speaking === 'draft' ? <Square size={20} /> : <Volume2 size={24} />}</button>
+                  <button type="button" onClick={() => { stopSpeech.current?.(); discard(stage.draft); sayAgain(); }} aria-label="Say it again" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-[var(--pc-accent-ink)]"><Mic size={24} /></button>
+                </div>
+                {wa ? (
+                  <button type="button" onClick={() => send(stage.draft, said, true)} className="press mt-3 flex h-[88px] w-full items-center justify-center gap-3 rounded-[24px] bg-pc-accent text-[24px] font-bold text-[var(--pc-on-accent)]">
+                    <Send size={28} /> Send
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => void copy(stage.draft, said)} className="press mt-3 flex h-[88px] w-full items-center justify-center gap-3 rounded-[24px] bg-pc-accent text-[24px] font-bold text-[var(--pc-on-accent)]">
+                    <Copy size={28} /> Copy
+                  </button>
+                )}
+              </div>
+            )}
+            {stage.kind === 'draft' && !big && (edit !== null ? (
               <div className="mt-3 flex gap-2">
                 <button type="button" onClick={() => setEdit(null)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px]">Cancel</button>
                 <button type="button" disabled={!edit.trim()} onClick={() => void saveEdit(stage.draft, said)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px] font-semibold text-[var(--pc-accent-ink)] disabled:opacity-50">Done</button>
@@ -336,7 +384,7 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
                     className="press flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-pc-surface">{speaking === 'draft' ? <Square size={17} /> : <Volume2 size={20} />}</button>
                 )}
                 {wa ? (
-                  <button type="button" onClick={() => send(stage.draft, said)} className="press flex h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)]">
+                  <button type="button" onClick={() => send(stage.draft, said, voiceOf)} className="press flex h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)]">
                     <Send size={19} /> Send
                   </button>
                 ) : (
@@ -349,7 +397,13 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
                 )}
               </div>
             ))}
-            {stage.kind === 'sending' && (
+            {stage.kind === 'sending' && big && (
+              <button type="button" onClick={() => undoSend(stage.draft, stage.said, true)} className="press mt-3 flex h-[88px] w-full flex-col items-center justify-center rounded-[24px] bg-pc-surface text-[var(--pc-accent-ink)]">
+                <span className="text-[24px] font-bold">Undo</span>
+                <span className="text-[15px] font-medium text-pc-text-muted">Sending in {left} s</span>
+              </button>
+            )}
+            {stage.kind === 'sending' && !big && (
               <div className="mt-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold">Sending in {left} s…</p>
@@ -358,14 +412,14 @@ export function Line({ contact, waOwner, replyTo, onBack, onProfile, onSent }: {
                     <div className="h-full rounded-[2px] bg-pc-accent" style={{ animation: `wa-fill ${SEND_DELAY}ms linear forwards` }} />
                   </div>
                 </div>
-                <button type="button" onClick={() => undoSend(stage.draft, stage.said)} className="press h-14 shrink-0 rounded-full bg-pc-surface px-6 text-[17px] font-semibold text-[var(--pc-accent-ink)]">Undo</button>
+                <button type="button" onClick={() => undoSend(stage.draft, stage.said, stage.voice)} className="press h-14 shrink-0 rounded-full bg-pc-surface px-6 text-[17px] font-semibold text-[var(--pc-accent-ink)]">Undo</button>
               </div>
             )}
             {stage.kind === 'sent' && <p className="mt-2 text-[15px] font-semibold text-[var(--pc-accent-ink)]" role="status">{stage.how}</p>}
           </section>
         )}
-        {stage.kind !== 'sending' && edit === null && (
-          <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={text => void prepare(text)} voice transcribe={transcribeAudio}
+        {stage.kind !== 'sending' && edit === null && !big && (
+          <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={(text, _a, meta) => void prepare(text, !!meta?.voice)} voice transcribe={transcribeAudio} handsFree={handsFree}
             draftKey={`wa:${contact.id}`} attach={false} sendLabel="Prepare the message"
             placeholder={stage.kind === 'draft' ? 'Say it differently' : lastTheirs ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
         )}

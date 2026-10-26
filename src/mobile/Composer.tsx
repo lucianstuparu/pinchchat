@@ -36,7 +36,8 @@ export interface ComposerPrefill {
 }
 
 interface Props {
-  onSend: (text: string, attachments: OutgoingAttachment[]) => void;
+  /** `voice`: the words came from the mic (Relay reads its message back then). */
+  onSend: (text: string, attachments: OutgoingAttachment[], meta?: { voice: boolean }) => void;
   /**
    * Initial content (share import, retry). The parent remounts the composer with
    * key={prefill.nonce} so each injection starts from a clean state.
@@ -62,13 +63,19 @@ interface Props {
   attach?: boolean;
   /** What the arrow does, for screen readers ("Send"; the WhatsApp app: "Prepare the message"). */
   sendLabel?: string;
+  /**
+   * Hands-free (Relay, a held face; Lucian 2026-10-26: "from the car without looking at the phone"): the
+   * mic stops after a pause and what was said goes on by itself. In Relay that prepares the message, which
+   * is read back; only the Send tap sends it.
+   */
+  handsFree?: boolean;
 }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const noTranscriber = () => Promise.reject(new Error('no transcriber'));
 
-export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, transcribe, placeholder = L('Message'), draftKey = 'chat', attach = true, sendLabel }: Props) {
+export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onReplyCancel, voice, transcribe, placeholder = L('Message'), draftKey = 'chat', attach = true, sendLabel, handsFree }: Props) {
   // The draft comes back after a reload; shared or retried content replaces it.
   const [text, setText] = useDraft(draftKey, prefill?.text ? prefill.text + '\n' : undefined);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(() => prefill?.attachments ?? []);
@@ -94,7 +101,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [plusOpen, setPlusOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const speech = useSpeech(text, setText, transcribe ?? noTranscriber);
+  const speech = useSpeech(text, setText, transcribe ?? noTranscriber, { autoStop: handsFree });
+  const byVoice = useRef(false);
+  useEffect(() => { if (speech.listening) byVoice.current = true; }, [speech.listening]);
 
   // ---- a voice message: audio sent as is (the + menu)
   const [vm, setVm] = useState<'idle' | 'starting' | 'recording' | 'writing'>('idle');
@@ -170,7 +179,8 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     speech.cancel();
     const body = text.trim();
     const said = intent ? `${intent.prefix}${body}` : body;
-    onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${said}` : said, attachments);
+    onSend(replyTo ? `${quoteForReply(replyTo.text)}\n\n${said}` : said, attachments, { voice: byVoice.current });
+    byVoice.current = false;
     setText('');
     setIntent(null);
     setAttachments([]);
@@ -178,7 +188,15 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     onHintDismiss?.();
     onReplyCancel?.();
   };
-  const clear = () => { speech.cancel(); setText(''); setError(null); taRef.current?.focus(); };
+  const clear = () => { speech.cancel(); byVoice.current = false; setText(''); setError(null); taRef.current?.focus(); };
+  // Hands-free: the mic has stopped and written something: it goes on as if Send (here: Prepare) was tapped.
+  const wasHearing = useRef(false);
+  useEffect(() => {
+    const now = speech.listening || speech.state === 'writing';
+    if (wasHearing.current && !now && handsFree && text.trim() && !speech.error) send();
+    wasHearing.current = now;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- on the mic's state only
+  }, [speech.listening, speech.state]);
 
   const addFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;

@@ -9,21 +9,27 @@ export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis'
 
 /** Speak the texts one after the other; returns a stop function. `onEnd` runs when all are done or stopped. */
 export function speak(texts: string[], lang = 'ro', onEnd?: () => void): () => void {
+  return speakParts(texts.map(text => ({ text, lang })), onEnd);
+}
+
+/** The same with a language per part: Relay's read-back says "To Fleur" in Romanian, the message in French. */
+export function speakParts(list: Array<{ text: string; lang: string }>, onEnd?: () => void): () => void {
   if (!canSpeak()) { onEnd?.(); return () => undefined; }
   const synth = window.speechSynthesis;
   synth.cancel();
-  const locale = LOCALE[lang] ?? lang;
-  const voice = synth.getVoices().find(v => v.lang === locale) ?? synth.getVoices().find(v => v.lang.startsWith(lang));
-  const parts = texts.map(t => t.replace(/\*\*/g, '').trim()).filter(Boolean);
+  const parts = list.map(p => ({ ...p, text: p.text.replace(/\*\*/g, '').trim() })).filter(p => p.text);
   if (parts.length === 0) { onEnd?.(); return () => undefined; }
-  let left = parts.length;
-  for (const t of parts) {
-    const u = new SpeechSynthesisUtterance(t);
+  let left = parts.length, ended = false;
+  const finish = () => { if (!ended) { ended = true; onEnd?.(); } };
+  for (const p of parts) {
+    const locale = LOCALE[p.lang] ?? p.lang;
+    const voice = synth.getVoices().find(v => v.lang === locale) ?? synth.getVoices().find(v => v.lang.startsWith(p.lang));
+    const u = new SpeechSynthesisUtterance(p.text);
     u.lang = locale;
     if (voice) u.voice = voice;
     u.rate = 0.95;
-    u.onend = u.onerror = () => { if (--left === 0) onEnd?.(); };
+    u.onend = u.onerror = () => { if (--left === 0) finish(); };
     synth.speak(u);
   }
-  return () => { synth.cancel(); onEnd?.(); };
+  return () => { synth.cancel(); finish(); };
 }

@@ -7,7 +7,7 @@
  * same contacts and drafts on CT 103), with its own look: the call green, dark text on it.
  * No gateway login: register-api knows the person from Cloudflare Access.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Languages, Plus, Volume2 } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SessionExpired, whoami } from '../app/api';
@@ -16,6 +16,7 @@ import { AppHeader, Segmented } from '../ui/Controls';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
+import { useLift } from '../ui/dragOrder';
 import { Face } from './Face';
 import { Line } from './Line';
 import { Profile } from './Profile';
@@ -68,6 +69,9 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
 
   // ?c=<contact id> (a notification, or oc's WhatsApp button) opens that person's line.
   const [open, setOpen] = useState<string | null>(() => new URLSearchParams(window.location.search).get('c'));
+  // Opened by holding a face: that line starts with the mic listening (hands-free).
+  const [voiceFor, setVoiceFor] = useState<string | null>(null);
+  const speakTo = (c: Contact) => { setVoiceFor(c.id); setOpen(c.id); };
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has('c')) return;
     const url = new URL(window.location.href); url.searchParams.delete('c');
@@ -98,12 +102,14 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
 
   if (current) {
     return <>{<Line key={current.id} contact={current} waOwner={waOwner} replyTo={replyTo?.contact === current.id ? replyTo.text : null}
-      onBack={() => { setOpen(null); setReplyTo(null); }} onProfile={() => setProfile(current)} onSent={() => void refresh()} />}{sheets}</>;
+      startVoice={voiceFor === current.id}
+      onBack={() => { setOpen(null); setReplyTo(null); setVoiceFor(null); }} onProfile={() => setProfile(current)} onSent={() => void refresh()} />}{sheets}</>;
   }
 
   const people = contacts ?? [];
   const unread = people.filter(c => (c.unread ?? 0) > 0 && c.last_in).sort((a, b) => (b.last_in?.ts ?? '').localeCompare(a.last_in?.ts ?? ''));
   const name = person ? person[0].toUpperCase() + person.slice(1) : '';
+  const ready = (c: Contact) => !!c.phone || c.channel !== 'whatsapp' || !waOwner;
 
   return (
     <div className="flex h-dvh flex-col">
@@ -130,13 +136,13 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
             <h2 className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">New</h2>
             <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[20px] bg-pc-surface">
               {unread.map(c => (
-                <button key={c.id} type="button" onClick={() => setOpen(c.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[var(--pc-hover-strong)]">
+                <Hold key={c.id} onTap={() => setOpen(c.id)} onHold={() => speakTo(c)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[var(--pc-hover-strong)]">
                   <Face contact={c} size={48} ring />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2"><span className="truncate text-[17px] font-semibold">{c.label}</span><span className="ml-auto shrink-0 text-[12px] text-pc-text-muted">{timeOf(c.last_in!.ts)}</span></span>
                     <span className="line-clamp-2 text-[15px] leading-snug text-pc-text-secondary">{c.last_in!.text}</span>
                   </span>
-                </button>
+                </Hold>
               ))}
             </div>
           </section>
@@ -153,14 +159,14 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
           )}
           <div className="grid grid-cols-3 gap-x-2 gap-y-4">
             {people.map(c => (
-              <button key={c.id} type="button" onClick={() => (c.phone || c.channel !== 'whatsapp' || !waOwner ? setOpen(c.id) : setProfile(c))}
+              <Hold key={c.id} onTap={() => (ready(c) ? setOpen(c.id) : setProfile(c))} onHold={() => (ready(c) ? speakTo(c) : setProfile(c))}
                 className="press flex min-w-0 flex-col items-center gap-1.5 rounded-[20px] px-1 pb-2 pt-3 active:bg-[var(--pc-hover-strong)]">
                 <Face contact={c} size={72} ring />
                 <span className="mt-1 max-w-full truncate text-[16px] font-semibold">{c.label}</span>
                 <span className="max-w-full truncate text-[12px] text-pc-text-muted">
                   {c.channel === 'whatsapp' && waOwner && !c.phone ? 'No number yet' : `${langName(c.lang)}${c.channel !== 'whatsapp' ? ` · ${channelName(c.channel)}` : ''}`}
                 </span>
-              </button>
+              </Hold>
             ))}
             {contacts && (
               <button type="button" onClick={() => setProfile({ lang: 'fr', tone: 'formal', aliases: [] })}
@@ -174,12 +180,25 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
         {people.length > 0 && (
           <p className="mt-8 flex items-start gap-2 px-2 text-[13px] text-pc-text-muted">
             <Volume2 size={15} className="mt-0.5 shrink-0" />
-            Tap a person, say what to tell them in any language, check it in theirs, then Send (WhatsApp) or Copy. Nothing leaves without your tap.
+            Tap a person, say what to tell them in any language, check it in theirs, then Send (WhatsApp) or Copy. Hold a face to speak at once: the mic stops when you pause and you hear the message before you Send. Nothing leaves without your tap.
           </p>
         )}
       </main>
       {sheets}
     </div>
+  );
+}
+
+/** A face: a tap opens the line, holding it (0.4 s, a buzz) opens it with the mic listening. */
+function Hold({ onTap, onHold, className, children }: { onTap: () => void; onHold: () => void; className: string; children: ReactNode }) {
+  const hold = useLift(() => onHold());
+  return (
+    <button type="button" onClick={onTap} className={`select-none [-webkit-touch-callout:none] ${className}`} {...hold.mouse}
+      onTouchStart={e => hold.touchStart(e.touches[0].clientX, e.touches[0].clientY)}
+      onTouchMove={e => hold.touchMove(e.touches[0].clientX, e.touches[0].clientY)}
+      onTouchEnd={e => hold.touchEnd(e)}>
+      {children}
+    </button>
   );
 }
 

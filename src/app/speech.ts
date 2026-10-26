@@ -31,7 +31,9 @@ export interface Speech {
 
 /** `text` is the box as it is now (Live writes after it); `setText` receives an updater. */
 export function useSpeech(text: string, setText: (f: (prev: string) => string) => void,
-  transcribe: (audio: OutgoingAttachment) => Promise<string>): Speech {
+  transcribe: (audio: OutgoingAttachment) => Promise<string>,
+  /** Hands-free (Relay, held face): the mic stops by itself after a pause in speech. */
+  opts: { autoStop?: boolean } = {}): Speech {
   const textNow = useRef(text);
   useEffect(() => { textNow.current = text; }, [text]);
   const [state, setState] = useState<MicState>('idle');
@@ -43,6 +45,9 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
   const dict = useRef<Dictation | null>(null);
   const round = useRef(0);   // bumped on send/clear, so late text is dropped
   const live = getSpeechMode() === 'live' && canDictate();
+  // Hands-free: when speech was heard and then nothing new for PAUSE_MS, the mic stops as if tapped.
+  const spoke = useRef<{ any: boolean; last: number }>({ any: false, last: 0 });
+  const heardNow = () => { spoke.current = { any: true, last: Date.now() }; };
 
   const cancel = () => {
     round.current++;
@@ -58,7 +63,8 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
       const mine = ++round.current;
       const now = textNow.current;
       const base = now.trim() ? now.replace(/\s*$/, ' ') : '';
-      const d = dictate(getDictationLang(), t => { if (round.current === mine) setText(() => base + t); }, err => {
+      spoke.current = { any: false, last: Date.now() };
+      const d = dictate(getDictationLang(), t => { if (round.current === mine) { heardNow(); setText(() => base + t); } }, err => {
         if (round.current !== mine) return;
         dict.current = null; setState('idle');
         if (err === 'not-allowed') setError(L('Microphone blocked: allow it for this app in Chrome’s site settings.'));
@@ -69,6 +75,7 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     }
     if (state === 'idle') {
       setState('starting');
+      spoke.current = { any: false, last: Date.now() };
       try { rec.current = await record(); setSecs(0); setState('recording'); }
       catch { setState('idle'); setError(L('Microphone not available: allow it for this app in Chrome’s site settings.')); }
       return;
@@ -100,8 +107,10 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     const t = window.setInterval(() => setSecs(n => n + 1), 1000);
     const m = window.setInterval(() => {
       const r = rec.current; if (!r) return;
-      setLevel(r.level());
+      const lv = r.level();
+      setLevel(lv);
       setHeard(r.peak() >= SILENT);
+      if (lv > Math.max(SILENT * 2, r.peak() * 0.25)) heardNow();   // relative, so road noise is not speech
     }, 120);
     return () => { window.clearInterval(t); window.clearInterval(m); setLevel(0); setHeard(true); };
   }, [state]);
@@ -112,6 +121,16 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
     return () => window.clearInterval(t);
   }, [state]);
   useEffect(() => () => { void rec.current?.stop(); dict.current?.abort(); }, []);
+  const toggleNow = useRef(toggle);
+  useEffect(() => { toggleNow.current = toggle; });
+  useEffect(() => {
+    if (!opts.autoStop || (state !== 'live' && state !== 'recording')) return;
+    const t = window.setInterval(() => {
+      const s = spoke.current;
+      if (s.any && Date.now() - s.last > PAUSE_MS) { window.clearInterval(t); void toggleNow.current(); }
+    }, 200);
+    return () => window.clearInterval(t);
+  }, [state, opts.autoStop]);
 
   return {
     state, listening: state === 'live' || state === 'recording' || state === 'starting',
@@ -120,6 +139,7 @@ export function useSpeech(text: string, setText: (f: (prev: string) => string) =
   };
 }
 
+const PAUSE_MS = 1800;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** The text box's placeholder while the mic works; `idle` when it does not. */
