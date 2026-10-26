@@ -151,6 +151,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
   const prepare = async (said: string, voice = false) => {
     if (stage.kind === 'draft' && !isLocal(stage.draft)) void act(stage.draft.id, 'cancel').catch(() => undefined);   // a new message replaces the old draft
     setStage({ kind: 'preparing', said, voice });
+    setPrefill(p => (p?.dictate ? null : p));   // the mic's start was used: the box must not listen again when it comes back after Send
     try {
       const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined);
       const d: Draft = wa ? await waDraft(contact.id, w.text, w.back)
