@@ -152,6 +152,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
     if (stage.kind === 'draft' && !isLocal(stage.draft)) void act(stage.draft.id, 'cancel').catch(() => undefined);   // a new message replaces the old draft
     setStage({ kind: 'preparing', said, voice });
     setPrefill(p => (p?.dictate ? null : p));   // the mic's start was used: the box must not listen again when it comes back after Send
+    keep(`draft:wa:${contact.id}`, null);   // and the words are used: the box comes back empty (Lucian 2026-10-26: "după send trebuie șters și textbox-ul")
     try {
       const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined);
       const d: Draft = wa ? await waDraft(contact.id, w.text, w.back)
