@@ -11,7 +11,7 @@ import { dueChip } from '../app/todoRules';
 import type { ArtItem, Category } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
-import { BOX, BOX_GLOW, BOX_INK, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
+import { BOX, BOX_GLOW, BOX_INK, byRank, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { catStats, groupNow, isOpen, matchesArt, plan, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
 
 type Mode = 'light' | 'dark';
@@ -115,7 +115,7 @@ type ListProps = { items: ArtItem[]; today: string; mode: Mode; cats: Category[]
 // ---- Acum
 export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: ListProps & { onMove?: (m: Move<ArtItem>) => void }) {
   const g = groupNow(items, today);
-  const box = [...g.overdue, ...g.now];
+  const box = [...g.overdue, ...g.now].sort(byRank);   // one list: a dragged order wins over overdue-first
   const zones: Record<string, ArtItem[]> = { [BOX]: box, week: g.week, priority: g.priority, soon: g.soon, check: g.check };
   const { drag, lift } = useDragDrop<ArtItem>((item, from, over) => {
     const m = moveFor(item, from, over, z => (zones[z] ?? []).map(i => i.id));
