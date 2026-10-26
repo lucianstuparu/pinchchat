@@ -9,7 +9,8 @@
  *
  * Said by voice (Lucian 2026-10-26: "from the car without looking too much at the phone"): the message is
  * read back aloud (to whom, the message, what it means) and the card turns into big buttons, Send the
- * biggest, at the bottom. Opened by holding a face, the mic starts at once and stops when you pause.
+ * biggest, at the bottom. Every time the mic stops (a tap, or a pause) the words go on by themselves (Lucian
+ * 2026-10-26: "it didn't read back automatically when I clicked stop recording"); holding a face starts the mic at once.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ClipboardPaste, Copy, Mic, Pencil, RotateCcw, Send, Share2, Square, Trash2, Volume2 } from 'lucide-react';
@@ -60,7 +61,6 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
     return { kind: 'idle' };
   });
   const [prefill, setPrefill] = useState<ComposerPrefill | null>(() => (startVoice ? { nonce: Date.now(), text: '', attachments: [], dictate: true } : null));
-  const [handsFree, setHandsFree] = useState(!!startVoice);
   const [edit, setEdit] = useState<string | null>(null);
   const [paste, setPaste] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
       ...(lang !== MY_LANG && d.back ? [{ text: `Adică: ${d.back}`, lang: MY_LANG }] : []),
     ], () => setSpeaking(s => (s === 'draft' ? null : s)));
   };
-  const sayAgain = () => { setHandsFree(true); setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate: true }); };
+  const sayAgain = () => { setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate: true }); };
 
   const prepare = async (said: string, voice = false) => {
     if (stage.kind === 'draft' && !isLocal(stage.draft)) void act(stage.draft.id, 'cancel').catch(() => undefined);   // a new message replaces the old draft
@@ -419,7 +419,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
           </section>
         )}
         {stage.kind !== 'sending' && edit === null && !big && (
-          <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={(text, _a, meta) => void prepare(text, !!meta?.voice)} voice transcribe={transcribeAudio} handsFree={handsFree}
+          <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={(text, _a, meta) => void prepare(text, !!meta?.voice)} voice transcribe={transcribeAudio} handsFree
             draftKey={`wa:${contact.id}`} attach={false} sendLabel="Prepare the message"
             placeholder={stage.kind === 'draft' ? 'Say it differently' : lastTheirs ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
         )}
