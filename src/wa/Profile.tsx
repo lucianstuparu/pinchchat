@@ -1,20 +1,27 @@
 /**
- * A person's card: shown name, full name, how they are reached (WhatsApp, email, SMS, another app),
+ * A person's card: their photo (saved from WhatsApp and chosen here; it is hard to find a face by its
+ * initial, Lucian 2026-10-26), shown name, full name, how they are reached (WhatsApp, email, SMS, another app),
  * the language and tone to write to them in, whether their WhatsApp messages are kept here, and their
  * agent: conversation samples (pasted text or a WhatsApp "Export chat" file), the style card it learns
  * from them (editable), and what it remembers.
  */
-import { useEffect, useRef, useState } from 'react';
-import { FileText, Trash2, Upload } from 'lucide-react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { Camera, FileText, Trash2, Upload } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented } from '../ui/Controls';
 import { ProgressRow } from '../ui/ProgressRow';
 import { useBusy } from '../ui/draft';
-import { CHANNELS, LANGS, addSample, agentProfile, deleteSample, saveContact, saveStyle, type AgentProfile, type Channel, type Contact } from './api';
+import { CHANNELS, LANGS, addSample, agentProfile, deletePhoto, deleteSample, saveContact, savePhoto, saveStyle, squareJpeg, type AgentProfile, type Channel, type Contact } from './api';
+import { Face } from './Face';
+import { FacePhotos } from './photos';
 
 const field = 'mt-1 h-12 w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 text-[16px] text-pc-text outline-none focus:border-pc-accent';
 
-export function Profile({ contact, waOwner, onClose, onSaved }: { contact: Partial<Contact>; waOwner: boolean; onClose: () => void; onSaved: (c: Contact) => void }) {
+/** `photo` in onSaved: the new face ({v, data}), null when it was removed, undefined when unchanged; `problem`: the photo did not go. */
+export function Profile({ contact, waOwner, onClose, onSaved }: {
+  contact: Partial<Contact>; waOwner: boolean; onClose: () => void;
+  onSaved: (c: Contact, photo?: { v: number; data: string } | null, problem?: string) => void;
+}) {
   const [f, setF] = useState({
     label: contact.label ?? '', name: contact.name ?? '', phone: contact.phone ?? '', email: contact.email ?? '',
     aliases: (contact.aliases ?? []).join(', '), lang: contact.lang ?? 'fr', tone: contact.tone ?? 'formal',
@@ -23,13 +30,29 @@ export function Profile({ contact, waOwner, onClose, onSaved }: { contact: Parti
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useBusy('wa-profile', true);
+  // The face: changed here, kept with Save (undefined: as it was; null: removed).
+  const kept = useContext(FacePhotos)[contact.id ?? '']?.data ?? null;
+  const [photo, setPhoto] = useState<string | null | undefined>(undefined);
+  const shown = photo === undefined ? kept : photo;
+  const pickRef = useRef<HTMLInputElement>(null);
+  const choose = async (file?: File) => {
+    if (!file) return;
+    try { setPhoto(await squareJpeg(file)); setError(null); }
+    catch { setError('Could not read that picture. Try a JPEG or PNG.'); }
+  };
   const save = async () => {
     setBusy(true); setError(null);
     try {
-      onSaved(await saveContact({ id: contact.id, label: f.label.trim() || f.name.trim().split(/\s+/)[0], name: f.name.trim(),
+      const c = await saveContact({ id: contact.id, label: f.label.trim() || f.name.trim().split(/\s+/)[0], name: f.name.trim(),
         phone: f.channel === 'whatsapp' || f.channel === 'sms' ? f.phone.trim() : undefined, email: f.channel === 'email' ? f.email.trim() : undefined,
         aliases: f.aliases.split(',').map(a => a.trim()).filter(Boolean), lang: f.lang, tone: f.tone as Contact['tone'],
-        listen: f.channel === 'whatsapp' && waOwner ? f.listen : undefined, channel: f.channel }));
+        listen: f.channel === 'whatsapp' && waOwner ? f.listen : undefined, channel: f.channel });
+      let face: { v: number; data: string } | null | undefined;
+      try {
+        if (photo) face = { v: (await savePhoto(c, photo)).v, data: photo };
+        else if (photo === null && kept) { await deletePhoto(c); face = null; }
+      } catch (e) { onSaved(c, undefined, `Saved, but not the photo (${e instanceof Error ? e.message : 'no connection'}). Add it again in the profile.`); return; }
+      onSaved(c, face);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save'); }
     finally { setBusy(false); }
   };
@@ -41,6 +64,23 @@ export function Profile({ contact, waOwner, onClose, onSaved }: { contact: Parti
         <CloseButton onClick={onClose} />
       </div>
       <div className="space-y-3 pb-4 pt-2">
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={() => pickRef.current?.click()} aria-label={shown ? 'Change the photo' : 'Add a photo'}
+            className="press relative shrink-0 rounded-full">
+            {shown || f.label.trim() || f.name.trim()
+              ? <Face contact={{ id: contact.id ?? 'new', label: f.label.trim() || f.name.trim() || '?' }} size={80} photo={shown} />
+              : <span className="flex h-20 w-20 items-center justify-center rounded-full bg-pc-surface text-pc-text-muted"><Camera size={28} /></span>}
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--pc-bg-elevated)] bg-pc-accent text-[var(--pc-on-accent)]"><Camera size={15} /></span>
+          </button>
+          <div className="min-w-0 flex-1">
+            <button type="button" onClick={() => pickRef.current?.click()} className="press h-10 rounded-full bg-pc-surface px-4 text-[15px] font-medium">
+              {shown ? 'Change the photo' : 'Add a photo'}
+            </button>
+            {shown && <button type="button" onClick={() => setPhoto(null)} className="press ml-2 h-10 rounded-full px-3 text-[15px] text-pc-text-muted">Remove</button>}
+            <p className="mt-1 text-[12px] text-pc-text-muted">{photo !== undefined ? 'Kept when you tap Save' : 'WhatsApp: open their profile photo, ⋮ → Save, then choose it here'}</p>
+          </div>
+          <input ref={pickRef} type="file" accept="image/*" className="hidden" onChange={e => { void choose(e.target.files?.[0]); e.target.value = ''; }} />
+        </div>
         <label className="block text-[13px] text-pc-text-muted">Shown as
           <input value={f.label} onChange={e => setF({ ...f, label: e.target.value })} placeholder="Fleur" className={field} />
         </label>

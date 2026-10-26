@@ -182,6 +182,7 @@ const now = () => Date.now();
 const waDrafts = new Map();
 const waTranslations = new Map();
 const relayAgents = {};
+const relayPhotos = {};
 const waContacts = [
   { id: 'ct-1', name: 'Eugenia Gamurari', label: 'Bunica', aliases: ['bunica', 'bunicii', 'buni'], phone: '+33600000000', lang: 'ro', tone: 'informal', sent: 3, last_sent: '2026-10-24T08:00:00Z', listen: true, unread: 2, last_in: { text: 'Ai ajuns cu bine?', ts: '2026-10-24T11:40:00Z' } },
   { id: 'ct-2', name: 'Fleur Guillemot', label: 'Fleur', aliases: [], phone: '+33600000001', lang: 'fr', tone: 'formal', sent: 0, listen: true, unread: 1, last_in: { text: 'Bonjour, les documents sont-ils prêts pour lundi ?', ts: '2026-10-24T17:10:00Z' } },
@@ -446,6 +447,11 @@ const server = http.createServer((req, res) => {
       if (what === 'profile') return later(agent, 200);
       if (what === 'style') { agent.style = p.style; return later({ ok: true }, 100); }
       if (what === 'sample') { const file = `2026-10-25 ${p.name}`; agent.samples.push({ name: file, size: p.text.length, added: '2026-10-25' }); agent.style = '- vouvoie, phrases courtes\n- signe « Bien à vous, Lucian »'; return later({ file, style: agent.style }, 2500); }
+      if (what === 'photos') return later({ photos: Object.fromEntries(Object.entries(relayPhotos).map(([id, x]) => [id, p.known?.[id] === x.v ? { v: x.v } : x])) }, 150);
+      if (what === 'photo') { relayPhotos[cid] = { v: Date.now(), data: p.data }; return later({ v: relayPhotos[cid].v }, 300); }
+      if (what === 'photo-delete') { delete relayPhotos[cid]; return later({ ok: true }, 100); }
+      // pick: the stand-in finds a shown name or other name anywhere in the words
+      if (what === 'pick') { const t = sfold(p.said); const c = (p.people ?? []).find((x) => [x.label, ...(x.aliases ?? [])].some((n) => n && t.includes(sfold(n)))); return later({ id: c?.id ?? '' }, 1500); }
       if (what === 'sample-delete') { agent.samples = agent.samples.filter((x) => x.name !== p.name); return later({ ok: true }, 100); }
       res.statusCode = 404; res.end('{}');
     });

@@ -11,6 +11,9 @@
  * read back aloud (to whom, the message, what it means) and the card turns into big buttons, Send the
  * biggest, at the bottom. Every time the mic stops (a tap, or a pause) the words go on by themselves (Lucian
  * 2026-10-26: "it didn't read back automatically when I clicked stop recording"); holding a face starts the mic at once.
+ * On WhatsApp the read-back ends with "Trimit?" and the mic listens for a short answer (answer.ts): "da" sends
+ * (the same 5 s with Undo), "nu" drops it (Lucian 2026-10-26: "if I say ok to send the message").
+ * Relay's main mic opens the line with what was said (`autoSay`): it is prepared at once, by voice.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ClipboardPaste, Copy, Mic, Pencil, RotateCcw, Send, Share2, Square, Trash2, Volume2 } from 'lucide-react';
@@ -23,6 +26,7 @@ import { useBusy } from '../ui/draft';
 import { canSpeak, speak, speakParts } from '../ui/speak';
 import { useDelayedFlag } from '../ui/progress';
 import { Face } from './Face';
+import { answerOf, listenOnce } from './answer';
 import {
   MY_LANG, act, agentProfile, channelName, compose, fetchConversation, langName, learn, theyWrote, timeOf, translate, viaWhatsApp, waDraft,
   type Contact, type Draft, type WaMessage,
@@ -33,6 +37,7 @@ const draftKeyOf = (contact: string) => `wa:draft:${contact}`;
 const keep = (k: string, v: string | null) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* not kept */ } };
 const kept = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const isLocal = (d: Draft) => d.id.startsWith('local-');
+const localId = () => `local-${Date.now()}`;
 
 type Stage =
   | { kind: 'idle' }
@@ -42,8 +47,10 @@ type Stage =
   | { kind: 'sending'; draft: Draft; said?: string; voice?: boolean }
   | { kind: 'sent'; draft: Draft; how: string; voice?: boolean };
 
-export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile, onSent }: {
+export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, onProfile, onSent }: {
   contact: Contact; waOwner: boolean;
+  /** Said or typed in Relay's bar for this person: prepared at once (read back when said). */
+  autoSay?: { text: string; voice: boolean } | null;
   /** Opened by holding their face: the mic listens at once, hands-free. */
   startVoice?: boolean;
   /** Text pasted in Translate and answered from there: it opens as "they wrote". */
@@ -66,6 +73,11 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const stopSpeech = useRef<(() => void) | null>(null);
+  // Listening for the spoken yes or no after a read-back.
+  const [asking, setAsking] = useState(false);
+  const stopAsking = useRef<(() => void) | null>(null);
+  const quiet = () => { stopSpeech.current?.(); stopAsking.current?.(); stopAsking.current = null; setAsking(false); };
+  const stageNow = useRef<Stage>({ kind: 'idle' });
   const endRef = useRef<HTMLDivElement>(null);
   const foreign = contact.lang !== MY_LANG;
   useBusy(`wa-line-${contact.id}`, stage.kind === 'preparing' || stage.kind === 'sending' || edit !== null || paste !== null);
@@ -90,7 +102,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
   }, [load]);
   const msgs = useMemo(() => (inbox ? [...inbox, ...pasted].sort((a, b) => a.ts.localeCompare(b.ts)) : null), [inbox, pasted]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs, stage.kind]);
-  useEffect(() => () => stopSpeech.current?.(), []);
+  useEffect(() => () => { stopSpeech.current?.(); stopAsking.current?.(); }, []);
   const lastTheirs = msgs?.filter(m => m.from === 'them').at(-1);
 
   // Text answered from the Translate box: kept as theirs, once.
@@ -136,15 +148,37 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
 
   // ---- what you said -> the message in their language, by their agent
   // Read back aloud: to whom (in my language), the message (in theirs), what it means (in mine).
-  const readBack = (d: Draft) => {
-    stopSpeech.current?.();
+  const readBack = (d: Draft, said?: string) => {
+    quiet();
     setSpeaking('draft');
     const lang = d.lang ?? contact.lang;
-    stopSpeech.current = speakParts([
+    let cut = false;
+    const stop = speakParts([
       { text: `Pentru ${contact.label}:`, lang: MY_LANG },
       { text: d.text, lang },
       ...(lang !== MY_LANG && d.back ? [{ text: `Adică: ${d.back}`, lang: MY_LANG }] : []),
-    ], () => setSpeaking(s => (s === 'draft' ? null : s)));
+      ...(wa ? [{ text: 'Trimit?', lang: MY_LANG }] : []),
+    ], () => {
+      setSpeaking(s => (s === 'draft' ? null : s));
+      if (!cut && wa) ask(d, said);
+    });
+    stopSpeech.current = () => { cut = true; stop(); };
+  };
+  // After "Trimit?": a short spoken answer, only while this draft is still on the card.
+  const ask = (d: Draft, said?: string) => {
+    const still = () => { const s = stageNow.current; return s.kind === 'draft' && s.draft.id === d.id; };
+    if (!still()) return;
+    const l = listenOnce();
+    stopAsking.current = l.stop;
+    setAsking(true);
+    void l.done.then(t => {
+      if (stopAsking.current !== l.stop) return;   // stopped, or another one started
+      stopAsking.current = null; setAsking(false);
+      if (!still()) return;
+      const a = answerOf(t);
+      if (a === 'yes') send(d, said, true);
+      else if (a === 'no') { discard(d); speak(['Am renunțat.'], MY_LANG); }
+    });
   };
   const sayAgain = () => { setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate: true }); };
 
@@ -156,18 +190,28 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
     try {
       const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined);
       const d: Draft = wa ? await waDraft(contact.id, w.text, w.back)
-        : { id: `local-${Date.now()}`, name: contact.name, lang: contact.lang, text: w.text, back: w.back, status: 'draft' };
+        : { id: localId(), name: contact.name, lang: contact.lang, text: w.text, back: w.back, status: 'draft' };
       keepDraft(d);
       setStage({ kind: 'draft', draft: d, said, voice });
-      if (voice) readBack(d);
+      if (voice) readBack(d, said);
     } catch (e) {
       const error = navigator.onLine ? (e instanceof Error ? e.message : 'Could not write it') : 'No connection';
       setStage({ kind: 'failed', said, error, voice });
       if (voice) speak(['Nu am reușit să scriu mesajul.'], MY_LANG);
     }
   };
+  useEffect(() => { stageNow.current = stage; }, [stage]);
+  // Said to the main mic for this person: prepared at once, as said by voice.
+  const autoDone = useRef(false);
+  useEffect(() => {
+    // After the conversation loaded, so an answer follows their last message.
+    if (!autoSay?.text.trim() || autoDone.current || (msgs === null && !loadError)) return;
+    const t = window.setTimeout(() => { autoDone.current = true; void prepare(autoSay.text.trim(), autoSay.voice); }, 0);
+    return () => window.clearTimeout(t);
+  }, [msgs, loadError]);   // eslint-disable-line react-hooks/exhaustive-deps -- once, when the conversation is there
   const putBack = (said: string) => { setStage({ kind: 'idle' }); setPrefill({ nonce: Date.now(), text: said.trim(), attachments: [] }); };
   const discard = (d: Draft, said?: string) => {
+    quiet();
     if (!isLocal(d)) void act(d.id, 'cancel').catch(() => undefined);
     keepDraft(null);
     setStage({ kind: 'idle' });
@@ -199,7 +243,8 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
   };
   useEffect(() => stopTimers, []);   // leaving the screen keeps it a draft
   const send = (d: Draft, said?: string, voice?: boolean) => {
-    stopSpeech.current?.();
+    quiet();
+    if (voice) speak(['Trimit.'], MY_LANG);
     setStage({ kind: 'sending', draft: d, said, voice });
     setLeft(SEND_DELAY / 1000);
     ticker.current = window.setInterval(() => setLeft(n => Math.max(1, n - 1)), 1000);
@@ -219,7 +264,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
       }
     }, SEND_DELAY);
   };
-  const undoSend = (d: Draft, said?: string, voice?: boolean) => { stopTimers(); setStage({ kind: 'draft', draft: d, said, voice }); };
+  const undoSend = (d: Draft, said?: string, voice?: boolean) => { stopTimers(); if (voice) speak(['Oprit.'], MY_LANG); setStage({ kind: 'draft', draft: d, said, voice }); };
 
   // ---- other channels: Copy or Share, then paste it where they read
   const where = contact.channel === 'email' ? 'your email' : contact.channel === 'sms' ? 'Messages' : contact.channel === 'whatsapp' ? 'WhatsApp' : 'the app you use with them';
@@ -355,12 +400,18 @@ export function Line({ contact, waOwner, replyTo, startVoice, onBack, onProfile,
             {stage.kind === 'draft' && big && (
               <div className="mt-3">
                 <div className="grid grid-cols-4 gap-2">
-                  <button type="button" onClick={() => { stopSpeech.current?.(); discard(stage.draft); }} aria-label="Drop this message" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-pc-text-muted"><Trash2 size={22} /></button>
-                  <button type="button" onClick={() => setEdit(stage.draft.text)} aria-label="Change the text" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface"><Pencil size={22} /></button>
-                  <button type="button" onClick={() => (speaking === 'draft' ? stopSpeech.current?.() : readBack(stage.draft))} aria-label={speaking === 'draft' ? 'Stop' : 'Hear it again'}
+                  <button type="button" onClick={() => discard(stage.draft)} aria-label="Drop this message" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-pc-text-muted"><Trash2 size={22} /></button>
+                  <button type="button" onClick={() => { quiet(); setEdit(stage.draft.text); }} aria-label="Change the text" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface"><Pencil size={22} /></button>
+                  <button type="button" onClick={() => (speaking === 'draft' ? quiet() : readBack(stage.draft, said))} aria-label={speaking === 'draft' ? 'Stop' : 'Hear it again'}
                     className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface">{speaking === 'draft' ? <Square size={20} /> : <Volume2 size={24} />}</button>
-                  <button type="button" onClick={() => { stopSpeech.current?.(); discard(stage.draft); sayAgain(); }} aria-label="Say it again" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-[var(--pc-accent-ink)]"><Mic size={24} /></button>
+                  <button type="button" onClick={() => { discard(stage.draft); sayAgain(); }} aria-label="Say it again" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-[var(--pc-accent-ink)]"><Mic size={24} /></button>
                 </div>
+                {asking && (
+                  <button type="button" onClick={quiet} aria-label="Stop listening"
+                    className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-[rgba(var(--pc-accent-rgb),0.14)] text-[15px] font-semibold text-[var(--pc-accent-ink)]">
+                    <Mic size={18} className="animate-pulse" /> Listening · say “da” to send, “nu” to drop it
+                  </button>
+                )}
                 {wa ? (
                   <button type="button" onClick={() => send(stage.draft, said, true)} className="press mt-3 flex h-[88px] w-full items-center justify-center gap-3 rounded-[24px] bg-pc-accent text-[24px] font-bold text-[var(--pc-on-accent)]">
                     <Send size={28} /> Send

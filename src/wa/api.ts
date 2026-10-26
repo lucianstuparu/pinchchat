@@ -74,3 +74,61 @@ export const timeOf = (iso: string) => {
 
 /** Whether this contact's messages go out on WhatsApp from here (the owner's WhatsApp, a number on file). */
 export const viaWhatsApp = (c: Contact, waOwner: boolean) => c.channel === 'whatsapp' && waOwner && !!c.phone;
+
+// ---- faces (CT 113): a photo per person, added by hand (e.g. saved from WhatsApp), kept on the phone too
+export type Photos = Record<string, { v: number; data: string }>;
+const PHOTOS = 'wa:photos';
+export const cachedPhotos = (): Photos => { try { return JSON.parse(localStorage.getItem(PHOTOS) || '{}') as Photos; } catch { return {}; } };
+/** The server's faces; only those changed since the phone's copy come with their picture. */
+export async function fetchPhotos(have: Photos): Promise<Photos> {
+  const known = Object.fromEntries(Object.entries(have).map(([id, p]) => [id, p.v]));
+  const r = await post<{ photos: Record<string, { v: number; data?: string }> }>('/relay/photos', { known });
+  const out: Photos = {};
+  for (const [id, p] of Object.entries(r.photos)) { const data = p.data ?? (have[id]?.v === p.v ? have[id].data : undefined); if (data) out[id] = { v: p.v, data }; }
+  try { localStorage.setItem(PHOTOS, JSON.stringify(out)); } catch { /* not kept */ }
+  return out;
+}
+export const savePhoto = (c: Contact, data: string) => post<{ v: number }>('/relay/photo', { contact: asAgent(c), data });
+export const deletePhoto = (c: Contact) => post<{ ok: boolean }>('/relay/photo-delete', { contact: asAgent(c) });
+
+/** A picture from the phone as a small square JPEG (the middle of it), for a face. */
+export async function squareJpeg(file: File, size = 256): Promise<string> {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('This phone cannot read the picture');
+  ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  bmp.close();
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+// ---- who it is for: the main mic ("spune-i bunicii că ajung la 7")
+const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+/**
+ * The person named in what was said, on the phone: their shown name, first or full name, or another name
+ * they are called, also declined ("bunicii", "Ludmilei": a long name matches without its last letter).
+ * The one named first wins; null when nobody is named, or two are named at the same place (then the agent picks).
+ */
+export function matchContact(said: string, people: Contact[]): Contact | null {
+  const words = plain(said).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const text = ` ${words.join(' ')} `;
+  let best: { at: number; c: Contact } | null = null, tie = false;
+  for (const c of people) {
+    const names = [c.label, c.name, ...c.name.split(/\s+/).slice(0, 1), ...(c.aliases ?? [])].map(plain).map(n => n.trim()).filter(n => n.length >= 3);
+    let at = Infinity;
+    for (const n of names) {
+      if (n.includes(' ')) { const i = text.indexOf(` ${n.split(/[^\p{L}\p{N}]+/u).join(' ')} `); if (i >= 0) at = Math.min(at, text.slice(0, i).split(' ').length - 1); continue; }
+      const stem = n.length >= 5 ? n.slice(0, -1) : n;
+      const i = words.findIndex(w => (n.length >= 5 ? w.startsWith(stem) && w.length <= n.length + 3 : w === n));
+      if (i >= 0) at = Math.min(at, i);
+    }
+    if (at === Infinity) continue;
+    if (!best || at < best.at) { best = { at, c }; tie = false; }
+    else if (at === best.at && best.c.id !== c.id) tie = true;
+  }
+  return best && !tie ? best.c : null;
+}
+export const pickContact = (said: string, people: Contact[]) =>
+  post<{ id: string }>('/relay/pick', { said, people: people.map(c => ({ id: c.id, label: c.label, name: c.name, aliases: c.aliases ?? [] })) }).then(r => r.id);
