@@ -10,9 +10,11 @@
  * at once (Lucian 2026-10-26: "a main button which would record without choosing the person"): the name
  * is found in the words (matchContact; the agent when unclear), that person's line opens and the message
  * is prepared and read back, so you hear to whom before anything goes.
+ * Drafts (2026-10-27): messages kept for later (Later on the card) and those a mail rule prepared, until sent,
+ * copied or dropped. Relay's own notifications (Settings) bring a mail rule's message with Send on it.
  */
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Languages, Plus, Search } from 'lucide-react';
+import { Bell, Languages, Plus, Search } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SessionExpired, transcribeAudio, whoami } from '../app/api';
 import { getDictationLang, getSpeechMode, setDictationLang, setSpeechMode, DICTATION_LANGS, type SpeechMode } from '../app/voice';
@@ -24,12 +26,13 @@ import { useLift } from '../ui/dragOrder';
 import { ProgressRow } from '../ui/ProgressRow';
 import { speak } from '../ui/speak';
 import { Composer } from '../mobile/Composer';
+import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 import { Face } from './Face';
 import { FacePhotos } from './photos';
 import { Line } from './Line';
 import { Profile } from './Profile';
 import { Translate } from './Translate';
-import { MY_LANG, cachedPhotos, channelName, fetchContacts, fetchPhotos, langName, matchContact, pickContact, timeOf, type Contact, type Photos } from './api';
+import { MY_LANG, cachedPhotos, channelName, fetchContacts, fetchDrafts, fetchPhotos, langName, matchContact, pickContact, timeOf, type Contact, type Draft, type Photos } from './api';
 
 const CACHE = 'wa:contacts';
 const OWNER = 'wa:owner';
@@ -58,8 +61,10 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   const [state, setState] = useState<'ok' | 'offline' | 'expired'>('ok');
   const ready = (c: Contact) => !!c.phone || c.channel !== 'whatsapp' || !waOwner;
   const [loading, setLoading] = useState(false);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const refresh = useCallback(async () => {
     setLoading(true);
+    void fetchDrafts().then(setDrafts).catch(() => undefined);
     try {
       const { contacts: c, wa } = await fetchContacts();
       setContacts(c); setWaOwner(wa); setState('ok');
@@ -81,6 +86,8 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
 
   // ?c=<contact id> (a notification, or oc's WhatsApp button) opens that person's line.
   const [open, setOpen] = useState<string | null>(() => new URLSearchParams(window.location.search).get('c'));
+  // ?d=<draft id> with it (a mail rule's notification): that message on the card.
+  const [openDraft, setOpenDraft] = useState<string | null>(() => new URLSearchParams(window.location.search).get('d'));
   // Opened by holding a face: that line starts with the mic listening (hands-free).
   const [voiceFor, setVoiceFor] = useState<string | null>(null);
   const speakTo = (c: Contact) => { setVoiceFor(c.id); setOpen(c.id); };
@@ -105,7 +112,7 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   };
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has('c')) return;
-    const url = new URL(window.location.href); url.searchParams.delete('c');
+    const url = new URL(window.location.href); url.searchParams.delete('c'); url.searchParams.delete('d');
     window.history.replaceState(window.history.state, '', url.pathname + url.search);
   }, []);
   const [profile, setProfile] = useState<Partial<Contact> | null>(null);
@@ -140,9 +147,13 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   const withFaces = (n: ReactNode) => <FacePhotos.Provider value={photos}>{n}</FacePhotos.Provider>;
 
   if (current) {
+    // A kept draft of theirs opens on the card (the newest), unless something was just said for them.
+    const kept = said?.for === current.id ? null : (openDraft ?? drafts.filter(d => d.contact === current.id).at(-1)?.id ?? null);
     return withFaces(<>{<Line key={current.id} contact={current} waOwner={waOwner} replyTo={replyTo?.contact === current.id ? replyTo.text : null}
-      startVoice={voiceFor === current.id} autoSay={said?.for === current.id ? said : null}
-      onBack={() => { setOpen(null); setReplyTo(null); setVoiceFor(null); setSaid(null); }} onProfile={() => setProfile(current)} onSent={() => void refresh()} />}{sheets}</>);
+      startVoice={voiceFor === current.id} autoSay={said?.for === current.id ? said : null} openDraft={kept}
+      onBack={() => { setOpen(null); setOpenDraft(null); setReplyTo(null); setVoiceFor(null); setSaid(null); void refresh(); }} onProfile={() => setProfile(current)}
+      onSent={() => { setOpenDraft(null); void refresh(); }}
+      onKept={d => { setOpen(null); setOpenDraft(null); setSaid(null); setVoiceFor(null); setDrafts(ds => [...ds.filter(x => x.id !== d.id), d]); setNotice(`Kept in Drafts: to ${current.label}`); void refresh(); }} />}{sheets}</>);
   }
 
   const people = contacts ?? [];
@@ -182,6 +193,28 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
                     </span>
                   </Hold>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {drafts.length > 0 && (
+            <section className="mb-5 mt-2">
+              <h2 className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-pc-text-muted">Drafts</h2>
+              <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[20px] bg-pc-surface">
+                {[...drafts].reverse().map(d => {
+                  const c = people.find(x => x.id === d.contact);
+                  if (!c) return null;
+                  return (
+                    <button key={d.id} type="button" onClick={() => { setOpenDraft(d.id); setOpen(c.id); }} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[var(--pc-hover-strong)]">
+                      <Face contact={c} size={48} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline gap-2"><span className="truncate text-[17px] font-semibold">To {c.label}</span><span className="ml-auto shrink-0 text-[12px] text-pc-text-muted">{timeOf(d.saved_at ?? d.created ?? '')}</span></span>
+                        <span className="line-clamp-2 text-[15px] leading-snug text-pc-text-secondary">{d.text}</span>
+                        {d.origin === 'rule' && d.why && <span className="block truncate text-[13px] text-pc-text-muted">Mail rule: {d.why}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -286,6 +319,38 @@ function Hold({ onTap, onHold, className, children }: { onTap: () => void; onHol
   );
 }
 
+/** Relay's own notifications on this phone: a mail rule's message arrives with Send on it. */
+function Notifications() {
+  const [state, setState] = useState<PushState | 'busy'>('off');
+  const [error, setError] = useState('');
+  useEffect(() => { void getPushState().then(setState).catch(() => setState('unsupported')); }, []);
+  const toggle = async () => {
+    const from = state;
+    setState('busy'); setError('');
+    try { setState(from === 'on' ? await disablePush() : await enablePush()); }
+    catch (e) { setState(from); setError(e instanceof Error ? e.message : 'Could not change it'); }
+  };
+  if (state === 'unsupported') return null;
+  const on = state === 'on';
+  return (
+    <>
+      <p className="mb-1.5 mt-5 px-1 text-[13px] text-pc-text-muted">Notifications</p>
+      <button type="button" role="switch" aria-checked={on} disabled={state === 'busy' || state === 'blocked'} onClick={() => void toggle()}
+        className="flex min-h-14 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 py-2.5 text-left disabled:opacity-60">
+        <Bell size={20} className="shrink-0 text-[var(--pc-accent-ink)]" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[16px]">Messages ready to send</span>
+          <span className="block text-[13px] leading-snug text-pc-text-muted">{state === 'blocked' ? 'Blocked for this app in the phone’s settings' : 'When a mail rule prepares one: Send from the notification, with 5 s to undo'}</span>
+        </span>
+        <span className={`relative h-8 w-[52px] shrink-0 rounded-full transition-colors ${on ? 'bg-pc-accent' : 'bg-pc-border-strong'}`} aria-hidden>
+          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-[left] ${on ? 'left-[24px]' : 'left-1'}`} />
+        </span>
+      </button>
+      {error && <p className="mt-1.5 px-1 text-[13px] text-red-500" role="alert">{error}</p>}
+    </>
+  );
+}
+
 function Settings({ look, onLook, person, onClose }: { look: Look; onLook: (l: Look) => void; person: string | null; onClose: () => void }) {
   const [speech, setSpeech] = useState<SpeechMode>(getSpeechMode);
   const [lang, setLang] = useState(getDictationLang);
@@ -308,6 +373,7 @@ function Settings({ look, onLook, person, onClose }: { look: Look; onLook: (l: L
             options={DICTATION_LANGS.map(l => ({ value: l.code, label: l.name }))} />
         </div>
       )}
+      <Notifications />
       <p className="mt-6 pb-6 text-center text-[12px] text-pc-text-muted">Messages go from your WhatsApp, only when you tap Send · the people and messages stay on the home server</p>
     </Sheet>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, ListTodo, Mail, Pause, Play, Square } from 'lucide-react';
+import { Bell, ListTodo, Mail, MessageSquare, Pause, Play, Square } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { post, formatDay } from './api';
 import { UndoBar, type UndoInfo } from './UndoBar';
@@ -14,6 +14,8 @@ interface Seen { at: string; subject: string; from?: string; why?: string; task?
 export interface MailRule {
   id: string; title: string; query: string; expect: string; notify: string;
   task: { title: string; priority: string } | null; once: boolean; accounts: string[];
+  /** A message prepared in Relay on a yes (sent only by a tap on Send there). */
+  message?: { contact: string; label: string; channel: string; text: string } | null;
   status: 'active' | 'paused' | 'stopped' | 'done'; created: string; checked_at: string | null;
   fired: Seen[]; skipped: Seen[]; checked: number;
 }
@@ -51,6 +53,7 @@ function RuleRow({ rule, onAct }: { rule: MailRule; onAct: (a: RuleAction) => vo
           <span className="flex items-center gap-1"><Bell size={13} /> {rule.notify}</span>
           {rule.task && <span className="flex items-center gap-1"><ListTodo size={13} /> {rule.task.priority} · {rule.task.title}</span>}
         </p>
+        {rule.message && <p className={`mt-1 flex items-start gap-1 text-[13px] text-pc-text-muted ${open ? '' : 'line-clamp-1'}`}><MessageSquare size={13} className="mt-0.5 shrink-0" /> <span>To {rule.message.label}, ready in Relay: “{rule.message.text}”</span></p>}
         <p className={`mt-1 truncate text-[13px] ${last ? 'text-pc-accent' : 'text-pc-text-faint'}`}>{status}</p>
       </button>
       {open && (

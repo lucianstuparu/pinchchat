@@ -14,6 +14,9 @@
  * On WhatsApp the read-back ends with "Trimit?" and the mic listens for a short answer (answer.ts): "da" sends
  * (the same 5 s with Undo), "nu" drops it (Lucian 2026-10-26: "if I say ok to send the message").
  * Relay's main mic opens the line with what was said (`autoSay`): it is prepared at once, by voice.
+ * Later (Lucian 2026-10-27: "prepared drafts also in Relay for when I don't want to message right away"): the
+ * message is kept in Relay's Drafts, without the 24 h expiry, and opens on the card with this person (`openDraft`).
+ * A mail rule's message arrives the same way, with Relay's notification (Send from there, or open it here).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ClipboardPaste, Copy, Mic, Pencil, RotateCcw, Send, Share2, Square, Trash2, Volume2 } from 'lucide-react';
@@ -28,7 +31,7 @@ import { useDelayedFlag } from '../ui/progress';
 import { Face } from './Face';
 import { answerOf, listenOnce } from './answer';
 import {
-  MY_LANG, act, agentProfile, channelName, compose, fetchConversation, langName, learn, theyWrote, timeOf, translate, viaWhatsApp, waDraft,
+  MY_LANG, act, agentProfile, channelName, compose, fetchConversation, keepDraft as keepForLater, langName, learn, theyWrote, timeOf, translate, viaWhatsApp, waDraft,
   type Contact, type Draft, type WaMessage,
 } from './api';
 
@@ -55,8 +58,12 @@ type Stage =
   | { kind: 'sending'; draft: Draft; said?: string; voice?: boolean }
   | { kind: 'sent'; draft: Draft; how: string; voice?: boolean };
 
-export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, onProfile, onSent }: {
+export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft, onBack, onProfile, onSent, onKept }: {
   contact: Contact; waOwner: boolean;
+  /** A draft kept in Drafts (tapped there, or a mail rule's notification): it opens on the card. */
+  openDraft?: string | null;
+  /** Later: the message went to Drafts. */
+  onKept?: (d: Draft) => void;
   /** Said or typed in Relay's bar for this person: prepared at once (read back when said). */
   autoSay?: { text: string; voice: boolean } | null;
   /** Opened by holding their face: the mic listens at once, hands-free. */
@@ -141,14 +148,21 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
     })();
   }, [msgs, foreign, contact, translations]);
 
-  // ---- a draft left from before (the app was closed): shown again while it is still a draft
+  // ---- a draft left from before (the app was closed), or one from Drafts: shown again while it is still a draft
   useEffect(() => {
-    const saved = kept(draftKeyOf(contact.id));
+    const saved = openDraft || kept(draftKeyOf(contact.id));
     if (!saved || saved.startsWith('{')) return;   // none, or kept on the phone (read above)
     void post<{ drafts: Record<string, Draft> }>('/reg/wa/status', { ids: [saved] })
-      .then(r => { const d = r.drafts[saved]; if (d && (d.status === 'draft' || d.status === 'failed')) setStage(s => (s.kind === 'idle' ? { kind: 'draft', draft: { ...d, id: saved } } : s)); else keep(draftKeyOf(contact.id), null); })
+      .then(r => {
+        const d = r.drafts[saved];
+        if (d && (d.status === 'draft' || d.status === 'failed')) {
+          // One from Drafts takes the card even over a message written here and not used yet.
+          setStage(s => (s.kind === 'idle' || (openDraft && s.kind === 'draft' && isLocal(s.draft)) ? { kind: 'draft', draft: { ...d, id: saved } } : s));
+          keep(draftKeyOf(contact.id), saved);
+        } else if (!openDraft) keep(draftKeyOf(contact.id), null);
+      })
       .catch(() => undefined);
-  }, [contact.id]);
+  }, [contact.id, openDraft]);
   const keepDraft = (d: Draft | null) => keep(draftKeyOf(contact.id), d ? (isLocal(d) ? JSON.stringify(d) : d.id) : null);
 
   const say = (texts: string[], lang: string, key: string) => {
@@ -221,13 +235,31 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
     const t = window.setTimeout(() => { autoDone.current = true; void prepare(autoSay.text.trim(), autoSay.voice); }, 0);
     return () => window.clearTimeout(t);
   }, [msgs, loadError]);   // eslint-disable-line react-hooks/exhaustive-deps -- once, when the conversation is there
+  const [dropped, setDropped] = useState<Draft | null>(null);
+  useEffect(() => { if (!dropped) return; const t = window.setTimeout(() => setDropped(null), 6000); return () => window.clearTimeout(t); }, [dropped]);
   const putBack = (said: string) => { setStage({ kind: 'idle' }); setPrefill({ nonce: Date.now(), text: said.trim(), attachments: [] }); };
   const discard = (d: Draft, said?: string) => {
     quiet();
     if (!isLocal(d)) void act(d.id, 'cancel').catch(() => undefined);
     keepDraft(null);
     setStage({ kind: 'idle' });
+    if (d.saved) setDropped(d);   // a kept one was put aside on purpose: 6 s to take it back
     if (said) setPrefill({ nonce: Date.now(), text: said.trim(), attachments: [] });   // your words come back to the box
+  };
+  // ---- Drafts: Later keeps the message (no expiry); dropping a kept one can be undone for 6 s
+  const restore = async (d: Draft) => {
+    setDropped(null);
+    try { const r = await act(d.id, 'restore'); keepDraft({ ...r, id: d.id }); setStage({ kind: 'draft', draft: { ...r, id: d.id } }); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not bring it back'); }
+  };
+  const later = async (d: Draft, said?: string) => {
+    quiet();
+    try {
+      const k = isLocal(d) ? await keepForLater(contact.id, d.text, d.back) : { ...(await act(d.id, 'save')), id: d.id };
+      keepDraft(null);
+      setStage({ kind: 'idle' });
+      onKept?.(k);
+    } catch (e) { setStage({ kind: 'draft', draft: d, said, error: e instanceof Error ? e.message : 'Could not keep it' }); }
   };
   const saveEdit = async (d: Draft, said?: string) => {
     const t = (edit ?? '').trim();
@@ -238,6 +270,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
   };
   const done = (d: Draft, how: string, said?: string, voice?: boolean) => {
     keepDraft(null);
+    if (!wa && !isLocal(d)) void act(d.id, 'used').catch(() => undefined);   // copied or shared: out of Drafts
     setStage({ kind: 'sent', draft: d, how, voice });
     if (voice) speak([wa ? 'Trimis.' : 'Copiat.'], MY_LANG);
     void learn(contact, d.text, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined).then(load).catch(() => undefined);
@@ -387,6 +420,12 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
       <div className="shrink-0 border-t border-pc-border bg-pc-base pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto w-full max-w-[760px]">
         {hint && <p className="mx-4 mt-2 text-[13px] text-red-500" role="alert">{hint}</p>}
+        {dropped && (
+          <div className="mx-3 mt-3 flex items-center gap-3 rounded-[12px] bg-pc-surface px-4 py-2" role="status">
+            <p className="min-w-0 flex-1 truncate text-[15px]">Dropped from Drafts</p>
+            <button type="button" onClick={() => void restore(dropped)} className="press h-10 shrink-0 rounded-full px-4 text-[15px] font-semibold text-[var(--pc-accent-ink)]">Undo</button>
+          </div>
+        )}
         {showPreparing && stage.kind === 'preparing' && (
           <div className="px-3 pt-3">
             <ProgressRow tile={<Face contact={contact} size={40} />} name={`To ${contact.label}`} progress={null}
@@ -405,7 +444,13 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, onBack, o
         )}
         {draft && (
           <section className="mx-3 mt-3 rounded-[20px] border-2 border-[var(--pc-accent)] bg-pc-elevated px-4 pb-3 pt-3" aria-label={`Message to ${contact.label}`}>
-            <p className="text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">To {contact.label} · {langName(draft.lang ?? contact.lang)}{wa ? '' : ` · ${channelName(contact.channel)}`}</p>
+            <div className="flex items-start gap-2">
+              <p className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">To {contact.label} · {langName(draft.lang ?? contact.lang)}{wa ? '' : ` · ${channelName(contact.channel)}`}</p>
+              {stage.kind === 'draft' && edit === null && !draft.saved && (
+                <button type="button" onClick={() => void later(stage.draft, said)} className="press -mr-2 -mt-2 h-10 shrink-0 rounded-full px-3 text-[15px] font-semibold text-[var(--pc-accent-ink)]">Later</button>
+              )}
+            </div>
+            {draft.saved && <p className="text-[13px] text-pc-text-muted">{draft.origin === 'rule' && draft.why ? `From the mail rule “${draft.why}”` : 'Kept in Drafts'}{draft.saved_at ? ` · ${timeOf(draft.saved_at)}` : ''}</p>}
             {edit !== null && stage.kind === 'draft' ? (
               <textarea value={edit} onChange={e => setEdit(e.target.value)} rows={4} autoFocus aria-label="Message text"
                 className="mt-1.5 w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[17px] leading-snug outline-none focus:border-pc-accent" />

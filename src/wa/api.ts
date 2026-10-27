@@ -17,7 +17,11 @@ export interface Contact {
 }
 export interface WaMessage { id: string; from: 'them' | 'me'; text: string; transcript?: string; translation?: string; media?: string; ts: string; read?: boolean }
 export type DraftStatus = 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed' | 'expired';
-export interface Draft { id: string; name: string; lang?: string; text: string; back?: string; status: DraftStatus; sent_at?: string; error?: string }
+export interface Draft {
+  id: string; name: string; lang?: string; text: string; back?: string; status: DraftStatus; sent_at?: string; error?: string;
+  /** Kept in Drafts ("Later", or prepared by a mail rule): no 24 h expiry. */
+  contact?: string; saved?: boolean; saved_at?: string; origin?: 'relay' | 'rule'; why?: string; created?: string;
+}
 export interface HistoryEntry { ts: string; kind: 'theirs' | 'mine'; text: string; src?: string }
 export interface AgentProfile { style: string; memory: string; samples: Array<{ name: string; size: number; added: string }>; history: HistoryEntry[]; translations?: Record<string, string> }
 
@@ -36,8 +40,13 @@ export const fetchConversation = (contact: string) =>
   post<{ messages: WaMessage[] }>('/reg/wa/inbox', { contact, limit: 40 }).then(r => r.messages);
 export const waDraft = (contact: string, text: string, back?: string) =>
   post<{ ok: boolean; draft: Draft }>('/reg/wa/draft', { contact, text, back }).then(r => r.draft);
-export const act = (draft: string, action: 'send' | 'cancel' | 'edit', text?: string) =>
+export const act = (draft: string, action: 'send' | 'cancel' | 'edit' | 'save' | 'unsave' | 'used' | 'restore', text?: string) =>
   post<Draft>('/reg/wa/act', { draft, action, ...(text !== undefined ? { text } : {}) });
+/** Drafts: messages kept for later (Later on the card, or prepared by a mail rule), until sent, copied or dropped. */
+export const fetchDrafts = () => post<{ drafts: Draft[] }>('/reg/wa/drafts', {}).then(r => r.drafts);
+/** A message written here but not on the server yet (another channel) kept in Drafts. */
+export const keepDraft = (contact: string, text: string, back?: string) =>
+  post<{ ok: boolean; draft: Draft }>('/reg/wa/draft', { contact, text, back, saved: true }).then(r => r.draft);
 
 // ---- CT 113: the person's agents
 type AgentContact = Pick<Contact, 'id' | 'name' | 'label' | 'lang' | 'tone' | 'channel'>;
