@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented as SharedSegmented } from '../ui/Controls';
-import { Bell, Check, ChevronRight, Languages, LogOut, MessageCircle, Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { Bell, Check, ChevronRight, Languages, LogOut, Mail, MessageCircle, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { DICTATION_LANGS, getDictationLang, getSpeechMode, setDictationLang, setSpeechMode, type SpeechMode } from './voice';
 import { ACCENTS, type Accent, type Appearance, type Look } from './themes';
 import type { PushState } from '../mobile/pushNotifications';
@@ -19,6 +19,8 @@ interface Props {
   onView?: (v: 'mobile' | 'full') => void;
   /** Hide the colour choice (an app with a fixed colour, e.g. Shopping in Keep yellow). */
   fixedAccent?: boolean;
+  /** Omit to hide "Mail rules" (an app without them). */
+  onRules?: () => void;
   /** Extra groups between Appearance and Sign out. */
   children?: ReactNode;
   onLogout: () => void;
@@ -39,7 +41,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   return <SharedSegmented size="s" choice label={label} value={value} onChange={onChange} options={options.map(([v, labelText, icon]) => ({ value: v, label: labelText, icon }))} />;
 }
 
-export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onView, onLogout, onClose, children, fixedAccent }: Props) {
+export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onRules, onView, onLogout, onClose, children, fixedAccent }: Props) {
   const [speech, setSpeech] = useState<SpeechMode>(getSpeechMode);
   const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
@@ -72,6 +74,14 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
             </button>
           </Group>
         )}
+
+        {onRules && <Group foot="Mail you are waiting for: a notification or a task when it arrives.">
+          <button type="button" onClick={onRules} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+            <Icon bg="#007aff"><Mail size={16} /></Icon>
+            <span className="flex-1 text-[16px]">Mail rules</span>
+            <ChevronRight size={17} className="text-pc-text-faint" />
+          </button>
+        </Group>}
 
         <Group title="Appearance">
           <div className="space-y-3 px-4 py-3">
