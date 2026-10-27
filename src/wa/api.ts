@@ -55,6 +55,12 @@ export const compose = (c: Contact, said: string, replyTo?: string) =>
   post<{ text: string; back?: string }>('/relay/compose', { contact: asAgent(c), said, reply_to: replyTo });
 export const translate = (text: string, c?: Contact, msgId?: string) =>
   post<{ translation: string; lang: string }>('/relay/translate', { text, contact: c ? asAgent(c) : undefined, msg_id: msgId });
+/** Dictated with what to do ("translate this into French informal: …"): the text in that language, ready to copy. */
+export const phrase = (said: string) =>
+  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string }>('/relay/phrase', { said });
+/** What was said or typed starts by asking for a translation (Romanian, English, French, Russian, Ukrainian). */
+export const asksTranslation = (t: string) =>
+  /^[\s"'«„]*(?:(?:please|te rog|s'il te plaît|пожалуйста)[\s,]+)?(?:translate|tradu|traduce|traduceți|traduceti|traduis|traduisez|переведи|переведите|переклади)(?=[\s,:.!]|$)/i.test(t);
 export const learn = (c: Contact, sent: string, said?: string, theirs?: string) =>
   post<{ ok: boolean }>('/relay/learn', { contact: asAgent(c), sent, said, theirs });
 export const theyWrote = (c: Contact, text: string) => post<{ ok: boolean }>('/relay/they', { contact: asAgent(c), text });

@@ -32,7 +32,7 @@ import { FacePhotos } from './photos';
 import { Line } from './Line';
 import { Profile } from './Profile';
 import { Translate } from './Translate';
-import { MY_LANG, cachedPhotos, channelName, fetchContacts, fetchDrafts, fetchPhotos, langName, matchContact, pickContact, timeOf, type Contact, type Draft, type Photos } from './api';
+import { MY_LANG, asksTranslation, cachedPhotos, channelName, fetchContacts, fetchDrafts, fetchPhotos, langName, matchContact, pickContact, timeOf, type Contact, type Draft, type Photos } from './api';
 
 const CACHE = 'wa:contacts';
 const OWNER = 'wa:owner';
@@ -99,6 +99,7 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   const goTo = (c: Contact, text: string, voice: boolean) => { setChoosing(null); setFinding(null); setSaid({ text, voice, for: c.id }); setVoiceFor(null); setOpen(c.id); };
   const whoAndWhat = async (text: string, voice: boolean) => {
     try { localStorage.removeItem('draft:wa:home'); } catch { /* not kept */ }
+    if (asksTranslation(text)) { setTranslating({ said: text, voice }); return; }   // "translate this into French…": for no one, ready to copy
     const people = (contacts ?? []).filter(ready);
     const found = matchContact(text, people);
     if (found) { goTo(found, text, voice); return; }
@@ -117,7 +118,8 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   }, []);
   const [profile, setProfile] = useState<Partial<Contact> | null>(null);
   const [settings, setSettings] = useState(false);
-  const [translating, setTranslating] = useState(false);
+  // Translate: opened from its row (empty), or said to the main bar ("translate this into French…").
+  const [translating, setTranslating] = useState<false | { said?: string; voice?: boolean }>(false);
   // Pasted in Translate and answered: it opens that person's line as what they wrote.
   const [replyTo, setReplyTo] = useState<{ contact: string; text: string } | null>(null);
   const [newFrom, setNewFrom] = useState<string | null>(null);   // the text, while "Someone new" is being added
@@ -138,7 +140,7 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
   const sheets = (
     <>
       {profile && <Profile contact={profile} waOwner={waOwner} onClose={() => { setProfile(null); setNewFrom(null); }} onSaved={saved} />}
-      {translating && <Translate people={contacts ?? []} onAnswer={answer} onClose={() => setTranslating(false)}
+      {translating && <Translate people={contacts ?? []} said={translating.said} voice={translating.voice} onAnswer={answer} onClose={() => setTranslating(false)}
         onAddPerson={(lang, text) => { setTranslating(false); setNewFrom(text); setProfile({ lang: lang in LANG_OK ? lang : 'fr', tone: 'formal', aliases: [] }); }} />}
       {settings && <Settings look={look} onLook={onLook} person={person} onClose={() => setSettings(false)} />}
       {choosing && <WhoFor people={(contacts ?? []).filter(ready)} said={choosing.text} onPick={c => goTo(c, choosing.text, choosing.voice)} onClose={() => setChoosing(null)} />}
@@ -248,7 +250,7 @@ function Relay({ look, onLook }: { look: Look; onLook: (l: Look) => void }) {
             </div>
           </section>
 
-          <button type="button" onClick={() => setTranslating(true)}
+          <button type="button" onClick={() => setTranslating({})}
             className="press mt-5 flex min-h-14 w-full items-center gap-3 rounded-[20px] bg-pc-surface px-4 py-3 text-left active:bg-[var(--pc-hover-strong)]">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pc-elevated text-[var(--pc-accent-ink)]"><Languages size={20} /></span>
             <span className="min-w-0 flex-1">
