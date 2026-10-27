@@ -7,7 +7,7 @@ import { UndoBar, type UndoInfo } from './UndoBar';
 /**
  * Mail rules (Lucian 2026-10-27: "vreau să am un loc în oc să văd și regulile active, pot să am multe"):
  * made in the chat ("when Cărturești writes that the books are in the easybox, remind me to write to Marius"),
- * checked every 15 minutes on CT 103 (mail-rules.mjs). Here: every rule, what it waits for, what it does,
+ * checked every 5 minutes on CT 103 (mail-rules.mjs). Here: every rule, what it waits for, what it does,
  * what it last matched and what it said no to; pause, resume and stop, each with Undo.
  */
 interface Seen { at: string; subject: string; from?: string; why?: string; task?: { n?: number } | null }
@@ -104,7 +104,7 @@ export function RulesSheet({ mode, onClose }: { mode: 'light' | 'dark'; onClose:
       <div className="min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
         <p className="mb-4 text-[13px] leading-snug text-pc-text-muted">
           Say it in the chat: “when Cărturești writes that the books are in the easybox, remind me to write to Marius”.
-          Your mail is checked every 15 minutes; a small model reads each new match and only a real one notifies you.
+          Your mail is checked every 5 minutes; a small model reads each new match and only a real one notifies you.
         </p>
         {error && <p className="mb-3 text-[14px] text-red-500">{error}</p>}
         {rules === null && !error && <p className="text-[14px] text-pc-text-muted">Loading…</p>}
