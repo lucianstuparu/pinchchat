@@ -8,7 +8,7 @@ export interface NowItem {
   id: string;
   /** The short number, household-wide ("22 done"). */
   n?: number;
-  /** What kind of doing it is: Admin, Money, Health, People, Errands (the coloured pills). */
+  /** What kind of doing it is: Admin, Money, Health, People, Errands, Home, Business (Casa Artlia) (coloured icons in a row). */
   topics?: string[];
   /** "every month", when the task comes back after it is done. */
   repeat?: string;

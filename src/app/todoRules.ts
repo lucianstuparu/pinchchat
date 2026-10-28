@@ -14,6 +14,8 @@ export const TOPIC_COLORS: Record<string, { rail: string; bg: string; ink: strin
   Health:  { rail: '#e24b4a', bg: '#fdeaea', ink: '#a32d2d', inkDark: '#f59a99' },
   People:  { rail: '#ba7517', bg: '#faeeda', ink: '#854f0b', inkDark: '#e9b467' },
   Errands: { rail: '#8a9a2b', bg: '#eef0d9', ink: '#4d5a12', inkDark: '#c3d36a' },
+  Home:    { rail: '#7c5cd6', bg: '#efeafc', ink: '#5a3fb0', inkDark: '#b9a5f5' },
+  Business: { rail: '#c2418a', bg: '#fbe8f2', ink: '#8f2462', inkDark: '#f08cc2' },
 };
 export const NO_TOPIC = '#9aa2b4';
 export const railOf = (item: { topics?: string[] }) => TOPIC_COLORS[item.topics?.[0] ?? '']?.rail ?? NO_TOPIC;

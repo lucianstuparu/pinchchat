@@ -13,7 +13,7 @@ import { useDelayedFlag, useNow } from '../ui/progress';
 import { useBusy, useDraft } from '../ui/draft';
 import { Segmented } from '../ui/Controls';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronRight, Clock, Flag, Pin, RefreshCw, Repeat, Search, Sparkles, Star, X } from 'lucide-react';
+import { Building2, Check, ChevronRight, Clock, FileText, Flag, HeartPulse, House, MapPin, Pin, RefreshCw, Repeat, Search, Sparkles, Star, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
@@ -57,12 +57,18 @@ export function DueChip({ item, today, mode }: { item: Pick<NowItem, 'due_date' 
   );
 }
 
+/** Topic icons: in a row the topic is a tinted icon, only dates stay as words (Lucian, 2026-10-28). */
+const TOPIC_ICONS: Record<string, LucideIcon> = { Admin: FileText, Money: Wallet, Health: HeartPulse, People: Users, Errands: MapPin, Home: House, Business: Building2 };
+
 export function TopicPill({ topic, mode }: { topic: string; mode: Mode }) {
   const c = TOPIC_COLORS[topic];
-  if (!c) return null;
+  const Icon = TOPIC_ICONS[topic];
+  if (!c || !Icon) return null;
   return (
-    <span className="inline-flex h-[22px] items-center rounded-[8px] px-2 text-[12px] font-semibold"
-      style={mode === 'dark' ? { background: `${c.rail}33`, color: c.inkDark } : { background: c.bg, color: c.ink }}>{topic}</span>
+    <span role="img" aria-label={topic} title={topic} className="inline-flex h-[22px] w-[26px] items-center justify-center rounded-[8px]"
+      style={mode === 'dark' ? { background: `${c.rail}33`, color: c.inkDark } : { background: c.bg, color: c.ink }}>
+      <Icon size={14} strokeWidth={2.25} aria-hidden />
+    </span>
   );
 }
 
