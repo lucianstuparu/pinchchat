@@ -73,6 +73,9 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const [person, setPerson] = useState<string>(() => { try { return localStorage.getItem('shop:person') || ''; } catch { return ''; } });
   useEffect(() => { void whoami().then(p => { if (p) { setPerson(p); try { localStorage.setItem('shop:person', p); } catch { /* fine */ } } }); }, []);
   const { snap, queue, sync, apply, refresh, upload, cancelUpload } = useShop(person || 'me');
+  // The assistant's answers, plus asks still waiting in the outbox (offline): for the bar on both screens.
+  const allAsks: Ask[] = [...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
+    ? [{ id: op.id, text: op.text, photos: op.photos, status: (sync === 'offline' || sync === 'signed-out' ? 'queued' : 'working') as Ask['status'], ts: new Date().toISOString() }] : []))];
   const stores = snap.stores;
   const [store, setStoreState] = useState<string | null>(readStore);
   const setStore = (s: string | null) => { setStoreState(s); try { if (s) localStorage.setItem(STORE_KEY, s); else localStorage.removeItem(STORE_KEY); } catch { /* fine */ } };
@@ -168,10 +171,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
   const offerUndo = (i: Item, label: string) => setUndo({ key: Date.now(), label: `${label}: ${i.title}`, undo: () => apply({ op: 'untick', id: i.id }) });
   // Paid: the basket is bought at this shop; photos of things not on the list go to the assistant
   // once Undo has passed (or when the app is put away), so Undo puts everything back as it was.
-  const pendingAsk = useRef<{ timer: number; op: Op } | null>(null);
+  const pendingAsk = useRef<{ timer: number; ops: Op[] } | null>(null);
   const sendPending = useCallback(() => {
     const p = pendingAsk.current; if (!p) return;
-    window.clearTimeout(p.timer); pendingAsk.current = null; apply(p.op);
+    window.clearTimeout(p.timer); pendingAsk.current = null; for (const op of p.ops) apply(op);
   }, [apply]);
   useEffect(() => {
     const hide = () => { if (document.visibilityState === 'hidden') sendPending(); };
@@ -185,8 +188,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     for (const i of paid) apply({ op: 'tick', id: i.id, store: t.store });
     sendPending();
     if (t.extras.length) {
-      const op: Op = { op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), t.extras.length), store: t.store, photos: t.extras.map(e => e.ref) };
-      pendingAsk.current = { op, timer: window.setTimeout(sendPending, 6500) };
+      // At most 6 photos per ask (the server's limit; a 7th was silently dropped on 2026-10-28): one ask per 6.
+      const ops: Op[] = [];
+      for (let k = 0; k < t.extras.length; k += 6) {
+        const part = t.extras.slice(k, k + 6);
+        ops.push({ op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), part.length), store: t.store, photos: part.map(e => e.ref) });
+      }
+      pendingAsk.current = { ops, timer: window.setTimeout(sendPending, 6500) };
     }
     setTrip(null);
     const extra = t.extras.length ? ` + ${t.extras.length} not on the list` : '';
@@ -218,7 +226,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     return (
       <>
         <InStore trip={trip} onTrip={setTrip} items={snap.items} stores={stores} purchases={snap.purchases ?? []} products={products}
-          storeName={storeName} mode={mode} apply={apply} onPaid={pay} onLeave={() => setTrip(null)} onChangeShop={() => setTripPicking(true)} />
+          storeName={storeName} mode={mode} apply={apply} onPaid={pay} onLeave={() => setTrip(null)} onChangeShop={() => setTripPicking(true)}
+          askBar={<AddBar prefill={null} store={trip.store} stores={stores} known={snap.known} items={snap.items} asks={allAsks} onAdd={apply} />} />
         {tripPicking && (
           <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={trip.store}
             onPick={tag => { if (tag) startTrip(tag); setTripPicking(false); }}
@@ -355,8 +364,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
       {search === null && !home && <UndoBar info={undo} onClose={closeUndo} />}
       {search === null && (
         <AddBar key={prefill ?? ''} prefill={prefill} store={store} stores={stores} known={snap.known} items={snap.items}
-          asks={[...(snap.asks ?? []), ...queue.flatMap(op => (op.op === 'ask' && !(snap.asks ?? []).some(a => a.id === op.id)
-            ? [{ id: op.id, text: op.text, photos: op.photos, status: (sync === 'offline' || sync === 'signed-out' ? 'queued' : 'working') as Ask['status'], ts: new Date().toISOString() }] : []))]}
+          asks={allAsks}
           onAdd={(op) => { apply(op); setPrefill(null); }} />
       )}
 
