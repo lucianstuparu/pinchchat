@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented as SharedSegmented } from '../ui/Controls';
-import { Bell, Check, ChevronRight, Languages, LogOut, Mail, MessageCircle, Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { Bell, Check, ChevronRight, History, Languages, LogOut, Mail, MessageCircle, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { DICTATION_LANGS, getDictationLang, getSpeechMode, setDictationLang, setSpeechMode, type SpeechMode } from './voice';
 import { ACCENTS, type Accent, type Appearance, type Look } from './themes';
 import type { PushState } from '../mobile/pushNotifications';
@@ -21,6 +21,8 @@ interface Props {
   fixedAccent?: boolean;
   /** Omit to hide "Mail rules" (an app without them). */
   onRules?: () => void;
+  /** Omit to hide "Sent notifications" (the history kept by oc-push). */
+  onHistory?: () => void;
   /** Extra groups between Appearance and Sign out. */
   children?: ReactNode;
   onLogout: () => void;
@@ -41,7 +43,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   return <SharedSegmented size="s" choice label={label} value={value} onChange={onChange} options={options.map(([v, labelText, icon]) => ({ value: v, label: labelText, icon }))} />;
 }
 
-export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onRules, onView, onLogout, onClose, children, fixedAccent }: Props) {
+export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onRules, onHistory, onView, onLogout, onClose, children, fixedAccent }: Props) {
   const [speech, setSpeech] = useState<SpeechMode>(getSpeechMode);
   const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
@@ -72,6 +74,13 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
                 <span className={`absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white shadow transition-[left] ${pushOn ? 'left-[22px]' : 'left-[2px]'}`} />
               </span>
             </button>
+            {onHistory && (
+              <button type="button" onClick={onHistory} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+                <Icon bg="#8e8e93"><History size={16} /></Icon>
+                <span className="flex-1 text-[16px]">Sent notifications</span>
+                <ChevronRight size={17} className="text-pc-text-faint" />
+              </button>
+            )}
           </Group>
         )}
 

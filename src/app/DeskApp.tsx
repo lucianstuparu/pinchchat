@@ -42,6 +42,7 @@ import { ItemChips } from './ItemChips';
 import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
 import { RulesSheet } from './RulesSheet';
+import { NotificationsSheet } from './NotificationsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
@@ -135,6 +136,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [sheet, setSheet] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [notice, dismissNotice] = useNotice();
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [refreshing, setRefreshing] = useState(false);
@@ -636,9 +638,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {settings && (
         <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
           onRules={() => { setSettings(false); setRulesOpen(true); }}
+          onHistory={() => { setSettings(false); setHistoryOpen(true); }}
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />
       )}
       {rulesOpen && <RulesSheet mode={mode} onClose={() => setRulesOpen(false)} />}
+      {historyOpen && <NotificationsSheet mode={mode} onOpenItem={id => { setHistoryOpen(false); setSheet(id); }} onClose={() => setHistoryOpen(false)} />}
     </div>
   );
 }
