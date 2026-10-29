@@ -56,8 +56,10 @@ export const compose = (c: Contact, said: string, replyTo?: string) =>
 export const translate = (text: string, c?: Contact, msgId?: string) =>
   post<{ translation: string; lang: string }>('/relay/translate', { text, contact: c ? asAgent(c) : undefined, msg_id: msgId });
 /** Dictated with what to do ("translate this into French informal: …"): the text in that language, ready to copy. */
-export const phrase = (said: string) =>
-  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string }>('/relay/phrase', { said });
+export const phrase = (said: string, to?: string, tone?: 'formal' | 'informal') =>
+  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string; from?: string }>('/relay/phrase', { said, to, tone });
+/** The Translate box's languages (Lucian 2026-10-29: "4-5 languages in total"). */
+export const BOX_LANGS = ['ro', 'en', 'fr', 'ru', 'uk'];
 /** What was said or typed starts by asking for a translation (Romanian, English, French, Russian, Ukrainian). */
 export const asksTranslation = (t: string) =>
   /^[\s"'«„]*(?:(?:please|te rog|s'il te plaît|пожалуйста)[\s,]+)?(?:translate|tradu|traduce|traduceți|traduceti|traduis|traduisez|переведи|переведите|переклади)(?=[\s,:.!]|$)/i.test(t);

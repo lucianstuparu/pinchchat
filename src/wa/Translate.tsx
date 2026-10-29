@@ -6,17 +6,32 @@
  * The other way (Lucian 2026-10-27: "translate this in French informal" + what I dictate, "ready for one
  * tap copy"): said to Relay's main bar, or typed here starting with "translate…", it comes out in that
  * language, a little cleaned up, with Copy.
+ * A box like Google Translate (Lucian 2026-10-29: "not auto translate to Romanian, write a message in
+ * Romanian or English and have it translated to French or any combination, 4-5 languages"): pick the
+ * language it goes into (and the register); written in any language. Into Romanian is the reading way,
+ * with Answer it; into any other language it is a message to copy. The choice is remembered.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Languages, Plus, Share2, Square, Volume2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
+import { Segmented } from '../ui/Controls';
 import { ProgressRow } from '../ui/ProgressRow';
 import { useBusy } from '../ui/draft';
 import { canSpeak, speak } from '../ui/speak';
 import { Face } from './Face';
-import { MY_LANG, asksTranslation, langName, phrase, translate, type Contact } from './api';
+import { BOX_LANGS, MY_LANG, asksTranslation, langName, phrase, translate, type Contact } from './api';
 
-type Phrased = { text: string; lang: string; tone: 'formal' | 'informal'; back: string };
+type Tone = 'formal' | 'informal';
+type Phrased = { text: string; lang: string; tone: Tone; back: string; from?: string };
+
+const KEY = 'relay-translate-into';
+const remembered = (): { to: string; tone: Tone } => {
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { to?: string; tone?: Tone } | null;
+    if (v?.to && BOX_LANGS.includes(v.to)) return { to: v.to, tone: v.tone === 'formal' ? 'formal' : 'informal' };
+  } catch { /* private window: the default */ }
+  return { to: 'fr', tone: 'informal' };
+};
 
 export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose }: {
   people: Contact[];
@@ -28,6 +43,7 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   onClose: () => void;
 }) {
   const [text, setText] = useState(said ?? '');
+  const [into, setInto] = useState(remembered);
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<{ translation: string; lang: string } | null>(null);
   const [made, setMade] = useState<Phrased | null>(null);
@@ -36,15 +52,24 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   const [answering, setAnswering] = useState(false);
   const [stop, setStop] = useState<(() => void) | null>(null);
   useBusy('wa-translate', text.length > 0);
+  const reading = into.to === MY_LANG;
 
-  const go = async (t = text.trim()) => {
-    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false);
+  const go = async (t = text.trim(), to = into) => {
+    if (!t) return;
+    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false); setAnswering(false);
     try {
       if (asksTranslation(t)) setMade(await phrase(t));
-      else setOut(await translate(t));
+      else if (to.to === MY_LANG) setOut(await translate(t));
+      else setMade(await phrase(t, to.to, to.tone));
     }
     catch (e) { setError(navigator.onLine ? (e instanceof Error ? e.message : 'Could not translate it') : 'No connection'); }
     finally { setBusy(false); }
+  };
+  // Another language or register after a translation: translate it again at once.
+  const pick = (next: { to: string; tone: Tone }) => {
+    setInto(next);
+    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* not kept: fine */ }
+    if ((out || made || error) && text.trim() && !busy) void go(text.trim(), next);
   };
   const started = useRef(false);
   useEffect(() => {
@@ -65,6 +90,8 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   // Those who write in that language first.
   const ordered = out ? [...people].sort((a, b) => Number(b.lang === out.lang) - Number(a.lang === out.lang)) : people;
+  // What it says, in my language: not when it was written in my language or goes into it.
+  const showBack = made?.back && made.lang !== MY_LANG && made.from !== MY_LANG;
 
   return (
     <Sheet label="Translate" onClose={onClose} className="flex max-h-[92dvh] flex-col px-4 pt-2">
@@ -73,16 +100,24 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
         <CloseButton onClick={onClose} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">
-        <p className="mb-2 text-[13px] text-pc-text-muted">Paste an email or a message from any app. You get it in {langName(MY_LANG)}, then you can answer it. Or start with “translate into French…” to write it in another language.</p>
-        <textarea value={text} onChange={e => { setText(e.target.value); setOut(null); setMade(null); setAnswering(false); }} rows={made ? 3 : 6} autoFocus={!said} aria-label="Text to translate"
-          placeholder="Bonjour Lucian, …"
-          className="w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] leading-snug outline-none focus:border-pc-accent" />
+        <p className="mb-1 text-[13px] text-pc-text-muted">Into</p>
+        <Segmented choice size="s" label="Translate into" value={into.to} onChange={to => pick({ ...into, to })}
+          options={BOX_LANGS.map(l => ({ value: l, label: langName(l) }))} />
+        {!reading && (
+          <div className="mt-2">
+            <Segmented choice size="s" label="Register" value={into.tone} onChange={tone => pick({ ...into, tone })}
+              options={[{ value: 'informal', label: 'Informal (tu)' }, { value: 'formal', label: 'Formal (vous, Вы)' }]} />
+          </div>
+        )}
+        <textarea value={text} onChange={e => { setText(e.target.value); setOut(null); setMade(null); setAnswering(false); setError(null); }} rows={made ? 3 : 5} autoFocus={!said} aria-label="Text to translate"
+          placeholder={reading ? 'Paste a message in any language…' : 'Write in any language…'}
+          className="mt-3 w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] leading-snug outline-none focus:border-pc-accent" />
         {busy ? (
-          <div className="mt-3"><ProgressRow tile={<Languages size={18} />} name="Translating" status={asksTranslation(text) ? 'As you asked…' : `Into ${langName(MY_LANG)}…`} progress={null} /></div>
+          <div className="mt-3"><ProgressRow tile={<Languages size={18} />} name="Translating" status={asksTranslation(text) ? 'As you asked…' : `Into ${langName(into.to)}…`} progress={null} /></div>
         ) : !out && !made && (
           <button type="button" disabled={!text.trim()} onClick={() => void go()}
             className="press mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">
-            <Languages size={19} /> Translate
+            <Languages size={19} /> {asksTranslation(text) ? 'Translate' : `Translate into ${langName(into.to)}`}
           </button>
         )}
         {error && <p className="mt-2 text-[15px] text-red-500" role="alert">{error}</p>}
@@ -98,7 +133,7 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
                 )}
               </div>
               <p className="select-text whitespace-pre-wrap text-[19px] leading-snug">{made.text}</p>
-              {made.back && made.lang !== MY_LANG && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-muted">{made.back}</p>}
+              {showBack && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-muted">{made.back}</p>}
             </section>
             <div className="mt-3 flex items-center gap-2">
               {canShare && <button type="button" onClick={() => void navigator.share({ text: made.text }).catch(() => undefined)} aria-label="Share" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-pc-surface"><Share2 size={20} /></button>}
