@@ -27,6 +27,7 @@ import { useQuestions } from '../mobile/useQuestions';
 import { switchUiMode } from '../mobile/uiMode';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 import type { OutgoingAttachment } from '../mobile/attachments';
+import { KeepNote } from '../notes/KeepNote';
 import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { searchMessages, snippet } from '../mobile/searchMessages';
 import { useDeepSearch } from '../ui/useDeepSearch';
@@ -122,6 +123,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
   const [todoOpen, setTodoOpen] = useState(false);
+  // Notes: a share waiting for "Keep as a note", the list to reload, a note to open.
+  const [keeping, setKeeping] = useState<{ text: string; attachments: OutgoingAttachment[] } | null>(null);
+  const [notesKey, setNotesKey] = useState(0);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
   // Laptop: To do is a column beside the chat; phone: a full-screen panel. Only one is mounted, so
   // the New task box (its draft, its busy state) exists once.
   const [wide, setWide] = useState(() => window.matchMedia('(min-width: 768px)').matches);
@@ -248,12 +253,21 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     if (!id) return;
     clearShareParam();
     if (id === 'failed') return;
+    // A share asks first: keep it as a note (Lucian 2026-10-29), or send it in the chat as before.
     void takeSharedContent(id).then(shared => {
       if (!shared) { setHint('The shared content has expired.'); return; }
-      setPrefill({ nonce: Date.now(), text: shared.text, attachments: shared.attachments });
-      setHint(shared.rejected.length > 0 ? `Shared, but could not attach: ${shared.rejected.join(', ')}` : 'Shared. Add a note if you like, then send.');
+      setKeeping({ text: shared.text, attachments: shared.attachments });
+      if (shared.rejected.length > 0) setHint(`Shared, but could not attach: ${shared.rejected.join(', ')}`);
     });
   }, []);
+  const toChat = () => {
+    if (!keeping) return;
+    setPrefill({ nonce: Date.now(), text: keeping.text, attachments: keeping.attachments });
+    setHint('Shared. Add a note if you like, then send.');
+    setKeeping(null);
+  };
+  const kept = () => { setKeeping(null); setNotesKey(k => k + 1); setTab('notes'); setTodoOpen(true); setHint('Kept. The assistant is reading it.'); };
+  const openNote = (id: string) => { setSearch(null); setTab('notes'); setTodoOpen(true); setNoteOpen(id); };
 
   useEffect(() => saveOutbox(outbox), [outbox]);
   useEffect(() => {
@@ -368,12 +382,13 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, [searching, q, now.items, loops, shown, search]);
   // Then further: the server (closed items too, and by meaning) and the whole conversation (gateway).
   const deep = useDeepSearch(searching ? search : null, { path: '/reg/search', sessionKey: frontSession, getClient });
-  const moreItems = useMemo(() => deep.server.filter(h => !found.todo.some(i => i.id === h.ref) && !found.progress.some(l => l.id === h.ref)),
+  const moreItems = useMemo(() => deep.server.filter(h => h.kind !== 'note' && !found.todo.some(i => i.id === h.ref) && !found.progress.some(l => l.id === h.ref)),
     [deep.server, found.todo, found.progress]);
+  const noteHits = useMemo(() => deep.server.filter(h => h.kind === 'note'), [deep.server]);
   const olderMsgs = useMemo(() => deep.chat.filter(h => !loadedMatch(h, found.msgs)), [deep.chat, found.msgs]);
   const [openHit, setOpenHit] = useState<string | null>(null);
   const searchingFurther = useDelayedFlag(searching && deep.busy);
-  const foundCount = found.todo.length + found.progress.length + found.msgs.length + moreItems.length + olderMsgs.length;
+  const foundCount = found.todo.length + found.progress.length + found.msgs.length + moreItems.length + noteHits.length + olderMsgs.length;
   const jumpTo = (id: string) => {
     // A message above the window: widen it first, so the message is on screen to scroll to.
     const at = shown.findIndex(m => m.id === id);
@@ -465,7 +480,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet} onMove={m => void move(m)}
       onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}
       onAdd={addTask} transcribe={transcribeAudio} reply={taskReply} onDismissReply={() => setAsked(null)} onClose={onClose}
-      footer={onClose && todoOpen && !sheet && undo ? undoBar : null} />
+      footer={onClose && todoOpen && !sheet && undo ? undoBar : null}
+      notesKey={notesKey} noteOpen={noteOpen} onNoteOpened={() => setNoteOpen(null)} />
   );
 
   // The pinned card over the chat (phone): the most pressing thing, and how much else is waiting.
@@ -550,6 +566,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <SearchGroup title={found.todo.length + found.progress.length > 0 ? 'More, including done' : 'To-dos, including done'}>
           {moreItems.map(h => (
             <SearchRow key={h.id} onOpen={() => setSheet(h.ref)} title={h.title} byMeaning={!h.via.includes('words')}
+              excerpt={h.snippet && plainOf(h.snippet) !== h.title ? <Marked parts={markedParts(h.snippet)} /> : undefined} />
+          ))}
+        </SearchGroup>
+      )}
+      {noteHits.length > 0 && (
+        <SearchGroup title="Notes">
+          {noteHits.map(h => (
+            <SearchRow key={h.id} onOpen={() => openNote(h.ref)} icon={<StickyNote size={18} />} title={h.title} byMeaning={!h.via.includes('words')}
               excerpt={h.snippet && plainOf(h.snippet) !== h.title ? <Marked parts={markedParts(h.snippet)} /> : undefined} />
           ))}
         </SearchGroup>
@@ -701,6 +725,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />
       )}
       {rulesOpen && <RulesSheet mode={mode} onClose={() => setRulesOpen(false)} />}
+      {keeping && <KeepNote base="/reg" shared={keeping} onKept={kept} onChat={toChat} onClose={() => setKeeping(null)} />}
       {historyOpen && <NotificationsSheet mode={mode} onOpenItem={id => { setHistoryOpen(false); setSheet(id); }} onClose={() => setHistoryOpen(false)} />}
     </div>
   );

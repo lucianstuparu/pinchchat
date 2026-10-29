@@ -12,6 +12,7 @@ import { SpeechStatus } from './SpeechStatus';
 import { useDelayedFlag, useNow } from '../ui/progress';
 import { useBusy, useDraft } from '../ui/draft';
 import { Segmented } from '../ui/Controls';
+import { NotesView } from '../notes/Notes';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Building2, Check, ChevronRight, Clock, FileText, Flag, HeartPulse, House, MapPin, Pin, RefreshCw, Repeat, Search, Sparkles, Star, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import { formatAmount, type Loop, type NowItem } from './api';
@@ -25,7 +26,7 @@ import { TOPIC_COLORS, dueChip, groupTodo, matches, railOf, titleRuns, type DueK
 import type { OutgoingAttachment } from '../mobile/attachments';
 
 type Mode = 'light' | 'dark';
-export type TodoTab = 'todo' | 'progress';
+export type TodoTab = 'todo' | 'progress' | 'notes';
 
 /** A title with its **bold** runs. */
 export function Title({ text, className }: { text: string; className?: string }) {
@@ -279,6 +280,8 @@ export interface TodoPanelProps {
   onClose?: () => void;
   /** The undo bar, when this panel is the surface on top. */
   footer?: ReactNode;
+  /** Notes: reload after one was kept elsewhere (a share), and a note to open. */
+  notesKey?: number; noteOpen?: string | null; onNoteOpened?: () => void;
 }
 
 export function TodoPanel(p: TodoPanelProps) {
@@ -296,7 +299,7 @@ export function TodoPanel(p: TodoPanelProps) {
       <header className={`shrink-0 bg-pc-elevated ${p.onClose ? 'pt-[env(safe-area-inset-top)]' : ''}`}>
         {p.onClose && (
           <div className="flex h-[52px] items-center gap-1 pl-4 pr-1">
-            <h2 className="min-w-0 flex-1 text-[28px] font-bold tracking-tight">{p.tab === 'todo' ? 'To do' : 'In progress'}</h2>
+            <h2 className="min-w-0 flex-1 text-[28px] font-bold tracking-tight">{p.tab === 'todo' ? 'To do' : p.tab === 'notes' ? 'Notes' : 'In progress'}</h2>
             <button type="button" onClick={p.onRefresh} className="flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
               <RefreshCw size={18} className={spinning ? 'animate-spin' : ''} />
             </button>
@@ -307,7 +310,7 @@ export function TodoPanel(p: TodoPanelProps) {
         )}
         <div className="flex items-center gap-2 px-4 pb-2 pt-1">
           <Segmented<TodoTab> value={p.tab} onChange={p.onTab} label="Lists"
-            options={[{ value: 'todo', label: 'To do', count: p.items.filter(i => !i.hidden).length }, { value: 'progress', label: 'In progress', count: p.loops.length }]} />
+            options={[{ value: 'todo', label: 'To do', count: p.items.filter(i => !i.hidden).length }, { value: 'progress', label: 'In progress', count: p.loops.length }, { value: 'notes', label: 'Notes' }]} />
           {!p.onClose && (
             <button type="button" onClick={p.onRefresh} className="press flex h-10 w-10 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Refresh">
               <RefreshCw size={16} className={spinning ? 'animate-spin' : ''} />
@@ -316,6 +319,11 @@ export function TodoPanel(p: TodoPanelProps) {
         </div>
       </header>
 
+      {p.tab === 'notes' && !p.expired ? (
+        <div className="flex min-h-0 flex-1 flex-col px-3 pt-1 pb-[env(safe-area-inset-bottom)]">
+          <NotesView base="/reg" places refreshKey={p.notesKey} openId={p.noteOpen} onOpened={p.onNoteOpened} />
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {p.expired ? (
           <p className="px-2 py-6 text-[15px] text-pc-text-muted">Signed out of the lists. <a href="/" className="text-[var(--pc-accent-ink)]">Sign in again</a></p>
@@ -356,6 +364,7 @@ export function TodoPanel(p: TodoPanelProps) {
           </div>
         )}
       </div>
+      )}
       {p.footer && <div className="shrink-0 pb-[env(safe-area-inset-bottom)]">{p.footer}</div>}
     </div>
   );

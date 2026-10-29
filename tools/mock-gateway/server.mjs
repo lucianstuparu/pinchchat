@@ -206,6 +206,16 @@ function mockSearch(docs, q) {
     return [{ id: d.id, kind: d.kind, ref: d.ref, title: d.title, snippet, via: [...(byWords ? ['words'] : []), ...(byMeaning ? ['meaning'] : [])] }];
   }).sort((a, b) => b.via.length - a.via.length);
 }
+const mockNotes = [
+  { id: 'nt-2026-10-28-aaaaaa', place: 'home', by: 'lucian', from: 'oc', created: '2026-10-28T20:10:00Z', updated: '2026-10-28T20:10:00Z',
+    files: [{ ref: '2026-10/n-1111111111111111.png', name: 'ad.png', mime: 'image/png' }], status: 'ready', place_by: 'guess',
+    title: 'Atelier Dubois: carpenter and home jobs, Meyrin', summary: 'A carpenter who makes fitted furniture and takes everyday jobs around the house; send photos and a short description for a price idea.',
+    details: { who: 'Marc Dubois, Atelier Dubois', what: 'Fitted furniture, small home jobs', where: 'Workshop in Meyrin', website: 'www.example.org', phone: '+41 22 000 00 00' }, tags: ['carpenter', 'furniture', 'home-improvement', 'meyrin'] },
+  { id: 'nt-2026-10-26-bbbbbb', place: 'artlia', by: 'ludmila', from: 'artlia', created: '2026-10-26T18:55:00Z', updated: '2026-10-26T18:55:00Z',
+    files: [], status: 'ready', place_by: 'guess', title: 'Ușa de intrare: glisantă automată, 1,40 m', summary: 'Contract de întreținere obligatoriu pentru orice ușă automată. Vitraj conform DTU 39-4.', details: {}, tags: ['ușă', 'erp', 'pmr'] },
+  { id: 'nt-2026-10-22-cccccc', place: 'home', by: 'lucian', from: 'chat', created: '2026-10-22T16:18:00Z', updated: '2026-10-22T16:18:00Z', link: 'https://www.example.org/aides',
+    files: [], status: 'ready', place_by: 'guess', title: 'Heat pump aid amounts (EDF email)', summary: 'Chauffe-eau thermodynamique: 926 € ménage modeste précaire, 720 € modeste, 411 € autres.', details: { price: '411–926 €' }, tags: ['heat-pump', 'aid', 'edf'] },
+];
 const DRIVE_DOCS = [
   { ref: '00 Knowledge base/KB 03 - ERP et sécurité.txt', text: "KB 03 — ERP 5e catégorie. Le PEI (poteau incendie) doit être à moins de 150 m. Option TVA: sans option, environ 18 k€ de TVA perdus sur les travaux. Maîtrise d'œuvre: néant (maîtrise d'ouvrage directe)." },
   { ref: '04 Purchase - Notaire/Copie AAE PROMESSE DE VENTE SCI SODAMO.pdf.txt', text: 'PROMESSE DE VENTE à la requête de : PROMETTANT La Société dénommée SODAMO, Société civile immobilière. Prix : 640 000 €. Condition suspensive de prêt : Crédit Mutuel.' },
@@ -500,6 +510,41 @@ const server = http.createServer((req, res) => {
       if (p.action === 'cancel' && d.status === 'draft') d.status = 'cancelled';
       if (p.action === 'send' && (d.status === 'draft' || d.status === 'failed')) { if (p.text) d.text = p.text; d.status = 'sent'; d.sent_at = new Date().toISOString(); }
       setTimeout(() => res.end(JSON.stringify(d)), 600);   // register-api answers with the draft itself
+    });
+    return;
+  }
+  // Notes (src/notes; our.infra notes.mjs), oc and Casa Artlia. In-memory; a kept note is "read" after 3 s.
+  const noteCall = /^\/(reg|artlia)\/notes(?:\/(add|act|files\/.+))?$/.exec(url.pathname);
+  if (noteCall) {
+    if (noteCall[2]?.startsWith('files/')) {
+      res.setHeader('content-type', 'image/svg+xml');
+      res.end('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><rect width="360" height="640" fill="#e8e2d6"/><rect x="20" y="40" width="320" height="200" rx="12" fill="#b08860"/><text x="30" y="300" font-size="28" font-family="sans-serif">Screenshot</text></svg>');
+      return;
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      const app = noteCall[1] === 'reg' ? 'oc' : 'artlia';
+      const visible = mockNotes.filter((n) => !n.archived && (app === 'oc' || n.place === 'artlia'));
+      if (!noteCall[2]) { res.end(JSON.stringify({ notes: visible })); return; }
+      if (noteCall[2] === 'add') {
+        const now = new Date().toISOString();
+        const n = { id: `nt-2026-10-29-${Math.random().toString(16).slice(2, 8)}`, place: app === 'artlia' ? 'artlia' : 'home', by: 'lucian', from: app, created: now, updated: now,
+          said: p.said, link: p.link, files: (p.files || []).map((f, i) => ({ ref: `2026-10/n-${i}0000000000000000`.slice(0, 26) + '.png', name: f.name, mime: f.mimeType })),
+          status: 'reading', place_by: 'guess', title: p.said || 'Shared photo', details: {}, tags: [] };
+        mockNotes.unshift(n);
+        setTimeout(() => Object.assign(n, { status: 'ready', title: 'Atelier Dubois: carpenter, Meyrin', summary: 'A carpenter who makes fitted furniture and takes small jobs around the house. Send photos for a quote.',
+          details: { who: 'Marc Dubois, Atelier Dubois', what: 'Fitted furniture, small home jobs', where: 'Workshop in Meyrin', website: 'www.example.org' }, tags: ['carpenter', 'furniture', 'meyrin'] }), 3000);
+        res.end(JSON.stringify({ note: n })); return;
+      }
+      const n = mockNotes.find((x) => x.id === p.note);
+      if (!n) { res.statusCode = 404; res.end(JSON.stringify({ error: 'no such note' })); return; }
+      if (p.action === 'place') { n.place = p.place; n.place_by = 'person'; }
+      if (p.action === 'archive') n.archived = true;
+      if (p.action === 'unarchive') n.archived = false;
+      res.end(JSON.stringify({ note: n }));
     });
     return;
   }

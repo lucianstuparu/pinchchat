@@ -10,7 +10,7 @@ import type { GatewayClient } from '../lib/gateway';
 import { post } from '../app/api';
 
 export interface ServerHit {
-  id: string; kind: 'doc' | 'item' | 'term' | 'task' | 'loop'; ref: string; title: string; snippet: string; updated?: string;
+  id: string; kind: 'doc' | 'item' | 'term' | 'task' | 'loop' | 'note'; ref: string; title: string; snippet: string; updated?: string;
   via: Array<'words' | 'meaning'>;
 }
 export interface ChatHit { messageId: string; sessionKey: string; role: 'user' | 'assistant'; timestamp: number; snippet: string }

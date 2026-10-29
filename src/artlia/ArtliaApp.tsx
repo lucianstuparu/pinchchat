@@ -40,6 +40,9 @@ import { actOn, cachedList, docFolder, docName, fetchList, roError, uploadFile, 
 import { CatsView, CategoryView, NowView, PlanView } from './Lists';
 import { opsFor, type Move } from '../ui/dragRules';
 import { ArtSheet } from './ArtSheet';
+import { NotesView } from '../notes/Notes';
+import { KeepNote } from '../notes/KeepNote';
+import { clearShareParam, pendingShareId, takeSharedContent } from '../share/shareInbox';
 import { toneOf, toneStyle, topOf, withSender } from './rules';
 
 const SESSION = 'agent:artlia:main';
@@ -90,7 +93,7 @@ export default function ArtliaApp() {
   );
 }
 
-type Tab = 'now' | 'plan' | 'cats';
+type Tab = 'now' | 'plan' | 'cats' | 'notes';
 
 function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; look: Look; mode: 'light' | 'dark'; onLook: (l: Look) => void }) {
   const { status, messages, isLoadingHistory, activeSession, sendMessage, logout, getClient, addEventListener, switchSession } = gw;
@@ -208,6 +211,18 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
   // ---- chat plumbing
   const [prefill, setPrefill] = useState<ComposerPrefill | null>(null);
+  // Notes (Lucian 2026-10-29): a share asks "Keep as a note" (or send it in the chat); the list reloads after.
+  const [keeping, setKeeping] = useState<{ text: string; attachments: OutgoingAttachment[] } | null>(null);
+  const [notesKey, setNotesKey] = useState(0);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
+  useEffect(() => {
+    const id = pendingShareId();
+    if (!id) return;
+    clearShareParam();
+    if (id === 'failed') { setHint('Nu s-a putut citi ce ai trimis.'); return; }
+    void takeSharedContent(id).then(shared => { if (shared) setKeeping({ text: shared.text, attachments: shared.attachments }); else setHint('Ce ai trimis a expirat.'); });
+  }, []);
+  const openNotes = (id: string | null) => { setCat(null); setTab('notes'); setPanelOpen(true); setNoteOpen(id); };
   const [outbox, setOutbox] = useState<OutboxItem[]>(loadOutbox);
   const [replyTo, setReplyTo] = useState<{ text: string; mine: boolean } | null>(null);
   const sentAttachments = useRef(new Map<string, OutgoingAttachment[]>());
@@ -327,9 +342,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const moreItems = deep.server.filter(h => h.kind === 'item' && !local.items.some(i => i.id === h.ref));
   const docs = deep.server.filter(h => h.kind === 'doc');
   const terms = deep.server.filter(h => h.kind === 'term');
+  const noteHits = deep.server.filter(h => h.kind === 'note');
   const olderMsgs = deep.chat.filter(h => !loadedMatch(h, local.msgs));
   const searchingFurther = useDelayedFlag(searching && deep.busy);
-  const foundCount = local.items.length + local.msgs.length + moreItems.length + docs.length + terms.length + olderMsgs.length;
+  const foundCount = local.items.length + local.msgs.length + moreItems.length + docs.length + terms.length + noteHits.length + olderMsgs.length;
   const jumpTo = (id: string) => {
     setSearch(null); setFlash(id);
     window.setTimeout(() => document.getElementById(`d-${id}`)?.scrollIntoView({ block: 'center' }), 50);
@@ -363,6 +379,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           {docs.map(h => (
             <SearchRow key={h.id} onOpen={() => setDoc(h.ref)} icon={<FileText size={18} />} title={docName(h.ref)} byMeaning={!h.via.includes('words')}
               excerpt={<Marked parts={markedParts(h.snippet)} />} meta={docFolder(h.ref)} />
+          ))}
+        </SearchGroup>
+      )}
+      {noteHits.length > 0 && (
+        <SearchGroup title="Note">
+          {noteHits.map(h => (
+            <SearchRow key={h.id} onOpen={() => { setSearch(null); openNotes(h.ref); }} icon={<StickyNote size={18} />} title={h.title} byMeaning={!h.via.includes('words')}
+              excerpt={<Marked parts={markedParts(h.snippet)} />} />
           ))}
         </SearchGroup>
       )}
@@ -439,7 +463,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         {!cat && (
           <div className="px-3 pb-2">
             <Segmented<Tab> label="Ce arată lista" value={tab} onChange={setTab}
-              options={[{ value: 'now', label: 'Acum' }, { value: 'plan', label: 'Plan' }, { value: 'cats', label: 'Categorii' }]} />
+              options={[{ value: 'now', label: 'Acum' }, { value: 'plan', label: 'Plan' }, { value: 'cats', label: 'Categorii' }, { value: 'notes', label: 'Note' }]} />
           </div>
         )}
         {loadState !== 'ok' && (
@@ -449,6 +473,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           </p>
         )}
       </div>
+      {tab === 'notes' && !cat ? (
+        <div className="flex min-h-0 flex-1 flex-col px-2 pt-1 pb-[env(safe-area-inset-bottom)]">
+          <NotesView base="/artlia" places={false} refreshKey={notesKey} openId={noteOpen} onOpened={() => setNoteOpen(null)} />
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6 pt-1">
         {!list ? <p className="py-16 text-center text-[15px] text-pc-text-muted">{spinning ? 'Se încarcă…' : ''}</p>
           : cat ? <CategoryView cat={cat} items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
@@ -457,6 +486,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           : tab === 'plan' ? <PlanView items={items} today={today} mode={mode} cats={cats} onDone={i => void doAct(i, 'done').catch(() => undefined)} onOpen={i => openSheet(i.id)} />
           : <CatsView items={items} today={today} mode={mode} cats={cats} onPick={setCat} />}
       </div>
+      )}
       {onClose && panelOpen && !sheetId && undo && <div className="shrink-0 pb-[env(safe-area-inset-bottom)]">{undoBar}</div>}
     </div>
   );
@@ -543,6 +573,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <ArtSheet key={sheetItem.id} item={sheetItem} list={list} mode={mode} footer={undo ? undoBar : null}
           onClose={() => setSheetId(null)} onAct={doAct} onAsk={askAbout} onUpload={upload} />
       )}
+      {keeping && <KeepNote base="/artlia" shared={keeping} onClose={() => setKeeping(null)}
+        onChat={() => { setPrefill({ nonce: Date.now(), text: keeping.text, attachments: keeping.attachments }); setKeeping(null); }}
+        onKept={() => { setKeeping(null); setNotesKey(k => k + 1); openNotes(null); setHint('Păstrată. Asistentul o citește.'); }} />}
       {doc && <DocReader path={doc} query={sq} onClose={() => setDoc(null)} />}
       {settings && (
         <Sheet label="Setări" onClose={() => setSettings(false)} className="px-4 pt-2">

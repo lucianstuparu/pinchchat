@@ -89,6 +89,23 @@ const ro: Record<string, string> = {
   'Ask the assistant': 'Întreabă asistentul',
   'Searching further…': 'Se caută mai departe…',
   'Clear search': 'Golește căutarea',
+  // notes (src/notes)
+  'Notes': 'Note', 'Home': 'Acasă', 'Casa Artlia': 'Casa Artlia', 'Private': 'Privat', 'All': 'Toate', 'Where': 'Unde',
+  'Who': 'Cine', 'What': 'Ce', 'When': 'Când', 'Price': 'Preț', 'Phone': 'Telefon', 'Email': 'Email', 'Website': 'Site',
+  'Search the notes': 'Caută în note', 'New note': 'Notă nouă', 'Loading…': 'Se încarcă…', 'No connection': 'Fără conexiune',
+  'No notes match.': 'Nicio notă nu se potrivește.',
+  'Share a screenshot, a link or a text to this app and choose “Keep as a note”. The assistant reads it and fills in the details.':
+    'Trimite aici (Partajează) o captură de ecran, un link sau un text și alege „Păstrează ca notă”. Asistentul o citește și completează detaliile.',
+  'Reading it…': 'Se citește…', 'could not be read': 'nu s-a putut citi', 'Archived: {t}': 'Arhivat: {t}', 'Moved to {p}': 'Mutat în {p}',
+  'The assistant could not read it.': 'Asistentul nu a putut-o citi.', 'Try again': 'Încearcă din nou', 'Photo, full size': 'Fotografia, mărită',
+  'Written with it': 'Scris odată cu ea', 'Where it belongs': 'Unde ține', 'Where it belongs (the assistant’s guess)': 'Unde ține (după asistent)',
+  'Archive': 'Arhivează', 'Keep as a note': 'Păstrează ca notă', 'Keeping…': 'Se păstrează…', 'Send in the chat instead': 'Trimite în chat',
+  'The assistant reads it, writes down the details and tags, and guesses where it belongs. You can change it after.':
+    'Asistentul o citește, notează detaliile și etichetele și ghicește unde ține. Poți schimba după.',
+  'Link (optional)': 'Link (opțional)', 'Link': 'Link', 'A line with it': 'Un rând cu ea',
+  'A line with it (optional): “for the Artlia kitchen?”': 'Un rând (opțional): „pentru bucătăria Artlia?”', 'What to keep': 'Ce păstrezi',
+  'Add a photo or screenshot': 'Adaugă o poză sau o captură', 'Could not add {n}': 'Nu s-a putut adăuga {n}', 'Remove {n}': 'Scoate {n}',
+  'Could not keep it': 'Nu s-a putut păstra', 'Kept. The assistant is reading it.': 'Păstrată. Asistentul o citește.',
 };
 
 export function L(en: string, vars?: Record<string, string | number>): string {
