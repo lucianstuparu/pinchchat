@@ -158,10 +158,15 @@ export function useGateway() {
     }
   }, [getDeletedSessions]);
 
+  // How much history to ask for: the last 100 messages, or the whole conversation (the gateway's
+  // maximum, 1000) once the person asked for it ("Show the whole conversation"); every later reload
+  // keeps that until the session changes.
+  const historyLimitRef = useRef(100);
+  const [hasFullHistory, setHasFullHistory] = useState(false);
   const loadHistory = useCallback(async (sessionKey: string) => {
     setIsLoadingHistory(true);
     try {
-      const res = await clientRef.current?.send('chat.history', { sessionKey, limit: 100 });
+      const res = await clientRef.current?.send('chat.history', { sessionKey, limit: historyLimitRef.current });
       const rawMsgs = res?.messages as Array<Record<string, unknown>> | undefined;
       if (rawMsgs) {
         const merged = parseHistoryMessages(rawMsgs as Array<Record<string, any>>); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -445,6 +450,7 @@ export function useGateway() {
   const switchSession = useCallback((key: string) => {
     setActiveSession(key);
     activeSessionRef.current = key;
+    historyLimitRef.current = 100; setHasFullHistory(false);
     setMessages([]);
     setUnreadSessions(prev => {
       if (!prev.has(key)) return prev;
@@ -559,6 +565,13 @@ export function useGateway() {
 
   const getClient = useCallback(() => clientRef.current, []);
 
+  /** The whole conversation (up to the gateway's 1000 messages), for scrolling back and jumping to old messages. */
+  const loadFullHistory = useCallback(async () => {
+    historyLimitRef.current = 1000;
+    setHasFullHistory(true);
+    await loadHistory(activeSessionRef.current);
+  }, [loadHistory]);
+
   const addEventListener = useCallback((fn: (event: string, payload: JsonPayload) => void) => {
     const client = clientRef.current;
     if (!client) return () => {};
@@ -567,7 +580,7 @@ export function useGateway() {
 
   return {
     status, messages, sessions: enrichedSessions, agents, activeSession, isGenerating, isLoadingHistory,
-    isSessionsLoaded,
+    isSessionsLoaded, hasFullHistory, loadFullHistory,
     sendMessage, abort, switchSession, createNewSession, createSessionForAgent, loadSessions, deleteSession,
     authenticated, login, logout, connectError, isConnecting, agentIdentity,
     getClient, addEventListener,

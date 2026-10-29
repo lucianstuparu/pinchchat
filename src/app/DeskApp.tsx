@@ -11,8 +11,8 @@
  * tasks, topics and messages, and no programmer words ("loop" is "In progress" on screen).
  */
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Bell, CalendarClock, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, Bell, CalendarClock, History, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
@@ -100,7 +100,7 @@ export default function DeskApp() {
 }
 
 function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; look: Look; mode: 'light' | 'dark'; onLook: (l: Look) => void }) {
-  const { status, messages, isLoadingHistory, activeSession, sendMessage, logout, getClient, addEventListener, switchSession } = gw;
+  const { status, messages, isLoadingHistory, activeSession, sendMessage, logout, getClient, addEventListener, switchSession, hasFullHistory, loadFullHistory } = gw;
   const [person, setPerson] = useState<string | null>(null);
   useEffect(() => { void whoami().then(setPerson); }, []);
 
@@ -320,7 +320,38 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [atBottom, setAtBottom] = useState(true);
   const scrollToBottom = useCallback((smooth = true) => { const el = scrollRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); }, []);
   useEffect(() => { if (atBottom && search === null) scrollToBottom(false); }, [shown, outbox, questions, atBottom, search, scrollToBottom]);
-  const onScroll = () => { const el = scrollRef.current; if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); };
+  // Going back in time (Lucian 2026-10-29: "see the full history of chat ... a button to switch to
+  // progressive backward scroll"): the chat shows the newest WINDOW messages; scrolling near the top
+  // shows WINDOW more, keeping what is on screen in place. At the top of the last 100, a button loads
+  // the whole conversation from the gateway (up to 1000 messages) and scrolling goes on from there.
+  const WINDOW = 60;
+  const [windowSize, setWindowSize] = useState(WINDOW * 2);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const visible = shown.length > windowSize ? shown.slice(-windowSize) : shown;
+  const anchor = useRef<{ height: number; top: number } | null>(null);
+  const showOlder = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) anchor.current = { height: el.scrollHeight, top: el.scrollTop };
+    setWindowSize(w => w + WINDOW);
+  }, []);
+  useLayoutEffect(() => {
+    const el = scrollRef.current, a = anchor.current;
+    if (!el || !a) return;
+    anchor.current = null;
+    el.scrollTop = a.top + (el.scrollHeight - a.height);
+  }, [windowSize, shown.length]);
+  const loadWhole = async () => {
+    setLoadingAll(true);
+    const el = scrollRef.current;
+    if (el) anchor.current = { height: el.scrollHeight, top: el.scrollTop };
+    try { await loadFullHistory(); } finally { setLoadingAll(false); }
+    setWindowSize(w => w + WINDOW);
+  };
+  const onScroll = () => {
+    const el = scrollRef.current; if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    if (el.scrollTop < 400 && shown.length > windowSize && !anchor.current) showOlder();
+  };
 
   // ---- search: To do, In progress and the conversation, together
   useBackLayer(search !== null, () => setSearch(null));   // Back leaves search, like any overlay
@@ -344,10 +375,26 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const searchingFurther = useDelayedFlag(searching && deep.busy);
   const foundCount = found.todo.length + found.progress.length + found.msgs.length + moreItems.length + olderMsgs.length;
   const jumpTo = (id: string) => {
+    // A message above the window: widen it first, so the message is on screen to scroll to.
+    const at = shown.findIndex(m => m.id === id);
+    if (at >= 0 && shown.length - at > windowSize) setWindowSize(shown.length - at + 10);
     setSearch(null); setFlash(id);
     window.setTimeout(() => document.getElementById(`d-${id}`)?.scrollIntoView({ block: 'center' }), 50);
     window.setTimeout(() => setFlash(null), 1800);
   };
+  const pendingHit = useRef<Parameters<typeof loadedMatch>[0] | null>(null);
+  const openInWhole = async (h: Parameters<typeof loadedMatch>[0]) => {
+    pendingHit.current = h;
+    setLoadingAll(true);
+    try { await loadFullHistory(); } finally { setLoadingAll(false); }
+  };
+  useEffect(() => {
+    const h = pendingHit.current;
+    if (!h || !hasFullHistory) return;
+    const m = loadedMatch(h, shown);
+    pendingHit.current = null;
+    if (m) jumpTo(m.id); else setOpenHit(h.messageId);
+  }, [shown, hasFullHistory]); // eslint-disable-line react-hooks/exhaustive-deps
   const askAssistant = () => { const text = (search ?? '').trim(); setSearch(null); setPrefill({ nonce: Date.now(), text, attachments: [] }); };
 
   const toggleSelect = useCallback((m: ChatMessage) => {
@@ -513,7 +560,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             const onScreen = loadedMatch(h, shown);
             const open = openHit === h.messageId;
             return (
-              <button key={h.messageId} type="button" onClick={() => (onScreen ? jumpTo(onScreen.id) : setOpenHit(open ? null : h.messageId))}
+              <button key={h.messageId} type="button" onClick={() => (onScreen ? jumpTo(onScreen.id) : !hasFullHistory ? void openInWhole(h) : setOpenHit(open ? null : h.messageId))}
                 className="block w-full px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
                 <span className="mb-0.5 block text-[12px] text-pc-text-muted">{h.role === 'user' ? 'You' : 'Assistant'} · {dayLabel(h.timestamp)}</span>
                 <Marked parts={wordParts(h.snippet.trim(), search ?? '')} className={`text-[15px] leading-snug ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`} />
@@ -536,8 +583,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           <p className="mt-1 text-[15px] text-pc-text-muted">A task, a note, a link, a photo, a question. Type it or tap the mic and say it.</p>
         </div>
       )}
-      {shown.map((msg, i) => {
-        const prev = shown[i - 1];
+      {shown.length > visible.length ? (
+        <div className="flex justify-center py-3"><span className="text-[12px] text-pc-text-muted">Scroll up for earlier messages</span></div>
+      ) : shown.length > 0 && !hasFullHistory ? (
+        <div className="flex justify-center py-3">
+          <button type="button" onClick={() => void loadWhole()} disabled={loadingAll}
+            className="press inline-flex h-10 items-center gap-2 rounded-full bg-pc-surface px-4 text-[14px] font-medium text-pc-text-secondary disabled:opacity-60">
+            <History size={16} aria-hidden /> {loadingAll ? 'Loading the whole conversation…' : 'Show the whole conversation'}
+          </button>
+        </div>
+      ) : shown.length > 0 ? (
+        <div className="flex justify-center py-3"><span className="text-[12px] text-pc-text-muted">Start of the conversation</span></div>
+      ) : null}
+      {visible.map((msg, i) => {
+        const prev = visible[i - 1];
         const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
         const firstOfRun = newDay || prev.role !== msg.role;
         return (
