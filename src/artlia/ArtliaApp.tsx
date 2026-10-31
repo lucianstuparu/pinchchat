@@ -8,7 +8,7 @@
  * messages on the left with their name.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, BookOpen, ChevronRight, FileText, FolderSearch, HelpCircle, ListChecks, MessageSquare, Plus, RefreshCw, Search, StickyNote, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Bell, BookOpen, ChevronRight, FileText, FolderSearch, HelpCircle, ListChecks, MessageSquare, Plus, RefreshCw, Search, StickyNote, type LucideIcon } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { useGateway } from '../hooks/useGateway';
 import { LoginScreen } from '../components/LoginScreen';
@@ -38,6 +38,19 @@ import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
 import { actOn, cachedList, docFolder, docName, fetchList, roError, uploadFile, type ArtAction, type ArtItem, type ArtList, type Category } from './api';
 import { CatsView, CategoryView, NowView, PlanView } from './Lists';
+import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
+
+// A reminder notification opens the app on /?item=<art-id> (admin-reminders.mjs): that item's sheet,
+// once the list has loaded. Read once at start; a tap while the app is open arrives as a 'notice'
+// message from the service worker instead.
+const itemFromUrl = (() => {
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('item');
+  if (!id) return null;
+  url.searchParams.delete('item'); url.searchParams.delete('notice');
+  window.history.replaceState(null, '', url.pathname + url.search);
+  return id;
+})();
 import { opsFor, type Move } from '../ui/dragRules';
 import { ArtSheet } from './ArtSheet';
 import { NotesView } from '../notes/Notes';
@@ -163,6 +176,19 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     if (list?.items.some(i => i.id === id)) setSheetId(id); else setHint('Nu mai e în lista Casa Artlia');
   }, [list]);
   useEffect(() => { if (sheetId && list && !list.items.some(i => i.id === sheetId)) setSheetId(null); }, [sheetId, list]);
+  const [pendingItem, setPendingItem] = useState<string | null>(itemFromUrl);
+  useEffect(() => { if (pendingItem && list) { openSheet(pendingItem); setPendingItem(null); } }, [pendingItem, list, openSheet]);
+  useEffect(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw) return;
+    const on = (e: MessageEvent) => {
+      if (e.data?.type !== 'notice' || !e.data.url) return;
+      const id = new URL(e.data.url, window.location.origin).searchParams.get('item');
+      if (id) setPendingItem(id);
+    };
+    sw.addEventListener('message', on);
+    return () => sw.removeEventListener('message', on);
+  }, []);
 
   const [undo, setUndo] = useState<UndoInfo | null>(null);
   const closeUndo = useCallback(() => setUndo(null), []);
@@ -311,6 +337,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   };
 
   const [settings, setSettings] = useState(false);
+  // Reminders for both of you (07:30, Done / Amână 3 zile on the notification), Casa Artlia's own:
+  // oc does not repeat them (2026-10-31).
+  const [pushState, setPushState] = useState<PushState | 'busy'>('off');
+  useEffect(() => { void getPushState().then(setPushState).catch(() => setPushState('unsupported')); }, []);
+  const togglePush = async () => {
+    const from = pushState; setPushState('busy');
+    try { setPushState(from === 'on' ? await disablePush() : await enablePush()); } catch { setPushState(from); }
+  };
   const statusLine = status === 'connected' ? (allowed && gw.agents.length > 0 && !gw.agents.includes('artlia') ? 'Asistentul Casa Artlia nu e pornit încă' : null)
     : status === 'connecting' ? 'Se conectează…' : outbox.length > 0 ? `Fără conexiune · ${outbox.length} de trimis` : 'Fără conexiune';
   const today = list?.today ?? new Date().toISOString().slice(0, 10);
@@ -584,6 +618,19 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           <p className="mb-1.5 px-1 text-[13px] text-pc-text-muted">Aspect</p>
           <Segmented choice label="Aspect" value={look.appearance} onChange={a => onLook({ ...look, appearance: a })}
             options={[{ value: 'auto', label: 'Automat' }, { value: 'light', label: 'Luminos' }, { value: 'dark', label: 'Întunecat' }]} />
+          {pushState !== 'unsupported' && (<>
+            <button type="button" onClick={() => void togglePush()} disabled={pushState === 'blocked' || pushState === 'busy'} role="switch" aria-checked={pushState === 'on'}
+              className="mt-5 flex min-h-12 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 py-2.5 text-left disabled:opacity-60">
+              <Bell size={18} className="text-pc-text-muted" />
+              <span className="flex-1 text-[16px]">Notificări</span>
+              <span className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors ${pushState === 'on' ? 'bg-[#34c759]' : 'bg-pc-text-faint/40'}`}>
+                <span className={`absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white shadow transition-[left] ${pushState === 'on' ? 'left-[22px]' : 'left-[2px]'}`} />
+              </span>
+            </button>
+            <p className="mt-1.5 px-1 text-[13px] text-pc-text-muted">{pushState === 'blocked'
+              ? 'Blocate în Chrome. Permite notificările pentru aplicație din setările site-ului în Chrome.'
+              : 'Dimineața, ce e de făcut în Casa Artlia, cu Făcut și Amână. Le primiți amândoi.'}</p>
+          </>)}
           <button type="button" onClick={() => { setSettings(false); logout(); }} className="press mt-6 h-12 w-full rounded-[12px] bg-pc-surface text-[16px] text-red-500">Deconectare</button>
           <p className="mt-4 text-center text-[12px] text-pc-text-muted">Datele sunt pe serverul de acasă · documentele din Drive doar se citesc</p>
         </Sheet>
