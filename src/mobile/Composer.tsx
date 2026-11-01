@@ -2,7 +2,8 @@ import { L } from '../ui/lang';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
-import { ArrowUp, AudioLines, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { ArrowUp, AudioLines, ClipboardPaste, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { canReadClipboard, clipboardImages, pastedFiles } from '../lib/clipboard';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
 import { FieldControls, PrimaryButton } from '../app/MicButton';
 import { speechPlaceholder, useSpeech } from '../app/speech';
@@ -198,7 +199,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   // eslint-disable-next-line react-hooks/exhaustive-deps -- on the mic's state only
   }, [speech.listening, speech.state]);
 
-  const addFiles = async (files: FileList | null) => {
+  const addFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     setBusy(true);
     setError(null);
@@ -214,6 +215,17 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     setBusy(false);
     if (fileRef.current) fileRef.current.value = '';
   };
+
+  // A screenshot pasted into the box (the keyboard's clipboard, Ctrl+V) or with Paste in the + menu.
+  const pasteFromClipboard = async () => {
+    setPlusOpen(false);
+    try {
+      const files = await clipboardImages();
+      if (files.length) await addFiles(files);
+      else setError(L('No picture on the clipboard: copy a screenshot first'));
+    } catch { setError(L('The clipboard could not be read: allow it for this app in Chrome’s site settings')); }
+  };
+  const menu = (voice && canRecord()) || canReadClipboard();
 
   const shownError = error ?? speech.error;
   const round = 'press flex h-12 w-12 shrink-0 items-center justify-center rounded-full';
@@ -261,9 +273,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           </button>
         ) : !attach ? null : (
           <div className="relative mb-[6px] shrink-0">
-            <button type="button" onClick={() => (voice && canRecord() ? setPlusOpen(o => !o) : fileRef.current?.click())}
+            <button type="button" onClick={() => (menu ? setPlusOpen(o => !o) : fileRef.current?.click())}
               className={`${round} bg-pc-surface text-pc-text-secondary press ${plusOpen ? 'rotate-45' : ''}`}
-              aria-label={voice && canRecord() ? L('Add') : L('Attach')} aria-expanded={plusOpen}>
+              aria-label={menu ? L('Add') : L('Attach')} aria-expanded={plusOpen}>
               <Plus size={22} />
             </button>
             {plusOpen && (
@@ -274,12 +286,21 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                     <Paperclip size={19} className="text-[var(--pc-accent-ink)]" /> {L('Photo or file')}
                   </button>
+                  {canReadClipboard() && <>
+                    <div className="mx-4 h-px bg-[var(--pc-separator)]" />
+                    <button type="button" role="menuitem" onClick={() => void pasteFromClipboard()}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                      <ClipboardPaste size={19} className="text-[var(--pc-accent-ink)]" /> {L('Paste a screenshot')}
+                    </button>
+                  </>}
+                  {voice && canRecord() && <>
                   <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                   <button type="button" role="menuitem" onClick={() => void startVoiceMessage()}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                     <AudioLines size={19} className="text-[var(--pc-accent-ink)]" />
                     <span>{L('Voice message')}<span className="block text-[12px] text-pc-text-muted">{L('sent as audio')}</span></span>
                   </button>
+                  </>}
                 </div>
               </>
             )}
@@ -316,6 +337,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
               rows={intent ? 1 : 2}
               value={text}
               onChange={e => setText(e.target.value)}
+              onPaste={e => { const files = pastedFiles(e); if (files.length) { e.preventDefault(); void addFiles(files); } }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey && !isTouch()) { e.preventDefault(); send(); }
               }}

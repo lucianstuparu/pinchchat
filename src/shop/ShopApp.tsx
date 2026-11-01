@@ -13,7 +13,7 @@ import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, ClipboardPaste, CloudOff, Lock, Paperclip, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -28,6 +28,7 @@ import { GROUPS, GROUP_NAMES, groupColours, groupOf, type Group } from './groups
 import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { shrinkPhoto } from './photos';
+import { canReadClipboard, clipboardImages, pastedFiles } from '../lib/clipboard';
 import { ProductPicture } from './ProductPicture';
 import { PantrySheet } from './PantrySheet';
 import { OwnedSheet } from './OwnedSheet';
@@ -523,11 +524,11 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // sent until Send.
   const speech = useSpeech(text, setText, transcribeShop);
   const input = useRef<HTMLTextAreaElement>(null);
-  // Two pickers: Android offers the camera only for a single image with `capture`, and only the
-  // gallery when several images may be chosen, so "Take a photo" and "From the gallery" are separate.
-  const camera = useRef<HTMLInputElement>(null);
-  const gallery = useRef<HTMLInputElement>(null);
+  // One picker, the same as oc's: with no `accept` Android opens its own chooser (camera, photos,
+  // files) instead of the photo-only gallery; anything that is not a picture is left out.
+  const picker = useRef<HTMLInputElement>(null);
   const [photoMenu, setPhotoMenu] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useBusy('shop-photos', busy);   // photos being prepared
   const hints = suggest(text, known, items);
@@ -535,18 +536,28 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // typed or said, "is this one healthy?", "add this, 2 of them", "the receipt from Lidl".
   const [staged, setStaged] = useState<Array<{ ref: string; data: string }>>([]);
   useBusy('shop', !!text.trim() || staged.length > 0 || speech.listening || speech.state === 'writing');
-  const stagePhotos = async (files: FileList | null) => {
+  const stagePhotos = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     setBusy(true);
+    setPasteError(null);
     const added: Array<{ ref: string; data: string }> = [];
-    for (const f of Array.from(files).slice(0, 6)) {
+    for (const f of Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 6)) {
       try { added.push({ ref: newPhotoRef(), data: await shrinkPhoto(f) }); } catch { /* unreadable image: skipped */ }
     }
     setBusy(false);
-    if (camera.current) camera.current.value = '';
-    if (gallery.current) gallery.current.value = '';
+    if (picker.current) picker.current.value = '';
+    if (!added.length) setPasteError('Only pictures can go here');
     setStaged(prev => [...prev, ...added].slice(0, 6));
     input.current?.focus();
+  };
+  // A screenshot pasted into the box (the keyboard's clipboard, Ctrl+V) or with Paste in the menu.
+  const pasteFromClipboard = async () => {
+    setPhotoMenu(false);
+    try {
+      const files = await clipboardImages();
+      if (files.length) await stagePhotos(files);
+      else setPasteError('No picture on the clipboard: copy a screenshot first');
+    } catch { setPasteError('The clipboard could not be read: allow it for this app in Chrome’s site settings'); }
   };
   const tagsFor = (own: string[]) => (own.some(t => stores.some(s => s.tag === t)) || !store ? own : [...own, store]);
 
@@ -610,8 +621,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
-      <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void stagePhotos(e.target.files)} />
-      <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
+      <input ref={picker} type="file" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
       {staged.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1.5" aria-label="Photos to send">
           {staged.map(ph => (
@@ -627,10 +637,10 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
         </div>
       )}
       <SpeechStatus speech={speech} />
-      {speech.error && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error}</p>}
+      {(speech.error || pasteError) && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error || pasteError}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
-          <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
+          <button type="button" disabled={busy} onClick={() => (canReadClipboard() ? setPhotoMenu(m => !m) : picker.current?.click())} aria-expanded={photoMenu}
             className="press mb-[4px] flex h-12 w-12 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
             <Camera size={24} />
           </button>
@@ -638,14 +648,14 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             <>
               <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
               <div className="absolute bottom-[58px] left-0 z-30 w-56 overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated shadow-xl" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
+                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); picker.current?.click(); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
-                  <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
+                  <Paperclip size={19} className="text-[var(--pc-accent-ink)]" /> Photo
                 </button>
                 <div className="mx-4 h-px bg-[var(--pc-separator)]" />
-                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); gallery.current?.click(); }}
+                <button type="button" role="menuitem" onClick={() => void pasteFromClipboard()}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
-                  <Images size={19} className="text-[var(--pc-accent-ink)]" /> From the gallery
+                  <ClipboardPaste size={19} className="text-[var(--pc-accent-ink)]" /> Paste a screenshot
                 </button>
               </div>
             </>
@@ -653,6 +663,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
         </div>
         <div className={`relative flex min-w-0 flex-1 items-end rounded-[20px] border bg-pc-surface pl-4 pr-1.5 ${speech.listening ? 'border-[rgba(var(--pc-accent-rgb),0.8)]' : 'border-transparent'}`}>
           <textarea ref={input} value={text} rows={2} onChange={e => setText(e.target.value)} enterKeyHint="send" autoComplete="off"
+            onPaste={e => { const files = pastedFiles(e); if (files.length) { e.preventDefault(); void stagePhotos(files); } }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
             readOnly={speech.state === 'writing'}
             placeholder={speechPlaceholder(speech, staged.length ? 'What about the photo? (optional)' : 'Say or type: add, change, remove…')} aria-label="Instruction for the assistant"

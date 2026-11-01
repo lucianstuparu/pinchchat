@@ -33,3 +33,22 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/** The files in a paste (a screenshot copied on the phone or the laptop); empty for plain text. */
+export function pastedFiles(e: { clipboardData: DataTransfer | null }): File[] {
+  const items = Array.from(e.clipboardData?.items ?? []);
+  return items.filter(i => i.kind === 'file').map(i => i.getAsFile()).filter((f): f is File => !!f);
+}
+
+/** Whether the app can read an image from the clipboard itself (a Paste button, not the keyboard). */
+export const canReadClipboard = () => typeof navigator !== 'undefined' && !!navigator.clipboard?.read;
+
+/** The images on the clipboard, read on a tap; Chrome asks once for permission. */
+export async function clipboardImages(): Promise<File[]> {
+  const out: File[] = [];
+  for (const item of await navigator.clipboard.read()) {
+    const type = item.types.find(t => t.startsWith('image/'));
+    if (type) out.push(new File([await item.getType(type)], `screenshot.${type.split('/')[1] || 'png'}`, { type }));
+  }
+  return out;
+}
