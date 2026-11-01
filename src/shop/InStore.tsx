@@ -10,6 +10,9 @@
  * A long press opens a small menu instead of the browser's text selection (Lucian 2026-11-01): Add a
  * photo, Not at this shop, Not needed any more. A thing in the basket without a photo shows a camera
  * button: its photo goes to the assistant at Paid and becomes the item's product card.
+ *
+ * A thing in the basket shows how many ("×1"); a tap on it picks the number. At Paid the count goes on
+ * the item, and food goes into At home with it (Lucian 2026-11-01: "I might buy more of the same thing").
  */
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Camera, Check, ChevronDown, Lock, MessageSquare, Search, ShoppingBasket, Store as StoreIcon, Trash2, X } from 'lucide-react';
@@ -20,7 +23,7 @@ import { useBusy } from '../ui/draft';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf } from './groups';
 import { fold, newPhotoRef, type Item, type Op, type Product, type Purchase, type Store } from './logic';
 import { photoUrl, shrinkPhoto } from './photos';
-import { thumbOf, tripLists, type Shot, type Trip } from './trip';
+import { countOf, thumbOf, tripLists, type Shot, type Trip } from './trip';
 import { ShopLogo, ShopLogos } from './ShopLogo';
 
 export function InStore({ trip, onTrip, items, stores, purchases, products, storeName, mode, apply, onPaid, onLeave, onChangeShop, askBar }: {
@@ -55,6 +58,9 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
   const shots = trip.shots ?? [];
   const shotOf = (id: string) => shots.find(s => s.id === id);
   const [menu, setMenu] = useState<Item | null>(null);
+  const [counting, setCounting] = useState<Item | null>(null);
+  const countFor = (i: Item) => trip.count?.[i.id] ?? countOf(i.qty) ?? 1;
+  const setCount = (id: string, n: number) => onTrip({ ...trip, count: { ...trip.count, [id]: n } });
   const [undo, setUndo] = useState<UndoInfo | null>(null);
   const undoKey = useRef(0);
   const closeUndo = useCallback(() => setUndo(null), []);
@@ -122,7 +128,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             <h2 className="px-4 pb-1 pt-2 text-[13px] font-semibold text-pc-text-muted">On the list · {found.length}</h2>
             {found.length === 0 && <p className="px-4 py-2 text-[15px] text-pc-text-muted">Nothing on the list matches. Ask the assistant to add it.</p>}
             <div className="divide-y divide-[var(--pc-separator)]">
-              {found.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+              {found.map(i => <TripRow key={i.id} item={i} count={countFor(i)} onCount={() => setCounting(i)} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
             </div>
           </section>
         ) : <>
@@ -141,7 +147,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
                 <div key={g}>
                   {groups.length > 1 && <h3 className="px-4 pb-0.5 pt-2 text-[12px] font-semibold uppercase tracking-wide" style={{ color: groupColours(g, mode).ink }}>{GROUP_NAMES[g]}</h3>}
                   <div className="divide-y divide-[var(--pc-separator)]">
-                    {list.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+                    {list.map(i => <TripRow key={i.id} item={i} count={countFor(i)} onCount={() => setCounting(i)} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
                   </div>
                 </div>
               ))}
@@ -156,7 +162,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
               </button>
               {showMaybe && (
                 <div className="divide-y divide-[var(--pc-separator)]">
-                  {maybe.map(m => <TripRow key={m.item.id} item={m.item} shot={shotOf(m.item.id)} onMenu={() => setMenu(m.item)} onShoot={() => shootItem(m.item.id)} product={productOf(m.item.product)} why={m.why} shops={m.shops} storeName={storeName}
+                  {maybe.map(m => <TripRow key={m.item.id} item={m.item} count={countFor(m.item)} onCount={() => setCounting(m.item)} shot={shotOf(m.item.id)} onMenu={() => setMenu(m.item)} onShoot={() => shootItem(m.item.id)} product={productOf(m.item.product)} why={m.why} shops={m.shops} storeName={storeName}
                     inBasket={picked.has(m.item.id)} onTap={() => toggle(m.item.id)} onPhoto={setPhoto} />)}
                 </div>
               )}
@@ -167,7 +173,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             <section className="mx-3 mt-4 overflow-hidden rounded-[12px] bg-pc-surface">
               <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><ShoppingBasket size={14} /> Also in the basket · {fromSearch.length + trip.extras.length}</h2>
               <div className="divide-y divide-[var(--pc-separator)]">
-                {fromSearch.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+                {fromSearch.map(i => <TripRow key={i.id} item={i} count={countFor(i)} onCount={() => setCounting(i)} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
               </div>
               {trip.extras.length > 0 && (
                 <div className="px-4 pb-3 pt-2">
@@ -207,6 +213,21 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
           </button>
         </div>
       </div>
+
+      {counting && (
+        <Sheet label={`How many: ${counting.title}`} onClose={() => setCounting(null)} className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+          <p className="truncate px-1 text-[17px] font-semibold">How many?</p>
+          <p className="truncate px-1 pb-3 text-[15px] text-pc-text-muted">{counting.title}</p>
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 12 }, (_, k) => k + 1).map(n => (
+              <button key={n} type="button" onClick={() => { setCount(counting.id, n); setCounting(null); }} aria-pressed={countFor(counting) === n}
+                className={`press h-14 rounded-[12px] text-[19px] font-semibold ${countFor(counting) === n ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface'}`}>
+                {n}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
 
       {menu && (
         <Sheet label={menu.title} onClose={() => setMenu(null)} className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
@@ -267,8 +288,8 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
 /** Ticked = in the basket: the same green as a done task in oc. */
 const GREEN = '#1d9e75';
 
-function TripRow({ item, product, shot, why, shops = [], storeName = t => t, inBasket, onTap, onPhoto, onMenu, onShoot }: {
-  item: Item; product?: Product; shot?: Shot; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean;
+function TripRow({ item, product, shot, count, onCount, why, shops = [], storeName = t => t, inBasket, onTap, onPhoto, onMenu, onShoot }: {
+  item: Item; product?: Product; shot?: Shot; count?: number; onCount?: () => void; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean;
   onTap: () => void; onPhoto?: (src: string) => void; onMenu?: () => void; onShoot?: () => void;
 }) {
   const pic = shot ? photoUrl(shot.ref) : product?.photos[0] ? photoUrl(product.photos[0]) : null;
@@ -296,6 +317,12 @@ function TripRow({ item, product, shot, why, shops = [], storeName = t => t, inB
           )}
         </span>
       </button>
+      {inBasket && onCount && (
+        <button type="button" onClick={onCount} aria-label={`How many: ${count ?? 1}. Change`}
+          className="press mr-2 flex h-10 min-w-[48px] shrink-0 items-center justify-center rounded-full bg-pc-base px-3 text-[15px] font-semibold tabular-nums" style={{ color: GREEN }}>
+          ×{count ?? 1}
+        </button>
+      )}
       {pic ? (
         <button type="button" onClick={() => onPhoto?.(pic)} aria-label={`See the photo of ${item.title}`} className="press mr-3 shrink-0">
           <img src={shot?.thumb ?? pic} alt="" loading="lazy" className={`h-12 w-12 rounded-[8px] bg-pc-surface object-cover ${inBasket ? 'opacity-75' : ''}`} />

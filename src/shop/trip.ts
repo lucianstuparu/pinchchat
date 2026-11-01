@@ -12,7 +12,11 @@ import { fold, isWish, storeTagsOf, tagOf, type Item, type Product, type Purchas
 export interface Extra { ref: string; thumb: string }
 /** A photo of a thing on the list, taken in the shop (2026-11-01): at Paid it becomes that item's product card. */
 export interface Shot { id: string; ref: string; thumb: string }
-export interface Trip { store: string; started: string; picked: string[]; extras: Extra[]; shots?: Shot[] }
+/** `count`: how many of a thing went in the basket, when set in the shop (2026-11-01). */
+export interface Trip { store: string; started: string; picked: string[]; extras: Extra[]; shots?: Shot[]; count?: Record<string, number> }
+
+/** The number at the start of a quantity ("2", "x20", "3 kg"), else undefined. */
+export const countOf = (qty?: string): number | undefined => { const m = /\d+/.exec(qty ?? ''); const n = m ? Number(m[0]) : 0; return n > 0 ? n : undefined; };
 
 const KEY = 'shop:trip';
 export const readTrip = (): Trip | null => { try { const v = localStorage.getItem(KEY); return v ? JSON.parse(v) as Trip : null; } catch { return null; } };

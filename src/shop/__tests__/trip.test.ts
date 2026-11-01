@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STORES as S, type Item } from '../logic';
-import { shopTagOf, tripLists } from '../trip';
+import { countOf, shopTagOf, tripLists } from '../trip';
 
 const item = (id: string, title: string, tags: string[] = [], more: Partial<Item> = {}): Item =>
   ({ id, kind: 'buy', title, tags, status: 'open', scope: 'shared', ...more });
@@ -42,5 +42,15 @@ describe('a trip to a shop', () => {
     const items = [item('k', 'Kefir', ['lidl'], { product: 'prd-1' })];
     const purchases = [{ id: 'p1', title: 'KEFIR 1L', product: 'prd-1', store: 'Carrefour Ségny', date: '2026-10-01' }];
     expect(tripLists(items, 'carrefour', S, purchases).maybe[0].why).toBe('bought here before');
+  });
+});
+
+describe('countOf', () => {
+  it('reads the number at the start of a quantity', () => {
+    expect(countOf('2')).toBe(2);
+    expect(countOf('x20')).toBe(20);
+    expect(countOf('3 kg')).toBe(3);
+    expect(countOf('some')).toBeUndefined();
+    expect(countOf(undefined)).toBeUndefined();
   });
 });

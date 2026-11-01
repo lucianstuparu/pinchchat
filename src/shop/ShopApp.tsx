@@ -31,11 +31,11 @@ import { photoUrl, shrinkPhoto } from './photos';
 import { PantrySheet } from './PantrySheet';
 import { OwnedSheet } from './OwnedSheet';
 import type { HomeTab } from './Products';
-import { daysUntil } from './pantry';
+import { daysUntil, newPantryId } from './pantry';
 import { useShop } from './useShop';
 import { InStore } from './InStore';
 import { ShopLogo, ShopLogos } from './ShopLogo';
-import { extrasAsk, newTrip, readTrip, shotsAsk, writeTrip, type Trip } from './trip';
+import { countOf, extrasAsk, newTrip, readTrip, shotsAsk, writeTrip, type Trip } from './trip';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
 const STORE_KEY = 'shop:store';
@@ -185,13 +185,19 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     if (!trip) return;
     const t = trip;
     const paid = snap.items.filter(i => t.picked.includes(i.id) && i.status === 'open');
+    // How many were bought, when set in the shop and different from the list: it goes on the item first.
+    const recounted = paid.filter(i => t.count?.[i.id] && t.count[i.id] !== (countOf(i.qty) ?? 1));
+    for (const i of recounted) apply({ op: 'edit', id: i.id, qty: String(t.count![i.id]) });
     for (const i of paid) apply({ op: 'tick', id: i.id, store: t.store });
     sendPending();
+    // Food goes into At home with how many (no date: the person adds it), once Undo has passed.
+    const food = paid.filter(i => groupOf(i) === 'groceries');
     // Photos of things on the list whose item is still there (not dropped meanwhile).
     const shots = (t.shots ?? []).filter(s => snap.items.some(i => i.id === s.id && i.status !== 'cancelled'));
-    if (t.extras.length || shots.length) {
+    if (food.length || t.extras.length || shots.length) {
+      const ops: Op[] = food.map(i => ({ op: 'pantry-add', id: newPantryId(), title: i.title, product: i.product,
+        qty: t.count?.[i.id] ? String(t.count[i.id]) : i.qty }));
       // At most 6 photos per ask (the server's limit; a 7th was silently dropped on 2026-10-28): one ask per 6.
-      const ops: Op[] = [];
       for (let k = 0; k < t.extras.length; k += 6) {
         const part = t.extras.slice(k, k + 6);
         ops.push({ op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), part.length), store: t.store, photos: part.map(e => e.ref) });
@@ -204,9 +210,10 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     }
     setTrip(null);
     const extra = t.extras.length ? ` + ${t.extras.length} not on the list` : '';
-    setUndo({ key: Date.now(), label: `Paid at ${storeName(t.store)}: ${paid.length} bought${extra}`, undo: () => {
+    setUndo({ key: Date.now(), label: `Paid at ${storeName(t.store)}: ${paid.length} bought${extra}${food.length ? ` · ${food.length} to At home` : ''}`, undo: () => {
       if (pendingAsk.current) { window.clearTimeout(pendingAsk.current.timer); pendingAsk.current = null; }
       for (const i of paid) apply({ op: 'untick', id: i.id });
+      for (const i of recounted) apply({ op: 'edit', id: i.id, qty: i.qty ?? '' });
       setTrip(t);
     } });
   };
