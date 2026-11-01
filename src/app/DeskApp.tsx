@@ -34,7 +34,7 @@ import { useDeepSearch } from '../ui/useDeepSearch';
 import { AskRow, Marked, SearchGroup, SearchRow, SearchingLine } from '../ui/SearchParts';
 import { loadedMatch, markedParts, plainOf, wordParts } from '../ui/searchText';
 import { useDelayedFlag } from '../ui/progress';
-import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem } from './api';
+import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem, type Watching } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { opsFor, type Move } from '../ui/dragRules';
@@ -118,7 +118,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, [ready, frontSession, activeSession, switchSession]);
 
   // ---- To do and In progress
-  const [now, setNow] = useState<{ today: string; items: NowItem[] }>({ today: '', items: [] });
+  const [now, setNow] = useState<{ today: string; items: NowItem[]; watch?: Watching }>({ today: '', items: [] });
   const [loops, setLoops] = useState<Loop[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
@@ -497,7 +497,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   useBackLayer(todoOpen, () => setTodoOpen(false));
 
   const panel = (onClose?: () => void) => (
-    <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} loops={loops} today={now.today}
+    <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} watch={now.watch} loops={loops} today={now.today}
       loaded={loaded} expired={expired} refreshing={refreshing} onRefresh={() => void refresh()}
       onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet} onMove={m => void move(m)}
       onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}
@@ -737,7 +737,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
       {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
         onActed={(id, action, title) => {
-          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled' };
+          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
       {settings && (

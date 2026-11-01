@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useDelayedFlag } from '../ui/progress';
 import { useBusy } from '../ui/draft';
 import { CloseButton, Sheet } from '../ui/Sheet';
-import { Ban, CalendarClock, Check, Clock, ListChecks, MessageSquare, MessagesSquare, Pencil, Pin, PinOff, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
+import { AlertTriangle, Ban, CalendarClock, Check, Clock, Eye, ListChecks, MessageSquare, MessagesSquare, Pencil, Pin, PinOff, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
 import { act, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet as ItemData } from './api';
 import { Title } from './Todo';
 import { TOPIC_COLORS, railOf } from './todoRules';
@@ -38,8 +38,10 @@ const KIND: Record<string, { icon: typeof Receipt; label: string }> = {
   bill: { icon: Receipt, label: 'Bill' }, deadline: { icon: CalendarClock, label: 'Deadline' }, subscription: { icon: Repeat, label: 'Subscription' },
   contract: { icon: Receipt, label: 'Contract' }, task: { icon: ListChecks, label: 'Task' }, buy: { icon: ShoppingCart, label: 'Shopping' },
   loop: { icon: MessagesSquare, label: 'In progress' },
+  // A watch-out (oc-app-design.md): it happens by itself; nothing to tick.
+  watch: { icon: Eye, label: 'Watching' },
 };
-const STATUS: Record<string, string> = { todo: 'To do', open: 'Open', next: 'Next', waiting: 'Waiting', paid: 'Paid', done: 'Done', cancelled: 'Not needed', closed: 'Finished' };
+const STATUS: Record<string, string> = { todo: 'To do', open: 'Open', next: 'Next', waiting: 'Waiting', paid: 'Paid', done: 'Done', cancelled: 'Not needed', closed: 'Finished', passed: 'Passed', watching: 'Watching' };
 const PRIORITY = [['P1', 'Urgent'], ['P2', 'High'], ['P3', 'Normal'], ['P4', 'Low']] as const;
 
 export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Props) {
@@ -47,8 +49,10 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Editing (oc-app-design.md §4): the title, the due date and the topics.
-  const [edit, setEdit] = useState<{ title: string; due: string; topics: string[]; repeat: string } | null>(null);
-  useBusy('item-edit', edit !== null);
+  const [edit, setEdit] = useState<{ title: string; due: string; topics: string[]; repeat: string; amount: string; place: string; check: string } | null>(null);
+  // "Went wrong…" on a watch-out: why, and the one thing to do now; it becomes a task (Undo brings it back).
+  const [wrong, setWrong] = useState<{ reason: string; step: string } | null>(null);
+  useBusy('item-edit', edit !== null || wrong !== null);
   const saving = useDelayedFlag(busy && edit !== null);   // an update never reloads over unsaved edits
 
   const load = () => fetchSheet(id).then(s => { setSheet(s); setError(null); }).catch(e => setError(e.message));
@@ -68,8 +72,10 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const str = (k: string) => (it && typeof it[k] === 'string' ? (it[k] as string) : undefined);
   const num = (k: string) => (it && typeof it[k] === 'number' ? (it[k] as number) : undefined);
   const isTopic = kind === 'loop';
+  const isWatch = kind === 'watch';
   const topics = Array.isArray(it?.topics) ? (it.topics as string[]) : [];
-  const startEdit = () => it && setEdit({ title: it.title, due: str('due_date') ?? '', topics, repeat: repeatText(it.repeat) });
+  const startEdit = () => it && setEdit({ title: it.title, due: str('due_date') ?? '', topics, repeat: repeatText(it.repeat),
+    amount: num('amount') != null ? String(num('amount')) : '', place: str('place') ?? '', check: str('check') ?? '' });
   const saveEdit = async () => {
     if (!edit || !it) return;
     const extra: Record<string, unknown> = {};
@@ -77,17 +83,24 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
     if (edit.due !== (str('due_date') ?? '')) extra.due_date = edit.due;
     if (edit.topics.join(',') !== topics.join(',')) extra.topics = edit.topics;
     if (edit.repeat !== repeatText(it.repeat)) extra.repeat = edit.repeat;
+    if (isWatch) {
+      if (edit.amount !== (num('amount') != null ? String(num('amount')) : '')) extra.amount = edit.amount;
+      if (edit.place !== (str('place') ?? '')) extra.place = edit.place;
+      if (edit.check !== (str('check') ?? '')) extra.check = edit.check;
+    }
     if (Object.keys(extra).length) await run('edit', extra);
     setEdit(null);
   };
 
   const rows: Array<[string, string]> = it ? ([
     ['Amount', num('amount') != null ? formatAmount(num('amount'), str('currency')) : ''],
-    ['Due', str('due_date') ? formatDay(str('due_date')!) : ''],
+    [isWatch ? 'When' : 'Due', str('due_date') ? formatDay(str('due_date')!) : ''],
+    ['Account or place', isWatch ? str('place') ?? '' : ''],
+    ['What to check', isWatch ? str('check') ?? '' : ''],
     ['Repeats', repeatText(it.repeat)],
     ['Put off until', str('snoozed_until') && !closed ? formatDay(str('snoozed_until')!) : ''],
     ['Scheduled', str('scheduled')?.replace('T', ' ') ?? ''],
-    ['Reminder', str('remind_on') && !closed ? formatDay(str('remind_on')!) : ''],
+    ['Reminder', str('remind_on') && !closed && !isWatch ? formatDay(str('remind_on')!) : ''],
     ['To', str('payee') ?? ''],
     ['If missed', str('consequence') ?? ''],
     ['Where it stands', str('state') ?? ''],
@@ -118,10 +131,10 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   {!isTopic && (
                     <>
                       <label className="flex items-center justify-between gap-3 rounded-[12px] bg-pc-surface px-3 py-2 text-[15px]">
-                        <span className="text-pc-text-muted">Due</span>
+                        <span className="text-pc-text-muted">{isWatch ? 'When' : 'Due'}</span>
                         <span className="flex items-center gap-2">
                           <input type="date" value={edit.due} onChange={e => setEdit({ ...edit, due: e.target.value })} className="bg-transparent text-right outline-none" />
-                          {edit.due && <button type="button" onClick={() => setEdit({ ...edit, due: '' })} className="text-[13px] text-[var(--pc-accent-ink)]">No date</button>}
+                          {edit.due && !isWatch && <button type="button" onClick={() => setEdit({ ...edit, due: '' })} className="text-[13px] text-[var(--pc-accent-ink)]">No date</button>}
                         </span>
                       </label>
                       {it.store === 'tasks' && (
@@ -133,6 +146,13 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                             ))}
                           </select>
                         </label>
+                      )}
+                      {isWatch && (
+                        <>
+                          <input value={edit.amount} onChange={e => setEdit({ ...edit, amount: e.target.value })} inputMode="decimal" placeholder="Amount (€)" aria-label="Amount" className="w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent" />
+                          <input value={edit.place} onChange={e => setEdit({ ...edit, place: e.target.value })} placeholder="Account or place" aria-label="Account or place" className="w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent" />
+                          <input value={edit.check} onChange={e => setEdit({ ...edit, check: e.target.value })} placeholder="What to check" aria-label="What to check" className="w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent" />
+                        </>
                       )}
                       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Topics">
                         {Object.entries(TOPIC_COLORS).map(([t, c]) => {
@@ -158,7 +178,8 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   <Title text={it.title} />
                 </h2>
               )}
-              {closed && <p className="mt-1 text-[15px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
+              {(closed || it.status === 'passed') && <p className="mt-1 text-[15px] text-pc-text-muted">{STATUS[it.status] ?? it.status}</p>}
+              {isWatch && !closed && it.status !== 'passed' && <p className="mt-1 text-[15px] text-pc-text-muted">Nothing to do: it happens by itself.</p>}
             </div>
 
             {rows.length > 0 && (
@@ -182,7 +203,25 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
               </div>
             )}
 
-            {closed ? (
+            {isWatch && !closed ? (
+              wrong ? (
+                <div className="mt-2 space-y-2">
+                  <input value={wrong.reason} onChange={e => setWrong({ ...wrong, reason: e.target.value })} autoFocus placeholder="What went wrong" aria-label="What went wrong" className="w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent" />
+                  <input value={wrong.step} onChange={e => setWrong({ ...wrong, step: e.target.value })} placeholder="What to do now (optional)" aria-label="What to do now" className="w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setWrong(null)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px] font-medium">Cancel</button>
+                    <button type="button" disabled={busy || !wrong.reason.trim()} onClick={() => { void run('went-wrong', { reason: wrong.reason.trim(), step: wrong.step.trim() }).then(() => setWrong(null)); }}
+                      className="press h-12 flex-1 rounded-[12px] bg-pc-accent text-[15px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">Make it a task</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
+                  {!edit && <button type="button" onClick={startEdit} className={secondary}><Pencil size={19} className="text-[var(--pc-accent-ink)]" /> Edit</button>}
+                  <button type="button" disabled={busy} onClick={() => setWrong({ reason: '', step: '' })} className={secondary}><AlertTriangle size={19} className="text-pc-accent" /> Went wrong…</button>
+                  <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Not needed</button>
+                </div>
+              )
+            ) : closed ? (
               <button type="button" disabled={busy} onClick={() => void run('reopen')} className="press mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-surface text-[16px] font-semibold disabled:opacity-60">
                 <Undo2 size={18} /> Reopen
               </button>

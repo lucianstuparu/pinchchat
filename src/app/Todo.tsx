@@ -14,15 +14,15 @@ import { useBusy, useDraft } from '../ui/draft';
 import { Segmented } from '../ui/Controls';
 import { NotesView } from '../notes/Notes';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Building2, Check, ChevronRight, Clock, FileText, Flag, HeartPulse, House, MapPin, Pin, RefreshCw, Repeat, Search, Sparkles, Star, Users, Wallet, X, type LucideIcon } from 'lucide-react';
-import { formatAmount, type Loop, type NowItem } from './api';
+import { Building2, Check, ChevronDown, ChevronRight, Clock, Eye, FileText, Flag, HeartPulse, House, MapPin, Pin, RefreshCw, Repeat, Search, Sparkles, Star, Users, Wallet, X, type LucideIcon } from 'lucide-react';
+import { formatAmount, formatDay, type Loop, type NowItem, type Watching } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
 import { BOX, BOX_GLOW, BOX_INK, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
 import { LoopsList } from './LoopsList';
 import { FieldControls, PrimaryButton } from './MicButton';
 import { speechPlaceholder, useSpeech } from './speech';
-import { TOPIC_COLORS, dueChip, groupTodo, matches, railOf, titleRuns, type DueKind } from './todoRules';
+import { TOPIC_COLORS, daysBetween, dueChip, groupTodo, matches, railOf, titleRuns, type DueKind } from './todoRules';
 import type { OutgoingAttachment } from '../mobile/attachments';
 
 type Mode = 'light' | 'dark';
@@ -144,6 +144,49 @@ function Row({ item, today, mode, onDone, onStar, onOpen, onLift, lifted }: RowP
 }
 
 
+// ---- watch-outs: "Passing by" (ai.manager oc-app-design.md). What happens by itself: one muted line
+// each, no tick box, nothing counted as to do. The blue "soon" chip only within 3 days.
+function WatchRow({ item, today, mode, onOpen }: { item: NowItem; today: string; mode: Mode; onOpen: (i: NowItem) => void }) {
+  const amount = formatAmount(item.amount, item.currency);
+  const d = item.due_date && today ? daysBetween(today, item.due_date) : null;
+  const when = d === null ? '' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 0 ? formatDay(item.due_date!) : formatDay(item.due_date!);
+  const soon = d !== null && d >= 0 && d <= 3;
+  return (
+    <button type="button" onClick={() => onOpen(item)} data-row={item.id}
+      className="press flex min-h-[44px] w-full items-center gap-2 rounded-[12px] py-1.5 pl-3 pr-2 text-left active:bg-[var(--pc-hover-strong)]">
+      <span className="w-[30px] shrink-0 text-right text-[15px] font-bold tabular-nums text-pc-text-muted">{item.n ?? ''}</span>
+      <Title text={item.title} className="min-w-0 flex-1 truncate text-[15px] leading-[20px] text-pc-text-secondary" />
+      {when && (soon
+        ? <span className="inline-flex h-[22px] shrink-0 items-center rounded-[8px] px-2 text-[12px] font-semibold tabular-nums" style={DUE_STYLE[mode].soon}>{when}</span>
+        : <span className="shrink-0 text-[13px] tabular-nums text-pc-text-muted">{when}</span>)}
+      {amount && <span className="shrink-0 text-[13px] font-medium tabular-nums text-pc-text-muted">{amount}</span>}
+    </button>
+  );
+}
+
+function PassingBy({ watch, today, mode, onOpen, open }: { watch: Watching; today: string; mode: Mode; onOpen: (i: NowItem) => void; open?: boolean }) {
+  const [showPassed, setShowPassed] = useState(!!open);
+  if (!watch.upcoming.length && !watch.passed.length) return null;
+  return (
+    <section aria-label="Passing by" className="px-1.5">
+      <h3 className="flex items-center gap-2 px-2 pb-0.5 pt-1 text-[12px] font-bold uppercase tracking-[0.06em] text-pc-text-muted">
+        <Eye size={13} strokeWidth={2.5} aria-hidden /> Passing by
+      </h3>
+      {watch.upcoming.map(i => <WatchRow key={i.id} item={i} today={today} mode={mode} onOpen={onOpen} />)}
+      {watch.upcoming.length === 0 && <p className="px-3 py-2 text-[14px] text-pc-text-muted">Nothing coming up.</p>}
+      {watch.passed.length > 0 && (
+        <>
+          <button type="button" onClick={() => setShowPassed(v => !v)} aria-expanded={showPassed}
+            className="press flex h-[44px] w-full items-center gap-1.5 px-3 text-left text-[13px] text-pc-text-muted">
+            <ChevronDown size={15} className={showPassed ? '' : '-rotate-90'} aria-hidden /> Passed · {watch.passed.length}
+          </button>
+          {showPassed && watch.passed.map(i => <WatchRow key={i.id} item={i} today={today} mode={mode} onOpen={onOpen} />)}
+        </>
+      )}
+    </section>
+  );
+}
+
 function GroupHead({ dot, mark, label, count, color }: { dot?: string; mark?: ReactNode; label: string; count: number; color?: string }) {
   return (
     <h3 className="flex items-center gap-2 px-2 pb-0.5 pt-1 text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: color ?? 'var(--pc-text-secondary)' }}>
@@ -155,8 +198,8 @@ function GroupHead({ dot, mark, label, count, color }: { dot?: string; mark?: Re
   );
 }
 
-function TodoList({ items, today, mode, filter, onDone, onStar, onOpen, onMove }: {
-  items: NowItem[]; today: string; mode: Mode; filter: 'priority' | 'deadlines' | null; onMove?: (m: Move<NowItem>) => void;
+function TodoList({ items, watch, today, mode, filter, onDone, onStar, onOpen, onMove }: {
+  items: NowItem[]; watch?: Watching; today: string; mode: Mode; filter: 'priority' | 'deadlines' | null; onMove?: (m: Move<NowItem>) => void;
 } & Omit<RowProps, 'item' | 'today' | 'mode'>) {
   const shown = filter === 'priority' ? items.filter(i => i.priority === 'P1') : filter === 'deadlines' ? items.filter(i => i.due_date || i.scheduled) : items;
   const g = groupTodo(shown, today);
@@ -188,6 +231,7 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen, onMove }
           {g.due.length === 0 && <p className="px-3 py-6 text-center text-[15px] font-medium" style={{ color: BOX_INK }}>Drop here what you do now</p>}
         </section>
       )}
+      {watch && !filter && !drag && <PassingBy watch={watch} today={today} mode={mode} onOpen={onOpen} />}
       {g.priority.length > 0 && (
         <section data-zone="priority" className="rounded-[16px] px-1.5" style={outline('priority')}>
           <GroupHead mark={<Star size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />} label="Priority" count={g.priority.length} />
@@ -206,7 +250,7 @@ function TodoList({ items, today, mode, filter, onDone, onStar, onOpen, onMove }
           {rows('waiting', g.waiting)}
         </section>
       )}
-      {shown.length === 0 && (
+      {shown.length === 0 && !(watch && !filter && (watch.upcoming.length || watch.passed.length)) && (
         <p className="px-4 py-10 text-center text-[15px] text-pc-text-muted">{filter === 'priority' ? 'No priorities. Tap the star on a task to make it one.' : 'Nothing with a date.'}</p>
       )}
       {drag && (
@@ -269,6 +313,8 @@ export interface TodoPanelProps {
   mode: Mode;
   tab: TodoTab; onTab: (t: TodoTab) => void;
   items: NowItem[]; loops: Loop[]; today: string;
+  /** Watch-outs ("Passing by"): never counted, never in the lists of things to do. */
+  watch?: Watching;
   loaded: boolean; expired: boolean; refreshing: boolean; onRefresh: () => void;
   onDone: (i: NowItem) => void; onStar: (i: NowItem) => void; onOpen: (id: string) => void;
   /** A drag: into or out of the box, or a new order. */
@@ -286,14 +332,18 @@ export interface TodoPanelProps {
 
 export function TodoPanel(p: TodoPanelProps) {
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<'priority' | 'deadlines' | null>(null);
+  const [filter, setFilter] = useState<'priority' | 'deadlines' | 'watching' | null>(null);
   const [showPutOff, setShowPutOff] = useState(false);
   const spinning = useDelayedFlag(p.refreshing);
   // Put off ("Remind in 3 days") stays out of the way until its day; a search still finds it.
   const putOff = p.items.filter(i => i.hidden);
   const visible = showPutOff ? p.items : p.items.filter(i => !i.hidden);
   const items = q.trim() ? p.items.filter(i => matches(i, q)) : visible;
-  const chip = (on: boolean) => `inline-flex h-8 items-center rounded-full border px-3 text-[13px] font-medium ${on ? 'border-pc-text bg-pc-text text-pc-base' : 'border-pc-border-strong text-pc-text-secondary'}`;
+  // A search finds watch-outs too; "Watching" shows only them, the passed ones unfolded.
+  const watch: Watching | undefined = p.watch && (q.trim()
+    ? { upcoming: p.watch.upcoming.filter(i => matches(i, q)), passed: p.watch.passed.filter(i => matches(i, q)) } : p.watch);
+  const hasWatch = !!p.watch && (p.watch.upcoming.length > 0 || p.watch.passed.length > 0);
+  const chip = (on: boolean) => `relative inline-flex h-8 items-center rounded-full border px-3 before:absolute before:inset-x-0 before:-inset-y-[7px] before:content-['']  text-[13px] font-medium ${on ? 'border-pc-text bg-pc-text text-pc-base' : 'border-pc-border-strong text-pc-text-secondary'}`;
   return (
     <div className="flex h-full flex-col bg-pc-elevated">
       <header className={`shrink-0 bg-pc-elevated ${p.onClose ? 'pt-[env(safe-area-inset-top)]' : ''}`}>
@@ -338,23 +388,26 @@ export function TodoPanel(p: TodoPanelProps) {
               {q && <button type="button" onClick={() => setQ('')} className="flex h-5 w-5 items-center justify-center rounded-full bg-pc-text-faint text-pc-surface" aria-label="Clear search"><X size={11} strokeWidth={3} /></button>}
             </label>
             {!q && <AddTask onAdd={p.onAdd} transcribe={p.transcribe} reply={p.reply} onDismissReply={p.onDismissReply} />}
-            {p.items.length > 0 && (
-              <div className="flex items-center gap-2 px-1">
+            {(p.items.length > 0 || hasWatch) && (
+              <div className="flex flex-wrap items-center gap-2 px-1">
                 <span className="mr-0.5 text-[12px] font-bold uppercase tracking-[0.06em] text-pc-text-faint">Show</span>
                 <button type="button" className={chip(filter === 'priority')} aria-pressed={filter === 'priority'} onClick={() => setFilter(f => (f === 'priority' ? null : 'priority'))}><Star size={13} strokeWidth={2.5} fill="currentColor" className="mr-1" aria-hidden />Priority</button>
                 <button type="button" className={chip(filter === 'deadlines')} aria-pressed={filter === 'deadlines'} onClick={() => setFilter(f => (f === 'deadlines' ? null : 'deadlines'))}>Deadlines</button>
+                {hasWatch && <button type="button" className={chip(filter === 'watching')} aria-pressed={filter === 'watching'} onClick={() => setFilter(f => (f === 'watching' ? null : 'watching'))}><Eye size={13} strokeWidth={2.5} className="mr-1" aria-hidden />Watching</button>}
               </div>
             )}
             {!p.loaded ? <p className="px-2 py-6 text-[15px] text-pc-text-muted">Loading…</p>
-              : p.items.length === 0 ? (
+              : filter === 'watching' && watch ? (
+                <PassingBy key={q} watch={watch} today={p.today} mode={p.mode} onOpen={i => p.onOpen(i.id)} open />
+              ) : p.items.length === 0 && !hasWatch ? (
                 <div className="flex flex-col items-center px-8 py-10 text-center">
                   <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(var(--pc-accent-rgb),0.12)] text-[var(--pc-accent-ink)]"><Check size={24} /></span>
                   <p className="text-[16px] font-semibold">All clear</p>
                   <p className="mt-1 text-[15px] text-pc-text-muted">Nothing needs you right now.</p>
                 </div>
-              ) : items.length === 0 && q.trim() ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
-              : items.length === 0 ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
-              : <TodoList items={items} today={p.today} mode={p.mode} filter={filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} onMove={p.onMove} />}
+              ) : items.length === 0 && q.trim() && !(watch && (watch.upcoming.length || watch.passed.length)) ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
+              : items.length === 0 && !hasWatch ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
+              : <TodoList items={items} watch={watch} today={p.today} mode={p.mode} filter={filter === 'watching' ? null : filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} onMove={p.onMove} />}
             {putOff.length > 0 && !q.trim() && (
               <button type="button" onClick={() => setShowPutOff(v => !v)} className="press flex h-10 w-full items-center gap-2 px-2 text-left text-[15px] text-pc-text-muted" aria-expanded={showPutOff}>
                 <Clock size={16} aria-hidden /> {putOff.length} put off until later · <span className="font-medium text-[var(--pc-accent-ink)]">{showPutOff ? 'Hide' : 'Show'}</span>

@@ -35,7 +35,16 @@ export interface NowItem {
   weight: number;
   section: Section;
   added_by?: string;
+  /** Watch-outs (kind watch): the account or place, and one line of what to check. */
+  place?: string;
+  check?: string;
 }
+
+/**
+ * Watch-outs (ai.manager oc-app-design.md): what happens by itself (a direct debit, a delivery, a renewal).
+ * Never something to do: not in items, not counted. upcoming nearest first; passed = the last 30 days.
+ */
+export interface Watching { upcoming: NowItem[]; passed: NowItem[] }
 
 export interface Loop {
   id: string;
@@ -56,7 +65,7 @@ export interface Sheet {
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
 }
 
-export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order';
+export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order' | 'went-wrong';
 
 export class SessionExpired extends Error {}
 
@@ -76,7 +85,7 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
 
 export const transcribeAudio = (audio: { content: string; mimeType: string }) =>
   post<{ text: string; lang: string | null }>('/reg/transcribe', { audio: audio.content, mimeType: audio.mimeType }).then(r => r.text);
-export const fetchNow = () => post<{ today: string; items: NowItem[] }>('/reg/now', {});
+export const fetchNow = () => post<{ today: string; items: NowItem[]; watch?: Watching }>('/reg/now', {});
 export const fetchLoops = () => post<{ today: string; loops: Loop[] }>('/reg/loops', {});
 export const fetchSheet = (item: string) => post<Sheet>('/reg/item', { item });
 export const fetchStates = (items: string[]) => post<{ items: Record<string, Partial<NowItem>>; today: string }>('/reg/status', { items });

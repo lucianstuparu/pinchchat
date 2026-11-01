@@ -40,7 +40,7 @@ export function areaOf(item: Pick<NowItem, 'store' | 'domain'> & { store: string
 }
 
 const DAY = 86_400_000;
-const daysBetween = (from: string, to: string) => Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / DAY);
+export const daysBetween = (from: string, to: string) => Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / DAY);
 const short = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString(RO ? 'ro-RO' : undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
 export type DueKind = 'overdue' | 'today' | 'soon' | 'later';
