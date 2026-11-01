@@ -25,7 +25,7 @@ export function Profile({ contact, waOwner, onClose, onSaved }: {
   const [f, setF] = useState({
     label: contact.label ?? '', name: contact.name ?? '', phone: contact.phone ?? '', email: contact.email ?? '',
     aliases: (contact.aliases ?? []).join(', '), lang: contact.lang ?? 'fr', tone: contact.tone ?? 'formal',
-    listen: !!contact.listen, channel: (contact.channel ?? (waOwner ? 'whatsapp' : 'other')) as Channel,
+    listen: !!contact.listen, noUndo: !!contact.no_undo, channel: (contact.channel ?? (waOwner ? 'whatsapp' : 'other')) as Channel,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export function Profile({ contact, waOwner, onClose, onSaved }: {
       const c = await saveContact({ id: contact.id, label: f.label.trim() || f.name.trim().split(/\s+/)[0], name: f.name.trim(),
         phone: f.channel === 'whatsapp' || f.channel === 'sms' ? f.phone.trim() : undefined, email: f.channel === 'email' ? f.email.trim() : undefined,
         aliases: f.aliases.split(',').map(a => a.trim()).filter(Boolean), lang: f.lang, tone: f.tone as Contact['tone'],
-        listen: f.channel === 'whatsapp' && waOwner ? f.listen : undefined, channel: f.channel });
+        listen: f.channel === 'whatsapp' && waOwner ? f.listen : undefined, no_undo: f.channel === 'whatsapp' && waOwner ? f.noUndo : undefined, channel: f.channel });
       let face: { v: number; data: string } | null | undefined;
       try {
         if (photo) face = { v: (await savePhoto(c, photo)).v, data: photo };
@@ -120,6 +120,14 @@ export function Profile({ contact, waOwner, onClose, onSaved }: {
             <input type="checkbox" checked={f.listen} onChange={e => setF({ ...f, listen: e.target.checked })} className="mt-1 h-5 w-5 shrink-0 accent-[var(--pc-accent)]" />
             <span className="text-[15px]"><b className="font-semibold">Keep their messages here</b>
               <span className="block text-[13px] text-pc-text-muted">You read or hear their WhatsApp messages here, translated, and get a notification. Nothing ever answers them; only your Send does.</span>
+            </span>
+          </label>
+        )}
+        {f.channel === 'whatsapp' && waOwner && (
+          <label className="flex min-h-12 items-start gap-3 rounded-[12px] bg-pc-surface px-3 py-3">
+            <input type="checkbox" checked={f.noUndo} onChange={e => setF({ ...f, noUndo: e.target.checked })} className="mt-1 h-5 w-5 shrink-0 accent-[var(--pc-accent)]" />
+            <span className="text-[15px]"><b className="font-semibold">Low risk: send at once</b>
+              <span className="block text-[13px] text-pc-text-muted">Send (or your “da”) sends straight away, with no 3 seconds to undo. For people where a slip does not matter.</span>
             </span>
           </label>
         )}

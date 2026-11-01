@@ -418,7 +418,7 @@ const server = http.createServer((req, res) => {
       }
       let c = waContacts.find(x => x.id === p.id);
       if (!c) { c = { id: `ct-${++seq}`, sent: 0 }; waContacts.push(c); }
-      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone ?? c.phone ?? '', email: p.email, lang: p.lang, tone: p.tone, listen: p.listen, channel: p.channel });
+      Object.assign(c, { name: p.name, label: p.label, aliases: p.aliases, phone: p.phone ?? c.phone ?? '', email: p.email, lang: p.lang, tone: p.tone, listen: p.listen, no_undo: p.no_undo, channel: p.channel });
       res.end(JSON.stringify({ ok: true, contact: c }));
     });
     return;

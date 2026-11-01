@@ -44,10 +44,10 @@ self.addEventListener('fetch', (event) => {
 
 // ---- Relay's notifications (oc-push, app "relay"): a message a mail rule prepared, waiting in Drafts.
 // Payload {title, body, url, tag, actions?, data?: {draft}}. Tapping the notification opens that person's
-// line with the message on the card. The Send button sends from here, after the app's 5 s with Undo
+// line with the message on the card. The Send button sends from here, after the app's 3 s with Undo
 // (Lucian 2026-10-27: "the tap variant"); Later only closes it (the draft stays in Drafts).
-const SEND_DELAY = 5000;
-const pending = new Map();   // draft id -> {cancelled}, while its 5 s run (the worker stays alive meanwhile)
+const SEND_DELAY = 3000;
+const pending = new Map();   // draft id -> {cancelled}, while its 3 s run (the worker stays alive meanwhile)
 const ICON = new URL('logo-192.png', SCOPE).href;
 const BADGE = new URL('favicon-32.png', SCOPE).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -13,7 +13,9 @@ export type Tone = 'informal' | 'formal';
 export type Channel = 'whatsapp' | 'email' | 'sms' | 'other';
 export interface Contact {
   id: string; name: string; label: string; aliases: string[]; phone: string; email?: string; lang: string; tone: Tone; channel: Channel;
-  last_sent?: string; sent: number; listen?: boolean; unread?: number; last_in?: { text: string; ts: string };
+  last_sent?: string; sent: number; listen?: boolean;
+  /** Low risk: Relay sends at once, without the Undo moment. */
+  no_undo?: boolean; unread?: number; last_in?: { text: string; ts: string };
 }
 export interface WaMessage { id: string; from: 'them' | 'me'; text: string; transcript?: string; translation?: string; media?: string; ts: string; read?: boolean }
 export type DraftStatus = 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed' | 'expired';
@@ -43,7 +45,7 @@ export const waDraft = (contact: string, text: string, back?: string) =>
 export const act = (draft: string, action: 'send' | 'cancel' | 'edit' | 'save' | 'unsave' | 'used' | 'restore', text?: string) =>
   post<Draft>('/reg/wa/act', { draft, action, ...(text !== undefined ? { text } : {}) });
 /** Drafts: messages kept for later (Later on the card, or prepared by a mail rule), until sent, copied or dropped. */
-export const fetchDrafts = () => post<{ drafts: Draft[] }>('/reg/wa/drafts', {}).then(r => r.drafts);
+export const fetchDrafts = () => post<{ drafts?: Draft[] }>('/reg/wa/drafts', {}).then(r => r.drafts ?? []);
 /** A message written here but not on the server yet (another channel) kept in Drafts. */
 export const keepDraft = (contact: string, text: string, back?: string) =>
   post<{ ok: boolean; draft: Draft }>('/reg/wa/draft', { contact, text, back, saved: true }).then(r => r.draft);

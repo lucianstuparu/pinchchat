@@ -3,7 +3,7 @@
  * each translated when they write in another language and readable aloud; then the dock where you say
  * what to tell them. Their own agent (relay-api on CT 113, Codex) writes it in their language and in
  * the style learned from samples, with what it remembers about them; you read it and its meaning in
- * yours, may hear it, change it or drop it. WhatsApp: Send, which waits 5 s with Undo (a sent message
+ * yours, may hear it, change it or drop it. WhatsApp: Send, which waits 3 s with Undo (none for a contact marked low risk) (a sent message
  * cannot be taken back). Other channels: Copy or Share, and you paste it where they read.
  * After a message goes, the agent keeps the exchange and updates its memory.
  *
@@ -12,7 +12,7 @@
  * biggest, at the bottom. Every time the mic stops (a tap, or a pause) the words go on by themselves (Lucian
  * 2026-10-26: "it didn't read back automatically when I clicked stop recording"); holding a face starts the mic at once.
  * On WhatsApp the read-back ends with "Trimit?" and the mic listens for a short answer (answer.ts): "da" sends
- * (the same 5 s with Undo), "nu" drops it (Lucian 2026-10-26: "if I say ok to send the message").
+ * (the same 3 s with Undo), "nu" drops it (Lucian 2026-10-26: "if I say ok to send the message").
  * Relay's main mic opens the line with what was said (`autoSay`): it is prepared at once, by voice.
  * Later (Lucian 2026-10-27: "prepared drafts also in Relay for when I don't want to message right away"): the
  * message is kept in Relay's Drafts, without the 24 h expiry, and opens on the card with this person (`openDraft`).
@@ -35,7 +35,9 @@ import {
   type Contact, type Draft, type WaMessage,
 } from './api';
 
-const SEND_DELAY = 5000;
+// The Undo moment (Lucian 2026-11-01: "just 3 seconds for undo ... then it just sends immediately"); none for
+// a contact marked low risk (no_undo).
+const SEND_DELAY = 3000;
 const draftKeyOf = (contact: string) => `wa:draft:${contact}`;
 const keep = (k: string, v: string | null) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* not kept */ } };
 const kept = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -268,16 +270,19 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
     try { const n = await act(d.id, 'edit', t); setStage({ kind: 'draft', draft: { ...n, id: d.id }, said }); setEdit(null); }
     catch (e) { setStage({ kind: 'draft', draft: d, said, error: e instanceof Error ? e.message : 'Could not change it' }); }
   };
-  const done = (d: Draft, how: string, said?: string, voice?: boolean) => {
+  const done = (d: Draft, how: string, said?: string, voice?: boolean, { shown = false } = {}) => {
     keepDraft(null);
     if (!wa && !isLocal(d)) void act(d.id, 'used').catch(() => undefined);   // copied or shared: out of Drafts
-    setStage({ kind: 'sent', draft: d, how, voice });
-    if (voice) speak([wa ? 'Trimis.' : 'Copiat.'], MY_LANG);
+    // Shown already (WhatsApp shows Sent at once): only the time is put in, if the card is still up.
+    if (shown) setStage(s => (s.kind === 'sent' && s.draft.id === d.id ? { ...s, how } : s));
+    else { setStage({ kind: 'sent', draft: d, how, voice }); if (voice) speak([wa ? 'Trimis.' : 'Copiat.'], MY_LANG); }
     void learn(contact, d.text, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined).then(load).catch(() => undefined);
     onSent();
   };
 
-  // ---- WhatsApp Send: 5 s with Undo, then it leaves
+  // ---- WhatsApp Send: 3 s with Undo (none for a low-risk contact), then it leaves. The card says Sent at
+  // once: OpenClaw takes a few more seconds to hand it to WhatsApp, and that wait is the server's, not yours.
+  // If WhatsApp refuses it, the message comes back as a draft with the reason.
   const timer = useRef<number | null>(null);
   const [left, setLeft] = useState(0);
   const ticker = useRef<number | null>(null);
@@ -286,28 +291,39 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
     if (ticker.current) window.clearInterval(ticker.current);
     timer.current = ticker.current = null;
   };
-  useEffect(() => stopTimers, []);   // leaving the screen keeps it a draft
+  useEffect(() => stopTimers, []);   // leaving the screen during Undo keeps it a draft
+  const go = async (d: Draft, said?: string, voice?: boolean) => {
+    stopTimers();
+    keepDraft(null);
+    setStage({ kind: 'sent', draft: d, how: 'Sent', voice });
+    if (voice) speak(['Trimis.'], MY_LANG);
+    const notSent = (draft: Draft, error: string) => {
+      keepDraft(draft);
+      const s = stageNow.current;
+      if (s.kind === 'idle' || (s.kind === 'sent' && s.draft.id === d.id)) setStage({ kind: 'draft', draft, said, voice, error });
+      else setHint(`Not sent to ${contact.label}: ${error}`);
+      speak(['Nu s-a trimis.'], MY_LANG);
+    };
+    try {
+      const r = await act(d.id, 'send');
+      if (r.status === 'sent') { done({ ...r, id: d.id }, `Sent ${timeOf(r.sent_at ?? new Date().toISOString())}`, said, voice, { shown: true }); void load(); }
+      else notSent({ ...r, id: d.id }, r.error || 'Not sent');
+    } catch (e) {
+      // The send may have gone through and only the answer got lost (the phone changed network, 2026-10-25): ask
+      // the server before saying it failed. A second Send of a sent draft is refused there anyway.
+      const now = await post<{ drafts: Record<string, Draft> }>('/reg/wa/status', { ids: [d.id] }).then(r => r.drafts?.[d.id]).catch(() => undefined);
+      if (now?.status === 'sent') { done({ ...now, id: d.id }, `Sent ${timeOf(now.sent_at ?? new Date().toISOString())}`, said, voice, { shown: true }); void load(); return; }
+      notSent(d, navigator.onLine ? (e instanceof Error ? e.message : 'Not sent') : 'No connection: not sent');
+    }
+  };
   const send = (d: Draft, said?: string, voice?: boolean) => {
     quiet();
+    if (contact.no_undo) { void go(d, said, voice); return; }
     if (voice) speak(['Trimit.'], MY_LANG);
     setStage({ kind: 'sending', draft: d, said, voice });
     setLeft(SEND_DELAY / 1000);
     ticker.current = window.setInterval(() => setLeft(n => Math.max(1, n - 1)), 1000);
-    timer.current = window.setTimeout(async () => {
-      stopTimers();
-      try {
-        const r = await act(d.id, 'send');
-        if (r.status === 'sent') { done({ ...r, id: d.id }, `Sent ${timeOf(r.sent_at ?? new Date().toISOString())}`, said, voice); void load(); }
-        else { setStage({ kind: 'draft', draft: { ...r, id: d.id }, said, voice, error: r.error || 'Not sent' }); if (voice) speak(['Nu s-a trimis.'], MY_LANG); }
-      } catch (e) {
-        // The send may have gone through and only the answer got lost (the phone changed network, 2026-10-25): ask
-        // the server before saying it failed. A second Send of a sent draft is refused there anyway.
-        const now = await post<{ drafts: Record<string, Draft> }>('/reg/wa/status', { ids: [d.id] }).then(r => r.drafts?.[d.id]).catch(() => undefined);
-        if (now?.status === 'sent') { done({ ...now, id: d.id }, `Sent ${timeOf(now.sent_at ?? new Date().toISOString())}`, said, voice); void load(); return; }
-        setStage({ kind: 'draft', draft: d, said, voice, error: navigator.onLine ? (e instanceof Error ? e.message : 'Not sent') : 'No connection: not sent' });
-        if (voice) speak(['Nu s-a trimis.'], MY_LANG);
-      }
-    }, SEND_DELAY);
+    timer.current = window.setTimeout(() => void go(d, said, voice), SEND_DELAY);
   };
   const undoSend = (d: Draft, said?: string, voice?: boolean) => { stopTimers(); if (voice) speak(['Oprit.'], MY_LANG); setStage({ kind: 'draft', draft: d, said, voice }); };
 

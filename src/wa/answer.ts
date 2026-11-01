@@ -1,7 +1,7 @@
 /**
  * The spoken answer after a read-back ("Trimit?"): the mic listens a few seconds for a short yes or no.
  * Lucian 2026-10-26: "ask for confirmation ... and then if I say ok to send the message", from the car.
- * Only a short answer counts: "da", "ok", "trimite", "yes", "oui" sends (still with the 5 s Undo);
+ * Only a short answer counts: "da", "ok", "trimite", "yes", "oui" sends (still with the 3 s Undo, none for a low-risk contact);
  * "nu", "stop", "anulează" drops it; anything else changes nothing and the buttons stay.
  */
 import { canDictate, canRecord, dictate, getDictationLang, getSpeechMode, record, SILENT } from '../app/voice';
