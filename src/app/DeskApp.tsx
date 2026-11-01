@@ -152,11 +152,13 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       const id = u.searchParams.get('item');
       if (id) { setSheet(id); dismissNotice(); return true; }
       if (u.searchParams.has('todo')) { setTab('todo'); setTodoOpen(true); dismissNotice(); return true; }
+      // No target of its own (a digest, a health alert): the notifications list, on that one.
+      if (u.searchParams.has('notifications')) { setHistoryOpen(true); return true; }
       return false;
     };
     const url = new URL(window.location.href);
     if (take(url.href)) {
-      url.searchParams.delete('item'); url.searchParams.delete('todo');
+      url.searchParams.delete('item'); url.searchParams.delete('todo'); url.searchParams.delete('notifications');
       window.history.replaceState(null, '', url.pathname + url.search + url.hash);
     }
     const on = (e: MessageEvent) => { if (e.data?.type === 'notice' && e.data.url) take(e.data.url); };
@@ -746,7 +748,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       )}
       {rulesOpen && <RulesSheet mode={mode} onClose={() => setRulesOpen(false)} />}
       {keeping && <KeepNote base="/reg" shared={keeping} onKept={kept} onChat={toChat} onClose={() => setKeeping(null)} />}
-      {historyOpen && <NotificationsSheet mode={mode} onOpenItem={id => { setHistoryOpen(false); setSheet(id); }} onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && <NotificationsSheet mode={mode} highlight={notice?.title}
+        onOpenItem={id => { setHistoryOpen(false); dismissNotice(); setSheet(id); }}
+        onOpenTodo={() => { setHistoryOpen(false); dismissNotice(); setTab('todo'); setTodoOpen(true); }}
+        onClose={() => { setHistoryOpen(false); dismissNotice(); }} />}
     </div>
   );
 }

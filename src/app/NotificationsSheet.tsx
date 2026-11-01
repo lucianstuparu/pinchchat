@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { formatDay } from './api';
@@ -8,12 +8,13 @@ import { formatDay } from './api';
  * by mistake"): the last 30 days of what oc, Shopping and Relay pushed to this person, newest first,
  * kept by oc-push on CT 105. A reminder opens its item; the other apps' notifications open that app.
  */
-interface Sent { ts: string; app: 'oc' | 'shop' | 'relay'; title: string; body?: string; url?: string; item?: string; sent?: number }
+interface Sent { ts: string; app: 'oc' | 'shop' | 'relay' | 'artlia'; title: string; body?: string; url?: string; item?: string; sent?: number }
 
 const APP: Record<Sent['app'], { name: string; origin: string | null }> = {
   oc: { name: 'oc', origin: null },
   shop: { name: 'Shopping', origin: 'https://shop.stuparu.eu' },
   relay: { name: 'Relay', origin: 'https://msg.stuparu.eu' },
+  artlia: { name: 'Casa Artlia', origin: 'https://artlia.stuparu.eu' },
 };
 
 const dayOf = (iso: string) => {
@@ -25,7 +26,11 @@ const dayOf = (iso: string) => {
 };
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-export function NotificationsSheet({ mode, onOpenItem, onClose }: { mode: 'light' | 'dark'; onOpenItem: (id: string) => void; onClose: () => void }) {
+/** `highlight`: the title of the notification that was tapped to get here (one with no item of its own),
+ *  shown in full and marked, so the list opens on what the tap was about. */
+export function NotificationsSheet({ mode, highlight, onOpenItem, onOpenTodo, onClose }: {
+  mode: 'light' | 'dark'; highlight?: string; onOpenItem: (id: string) => void; onOpenTodo: () => void; onClose: () => void;
+}) {
   const [items, setItems] = useState<Sent[] | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -34,6 +39,11 @@ export function NotificationsSheet({ mode, onOpenItem, onClose }: { mode: 'light
       .then((d: { items: Sent[] }) => setItems(d.items))
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // The newest one with that title is the one tapped.
+  const marked = highlight ? items?.find(n => n.title === highlight) : undefined;
+  const markedRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { markedRef.current?.scrollIntoView({ block: 'center' }); }, [marked]);
 
   const days: Array<[string, Sent[]]> = [];
   for (const n of items ?? []) {
@@ -46,6 +56,7 @@ export function NotificationsSheet({ mode, onOpenItem, onClose }: { mode: 'light
     const app = APP[n.app] ?? APP.oc;
     if (app.origin) { window.location.href = `${app.origin}${n.url ?? '/'}`; return; }
     if (n.item) onOpenItem(n.item);
+    else if (n.url?.includes('todo=1')) onOpenTodo();
   };
 
   return (
@@ -65,14 +76,16 @@ export function NotificationsSheet({ mode, onOpenItem, onClose }: { mode: 'light
             <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-elevated">
               {list.map((n, i) => {
                 const app = APP[n.app] ?? APP.oc;
-                const tappable = !!app.origin || !!n.item;
+                const tappable = !!app.origin || !!n.item || !!n.url?.includes('todo=1');
+                const isMarked = n === marked;
                 return (
-                  <button key={`${n.ts}-${i}`} type="button" onClick={() => open(n)} disabled={!tappable}
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left disabled:cursor-default">
+                  <button key={`${n.ts}-${i}`} ref={isMarked ? markedRef : undefined} type="button" onClick={() => open(n)} disabled={!tappable}
+                    aria-current={isMarked || undefined}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left disabled:cursor-default ${isMarked ? 'bg-[rgba(var(--pc-accent-rgb),0.10)]' : ''}`}>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] text-pc-text-muted">{timeOf(n.ts)}{n.app !== 'oc' ? ` · ${app.name}` : ''}{n.sent === 0 ? ' · not delivered' : ''}</span>
                       <span className="mt-0.5 block text-[16px] font-semibold leading-snug">{n.title}</span>
-                      {n.body && <span className="mt-0.5 block whitespace-pre-line text-[14px] leading-snug text-pc-text-secondary line-clamp-3">{n.body}</span>}
+                      {n.body && <span className={`mt-0.5 block whitespace-pre-line text-[14px] leading-snug text-pc-text-secondary ${isMarked ? '' : 'line-clamp-3'}`}>{n.body}</span>}
                     </span>
                     {tappable && <ChevronRight size={17} className="mt-6 shrink-0 text-pc-text-faint" />}
                   </button>

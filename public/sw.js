@@ -191,6 +191,13 @@ self.addEventListener('notificationclick', (event) => {
   const n = event.notification;
   const notice = { title: n.title, body: n.body, item: n.data && n.data.item, ts: Date.now() };
   const target = new URL(n.data && n.data.url || '/', self.location.origin);
+  // Every tap lands on something (2026-11-01, Lucian: "it just opens the app in default view"): a
+  // notification with an item opens the item even when its url says only "/" (the ones sent before the
+  // senders added /?item=), and one with no target of its own opens the notifications list on it.
+  if (!target.search) {
+    if (n.data && n.data.item) target.searchParams.set('item', n.data.item);
+    else target.searchParams.set('notifications', '1');
+  }
   target.searchParams.set('notice', '1');
   event.waitUntil((async () => {
     const cache = await caches.open(SHARE_CACHE);

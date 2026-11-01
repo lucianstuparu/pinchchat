@@ -2,7 +2,7 @@ import { L } from '../ui/lang';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
-import { ArrowUp, AudioLines, ClipboardPaste, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { ArrowUp, AudioLines, ClipboardPaste, Images, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
 import { canReadClipboard, clipboardImages, pastedFiles } from '../lib/clipboard';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
 import { FieldControls, PrimaryButton } from '../app/MicButton';
@@ -102,6 +102,9 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [plusOpen, setPlusOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Photos straight to Android's photo picker (2026-11-01, Lucian: no extra step choosing Camera /
+  // Camera Video / Files, which an input without `accept` shows); other files from their own item.
+  const photoRef = useRef<HTMLInputElement>(null);
   const speech = useSpeech(text, setText, transcribe ?? noTranscriber, { autoStop: handsFree });
   const byVoice = useRef(false);
   useEffect(() => { if (speech.listening) byVoice.current = true; }, [speech.listening]);
@@ -214,6 +217,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     setAttachments(prev => [...prev, ...added]);
     setBusy(false);
     if (fileRef.current) fileRef.current.value = '';
+    if (photoRef.current) photoRef.current.value = '';
   };
 
   // A screenshot pasted into the box (the keyboard's clipboard, Ctrl+V) or with Paste in the + menu.
@@ -225,7 +229,6 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
       else setError(L('No picture on the clipboard: copy a screenshot first'));
     } catch { setError(L('The clipboard could not be read: allow it for this app in Chrome’s site settings')); }
   };
-  const menu = (voice && canRecord()) || canReadClipboard();
 
   const shownError = error ?? speech.error;
   const round = 'press flex h-12 w-12 shrink-0 items-center justify-center rounded-full';
@@ -265,6 +268,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
       )}
       {shownError && <p className="mx-3 mb-1 text-[13px] text-red-500" role="alert">{shownError}</p>}
 
+      <input ref={photoRef} type="file" accept="image/*" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <input ref={fileRef} type="file" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <div className="flex items-end gap-2">
         {vm !== 'idle' ? (
@@ -273,18 +277,23 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
           </button>
         ) : !attach ? null : (
           <div className="relative mb-[6px] shrink-0">
-            <button type="button" onClick={() => (menu ? setPlusOpen(o => !o) : fileRef.current?.click())}
+            <button type="button" onClick={() => setPlusOpen(o => !o)}
               className={`${round} bg-pc-surface text-pc-text-secondary press ${plusOpen ? 'rotate-45' : ''}`}
-              aria-label={menu ? L('Add') : L('Attach')} aria-expanded={plusOpen}>
+              aria-label={L('Add')} aria-expanded={plusOpen}>
               <Plus size={22} />
             </button>
             {plusOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setPlusOpen(false)} />
                 <div className="absolute bottom-12 left-0 z-30 w-56 overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); photoRef.current?.click(); }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                    <Images size={19} className="text-[var(--pc-accent-ink)]" /> {L('Photo')}
+                  </button>
+                  <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                   <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
-                    <Paperclip size={19} className="text-[var(--pc-accent-ink)]" /> {L('Photo or file')}
+                    <Paperclip size={19} className="text-[var(--pc-accent-ink)]" /> {L('File')}
                   </button>
                   {canReadClipboard() && <>
                     <div className="mx-4 h-px bg-[var(--pc-separator)]" />

@@ -524,8 +524,8 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // sent until Send.
   const speech = useSpeech(text, setText, transcribeShop);
   const input = useRef<HTMLTextAreaElement>(null);
-  // One picker, the same as oc's: with no `accept` Android opens its own chooser (camera, photos,
-  // files) instead of the photo-only gallery; anything that is not a picture is left out.
+  // Straight to Android's photo picker (`accept="image/*"`, the same as oc's Photo): without `accept`
+  // Android first asks Camera / Camera Video / Files, an extra step (2026-11-01). Non-pictures are left out.
   const picker = useRef<HTMLInputElement>(null);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
@@ -621,7 +621,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
-      <input ref={picker} type="file" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
+      <input ref={picker} type="file" accept="image/*" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
       {staged.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1.5" aria-label="Photos to send">
           {staged.map(ph => (
@@ -640,7 +640,10 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       {(speech.error || pasteError) && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error || pasteError}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
-          <button type="button" disabled={busy} onClick={() => (canReadClipboard() ? setPhotoMenu(m => !m) : picker.current?.click())} aria-expanded={photoMenu}
+          {/* A tap goes straight to the photos (2026-11-01, Lucian: no extra step); a long press offers
+              Paste a screenshot, for a phone whose keyboard cannot paste a picture into the box. */}
+          <button type="button" disabled={busy} onClick={() => picker.current?.click()} aria-expanded={photoMenu}
+            onContextMenu={canReadClipboard() ? e => { e.preventDefault(); setPhotoMenu(true); } : undefined}
             className="press mb-[4px] flex h-12 w-12 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
             <Camera size={24} />
           </button>
