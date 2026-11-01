@@ -6,16 +6,21 @@
  * A ticked thing stays where it was, crossed out on green (Lucian 2026-10-29: "helps me quickly check
  * that I didn't check by mistake"). Search finds anything on the list, for any shop; Ask opens the
  * Shopping assistant's bar (the same as on the main screen); a product photo opens full size.
+ *
+ * A long press opens a small menu instead of the browser's text selection (Lucian 2026-11-01): Add a
+ * photo, Not at this shop, Not needed any more. A thing in the basket without a photo shows a camera
+ * button: its photo goes to the assistant at Paid and becomes the item's product card.
  */
-import { useRef, useState, type ReactNode } from 'react';
-import { Camera, Check, ChevronDown, Lock, MessageSquare, Search, ShoppingBasket, X } from 'lucide-react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { Camera, Check, ChevronDown, Lock, MessageSquare, Search, ShoppingBasket, Store as StoreIcon, Trash2, X } from 'lucide-react';
+import { UndoBar, type UndoInfo } from '../app/UndoBar';
 import { Sheet } from '../ui/Sheet';
 import { SearchHeader } from '../ui/Controls';
 import { useBusy } from '../ui/draft';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf } from './groups';
 import { fold, newPhotoRef, type Item, type Op, type Product, type Purchase, type Store } from './logic';
 import { photoUrl, shrinkPhoto } from './photos';
-import { thumbOf, tripLists, type Trip } from './trip';
+import { thumbOf, tripLists, type Shot, type Trip } from './trip';
 import { ShopLogo, ShopLogos } from './ShopLogo';
 
 export function InStore({ trip, onTrip, items, stores, purchases, products, storeName, mode, apply, onPaid, onLeave, onChangeShop, askBar }: {
@@ -47,6 +52,25 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
   const [busy, setBusy] = useState(false);
   useBusy('shop-trip', true);   // never reload the app in the middle of a shop
   const n = basket.length + trip.extras.length;
+  const shots = trip.shots ?? [];
+  const shotOf = (id: string) => shots.find(s => s.id === id);
+  const [menu, setMenu] = useState<Item | null>(null);
+  const [undo, setUndo] = useState<UndoInfo | null>(null);
+  const undoKey = useRef(0);
+  const closeUndo = useCallback(() => setUndo(null), []);
+  const shotFor = useRef<string | null>(null);   // the item the camera is photographing (null: not on the list)
+  const shootItem = (id: string) => { shotFor.current = id; camera.current?.click(); };
+  const shootExtra = () => { shotFor.current = null; camera.current?.click(); };
+  const drop = (i: Item) => {
+    apply({ op: 'drop', id: i.id });
+    onTrip({ ...trip, picked: trip.picked.filter(x => x !== i.id), shots: shots.filter(s => s.id !== i.id) });
+    setUndo({ key: ++undoKey.current, label: `Not needed: ${i.title}`, undo: () => apply({ op: 'untick', id: i.id }) });
+  };
+  const notHere = (i: Item) => {
+    const tags = i.tags ?? [];
+    apply({ op: 'edit', id: i.id, tags: tags.filter(t => t !== trip.store) });
+    setUndo({ key: ++undoKey.current, label: `Not at ${storeName(trip.store)}: ${i.title}`, undo: () => apply({ op: 'edit', id: i.id, tags }) });
+  };
 
   const addPhoto = async (files: FileList | null) => {
     const f = files?.[0];
@@ -56,7 +80,10 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
       const data = await shrinkPhoto(f);
       const ref = newPhotoRef();
       apply({ op: 'photo', ref, data });   // goes up now, while still in the shop, or as soon as there is signal
-      onTrip({ ...trip, extras: [...trip.extras, { ref, thumb: await thumbOf(f) }] });
+      const thumb = await thumbOf(f);
+      const id = shotFor.current;
+      if (id) onTrip({ ...trip, shots: [...shots.filter(s => s.id !== id), { id, ref, thumb } satisfies Shot] });
+      else onTrip({ ...trip, extras: [...trip.extras, { ref, thumb }] });
     } catch { /* unreadable image: skipped */ }
     setBusy(false);
     if (camera.current) camera.current.value = '';
@@ -95,7 +122,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             <h2 className="px-4 pb-1 pt-2 text-[13px] font-semibold text-pc-text-muted">On the list · {found.length}</h2>
             {found.length === 0 && <p className="px-4 py-2 text-[15px] text-pc-text-muted">Nothing on the list matches. Ask the assistant to add it.</p>}
             <div className="divide-y divide-[var(--pc-separator)]">
-              {found.map(i => <TripRow key={i.id} item={i} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+              {found.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
             </div>
           </section>
         ) : <>
@@ -114,7 +141,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
                 <div key={g}>
                   {groups.length > 1 && <h3 className="px-4 pb-0.5 pt-2 text-[12px] font-semibold uppercase tracking-wide" style={{ color: groupColours(g, mode).ink }}>{GROUP_NAMES[g]}</h3>}
                   <div className="divide-y divide-[var(--pc-separator)]">
-                    {list.map(i => <TripRow key={i.id} item={i} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+                    {list.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket={picked.has(i.id)} onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
                   </div>
                 </div>
               ))}
@@ -129,7 +156,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
               </button>
               {showMaybe && (
                 <div className="divide-y divide-[var(--pc-separator)]">
-                  {maybe.map(m => <TripRow key={m.item.id} item={m.item} product={productOf(m.item.product)} why={m.why} shops={m.shops} storeName={storeName}
+                  {maybe.map(m => <TripRow key={m.item.id} item={m.item} shot={shotOf(m.item.id)} onMenu={() => setMenu(m.item)} onShoot={() => shootItem(m.item.id)} product={productOf(m.item.product)} why={m.why} shops={m.shops} storeName={storeName}
                     inBasket={picked.has(m.item.id)} onTap={() => toggle(m.item.id)} onPhoto={setPhoto} />)}
                 </div>
               )}
@@ -140,7 +167,7 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
             <section className="mx-3 mt-4 overflow-hidden rounded-[12px] bg-pc-surface">
               <h2 className="flex items-center gap-1.5 px-4 pb-0.5 pt-2.5 text-[13px] font-semibold text-[var(--pc-accent-ink)]"><ShoppingBasket size={14} /> Also in the basket · {fromSearch.length + trip.extras.length}</h2>
               <div className="divide-y divide-[var(--pc-separator)]">
-                {fromSearch.map(i => <TripRow key={i.id} item={i} product={productOf(i.product)} inBasket onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
+                {fromSearch.map(i => <TripRow key={i.id} item={i} shot={shotOf(i.id)} onMenu={() => setMenu(i)} onShoot={() => shootItem(i.id)} product={productOf(i.product)} inBasket onTap={() => toggle(i.id)} onPhoto={setPhoto} />)}
               </div>
               {trip.extras.length > 0 && (
                 <div className="px-4 pb-3 pt-2">
@@ -165,10 +192,11 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
         </>}
       </main>
 
+      <UndoBar info={undo} onClose={closeUndo} />
       <div className="shrink-0 border-t border-pc-border bg-pc-base px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
         <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void addPhoto(e.target.files)} />
         <div className="flex items-center gap-2">
-          <button type="button" disabled={busy} onClick={() => camera.current?.click()}
+          <button type="button" disabled={busy} onClick={shootExtra}
             className="press flex h-14 shrink-0 items-center gap-2 rounded-full bg-pc-surface pl-4 pr-5 text-[15px] font-medium text-pc-text disabled:opacity-50"
             aria-label="Photograph something not on the list">
             <Camera size={22} className="text-[var(--pc-accent-ink)]" /> Not on the list
@@ -179,6 +207,28 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
           </button>
         </div>
       </div>
+
+      {menu && (
+        <Sheet label={menu.title} onClose={() => setMenu(null)} className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+          <p className="truncate px-1 pb-3 text-[17px] font-semibold">{menu.title}</p>
+          <div className="space-y-2">
+            <button type="button" disabled={busy} onClick={() => { const id = menu.id; setMenu(null); shootItem(id); }}
+              className="press flex h-12 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 text-[16px] font-medium">
+              <Camera size={20} className="text-[var(--pc-accent-ink)]" /> {shotOf(menu.id) ? 'Take the photo again' : 'Add a photo of it'}
+            </button>
+            {(menu.tags ?? []).includes(trip.store) && (
+              <button type="button" onClick={() => { notHere(menu); setMenu(null); }}
+                className="press flex h-12 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 text-[16px] font-medium">
+                <StoreIcon size={20} className="text-pc-text-muted" /> Not at {storeName(trip.store)}
+              </button>
+            )}
+            <button type="button" onClick={() => { drop(menu); setMenu(null); }}
+              className="press flex h-12 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 text-[16px] font-medium text-red-500">
+              <Trash2 size={20} /> Not needed any more
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       {asking && (
         <Sheet label="Ask the assistant" onClose={() => setAsking(false)} className="flex max-h-[85dvh] flex-col pt-2">
@@ -217,13 +267,15 @@ export function InStore({ trip, onTrip, items, stores, purchases, products, stor
 /** Ticked = in the basket: the same green as a done task in oc. */
 const GREEN = '#1d9e75';
 
-function TripRow({ item, product, why, shops = [], storeName = t => t, inBasket, onTap, onPhoto }: {
-  item: Item; product?: Product; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean;
-  onTap: () => void; onPhoto?: (src: string) => void;
+function TripRow({ item, product, shot, why, shops = [], storeName = t => t, inBasket, onTap, onPhoto, onMenu, onShoot }: {
+  item: Item; product?: Product; shot?: Shot; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean;
+  onTap: () => void; onPhoto?: (src: string) => void; onMenu?: () => void; onShoot?: () => void;
 }) {
+  const pic = shot ? photoUrl(shot.ref) : product?.photos[0] ? photoUrl(product.photos[0]) : null;
   const sub = [item.qty ? `×${item.qty}` : '', item.notes ?? '', why ?? ''].filter(Boolean);
   return (
-    <div className="flex items-center transition-colors" style={inBasket ? { background: 'rgba(29,158,117,0.10)' } : undefined}>
+    <div className="flex select-none items-center transition-colors [-webkit-touch-callout:none]" style={inBasket ? { background: 'rgba(29,158,117,0.10)' } : undefined}
+      onContextMenu={onMenu ? e => { e.preventDefault(); onMenu(); } : undefined}>
       <button type="button" onClick={onTap} aria-pressed={!!inBasket}
         aria-label={inBasket ? `Take “${item.title}” out of the basket` : `Put “${item.title}” in the basket`}
         className="flex min-h-[56px] min-w-0 flex-1 items-center gap-1 pr-2 text-left active:bg-[var(--pc-hover-strong)]">
@@ -244,11 +296,16 @@ function TripRow({ item, product, why, shops = [], storeName = t => t, inBasket,
           )}
         </span>
       </button>
-      {product?.photos[0] && (
-        <button type="button" onClick={() => onPhoto?.(photoUrl(product.photos[0]))} aria-label={`See the photo of ${item.title}`} className="press mr-3 shrink-0">
-          <img src={photoUrl(product.photos[0])} alt="" loading="lazy" className={`h-12 w-12 rounded-[8px] bg-pc-surface object-cover ${inBasket ? 'opacity-75' : ''}`} />
+      {pic ? (
+        <button type="button" onClick={() => onPhoto?.(pic)} aria-label={`See the photo of ${item.title}`} className="press mr-3 shrink-0">
+          <img src={shot?.thumb ?? pic} alt="" loading="lazy" className={`h-12 w-12 rounded-[8px] bg-pc-surface object-cover ${inBasket ? 'opacity-75' : ''}`} />
         </button>
-      )}
+      ) : inBasket && onShoot ? (
+        <button type="button" onClick={onShoot} aria-label={`Photograph ${item.title}`}
+          className="press mr-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] bg-pc-surface text-[var(--pc-accent-ink)]">
+          <Camera size={20} />
+        </button>
+      ) : null}
     </div>
   );
 }

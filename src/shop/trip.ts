@@ -10,7 +10,9 @@ import { groupOf, shopGroup, type Group } from './groups';
 import { fold, isWish, storeTagsOf, tagOf, type Item, type Product, type Purchase, type Store } from './logic';
 
 export interface Extra { ref: string; thumb: string }
-export interface Trip { store: string; started: string; picked: string[]; extras: Extra[] }
+/** A photo of a thing on the list, taken in the shop (2026-11-01): at Paid it becomes that item's product card. */
+export interface Shot { id: string; ref: string; thumb: string }
+export interface Trip { store: string; started: string; picked: string[]; extras: Extra[]; shots?: Shot[] }
 
 const KEY = 'shop:trip';
 export const readTrip = (): Trip | null => { try { const v = localStorage.getItem(KEY); return v ? JSON.parse(v) as Trip : null; } catch { return null; } };
@@ -85,3 +87,8 @@ export async function thumbOf(file: Blob, side = 160): Promise<string> {
 export const extrasAsk = (shopName: string, n: number) =>
   `[In the shop] Paid at ${shopName} just now. Also bought, not on the list: ${n === 1 ? 'the product in the photo' : `the ${n} products in the photos, one each`}. `
   + 'Save each to the catalogue, record the purchase at this shop today, and put food in the pantry (no date unless the photo shows one).';
+
+/** The instruction for the photos of things on the list: each photo is the exact product of one item. */
+export const shotsAsk = (shopName: string, shots: { id: string; title: string }[]) =>
+  `[In the shop] Photos at ${shopName} of things on the list, in this order: ${shots.map(s => `${s.title} (${s.id})`).join('; ')}. `
+  + 'Each photo shows the exact product of that item: product_find, else product_save from the photo, then link it to the item (shop_update edit product). Do not tick or add anything.';

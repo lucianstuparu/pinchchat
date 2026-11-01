@@ -35,7 +35,7 @@ import { daysUntil } from './pantry';
 import { useShop } from './useShop';
 import { InStore } from './InStore';
 import { ShopLogo, ShopLogos } from './ShopLogo';
-import { extrasAsk, newTrip, readTrip, writeTrip, type Trip } from './trip';
+import { extrasAsk, newTrip, readTrip, shotsAsk, writeTrip, type Trip } from './trip';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
 const STORE_KEY = 'shop:store';
@@ -187,12 +187,18 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     const paid = snap.items.filter(i => t.picked.includes(i.id) && i.status === 'open');
     for (const i of paid) apply({ op: 'tick', id: i.id, store: t.store });
     sendPending();
-    if (t.extras.length) {
+    // Photos of things on the list whose item is still there (not dropped meanwhile).
+    const shots = (t.shots ?? []).filter(s => snap.items.some(i => i.id === s.id && i.status !== 'cancelled'));
+    if (t.extras.length || shots.length) {
       // At most 6 photos per ask (the server's limit; a 7th was silently dropped on 2026-10-28): one ask per 6.
       const ops: Op[] = [];
       for (let k = 0; k < t.extras.length; k += 6) {
         const part = t.extras.slice(k, k + 6);
         ops.push({ op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), part.length), store: t.store, photos: part.map(e => e.ref) });
+      }
+      for (let k = 0; k < shots.length; k += 6) {
+        const part = shots.slice(k, k + 6).map(s => ({ ...s, title: snap.items.find(i => i.id === s.id)?.title ?? '' }));
+        ops.push({ op: 'ask', id: newAskId(), text: shotsAsk(storeName(t.store), part), store: t.store, photos: part.map(s => s.ref) });
       }
       pendingAsk.current = { ops, timer: window.setTimeout(sendPending, 6500) };
     }
