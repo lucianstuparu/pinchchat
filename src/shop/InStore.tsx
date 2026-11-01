@@ -23,6 +23,7 @@ import { useBusy } from '../ui/draft';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf } from './groups';
 import { fold, newPhotoRef, type Item, type Op, type Product, type Purchase, type Store } from './logic';
 import { photoUrl, shrinkPhoto } from './photos';
+import { ProductPicture } from './ProductPicture';
 import { countOf, thumbOf, tripLists, type Shot, type Trip } from './trip';
 import { ShopLogo, ShopLogos } from './ShopLogo';
 
@@ -292,6 +293,7 @@ function TripRow({ item, product, shot, count, onCount, why, shops = [], storeNa
   item: Item; product?: Product; shot?: Shot; count?: number; onCount?: () => void; why?: string; shops?: string[]; storeName?: (t: string) => string; inBasket?: boolean;
   onTap: () => void; onPhoto?: (src: string) => void; onMenu?: () => void; onShoot?: () => void;
 }) {
+  // The full-size view opens the photo as taken (the label), the row shows the product's picture.
   const pic = shot ? photoUrl(shot.ref) : product?.photos[0] ? photoUrl(product.photos[0]) : null;
   const sub = [item.qty ? `×${item.qty}` : '', item.notes ?? '', why ?? ''].filter(Boolean);
   return (
@@ -325,7 +327,8 @@ function TripRow({ item, product, shot, count, onCount, why, shops = [], storeNa
       )}
       {pic ? (
         <button type="button" onClick={() => onPhoto?.(pic)} aria-label={`See the photo of ${item.title}`} className="press mr-3 shrink-0">
-          <img src={shot?.thumb ?? pic} alt="" loading="lazy" className={`h-12 w-12 rounded-[8px] bg-pc-surface object-cover ${inBasket ? 'opacity-75' : ''}`} />
+          {shot ? <img src={shot.thumb} alt="" className={`h-12 w-12 rounded-[8px] bg-pc-surface object-cover ${inBasket ? 'opacity-75' : ''}`} />
+            : <ProductPicture p={product} size={48} radius={8} dim={inBasket} />}
         </button>
       ) : inBasket && onShoot ? (
         <button type="button" onClick={onShoot} aria-label={`Photograph ${item.title}`}

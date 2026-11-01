@@ -13,7 +13,7 @@ import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Package, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, CloudOff, Images, Lock, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -27,7 +27,8 @@ import { GroupCards } from './GroupCards';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf, type Group } from './groups';
 import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
-import { photoUrl, shrinkPhoto } from './photos';
+import { shrinkPhoto } from './photos';
+import { ProductPicture } from './ProductPicture';
 import { PantrySheet } from './PantrySheet';
 import { OwnedSheet } from './OwnedSheet';
 import type { HomeTab } from './Products';
@@ -501,7 +502,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
             </span>
           )}
         </span>
-        {product?.photos[0] && <img src={photoUrl(product.photos[0])} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-[8px] bg-pc-surface object-cover" />}
+        {product && (product.look?.cut || product.photos[0]) && <ProductPicture p={product} size={40} radius={8} />}
       </button>
     </div>
   );
@@ -762,7 +763,7 @@ function ItemSheet({ item, stores, today, mode, onClose, apply, product, onProdu
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (brand, size…)" rows={2} className={`${field} mt-3 resize-none`} aria-label="Notes" />
         {product && (
           <button type="button" onClick={() => onProduct(product.id)} className="mt-3 flex w-full items-center gap-3 rounded-[12px] bg-pc-surface px-3 py-2.5 text-left">
-            {product.photos[0] ? <img src={photoUrl(product.photos[0])} alt="" className="h-11 w-11 rounded-[8px] object-cover" /> : <Package size={22} className="text-pc-text-faint" />}
+            <ProductPicture p={product} size={44} radius={8} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{product.name}</span>
               <span className="flex items-center gap-1.5 text-[13px] text-pc-text-muted"><NovaBadge nova={product.health?.nova} small />{product.brand}</span>

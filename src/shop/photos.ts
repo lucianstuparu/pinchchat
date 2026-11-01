@@ -1,3 +1,5 @@
+import type { Product } from './logic';
+
 /**
  * Photos for the Shopping assistant: shrunk on the phone before upload (a 4 MB camera picture
  * becomes ~250 KB, enough to read a label or a receipt), so they fit the offline queue and send fast.
@@ -18,3 +20,13 @@ export async function shrinkPhoto(file: File): Promise<string> {
 
 /** Where the app shows a stored photo from (served by the desk API, behind Cloudflare Access). */
 export const photoUrl = (ref: string) => `/shop/media/${ref}`;
+
+/** The picture to show: the cut-out, else the first photo, else nothing. */
+export function pictureOf(p?: Product): { src: string; cut: boolean } | null {
+  if (p?.look?.cut) return { src: photoUrl(p.look.cut), cut: true };
+  if (p?.photos[0]) return { src: photoUrl(p.photos[0]), cut: false };
+  return null;
+}
+
+/** The words on the pill: the short name the assistant gives each product, else its name. */
+export const shortName = (p: Product) => p.short || p.name;

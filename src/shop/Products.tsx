@@ -8,7 +8,8 @@ import { CloseButton, Sheet } from '../ui/Sheet';
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Euro, Heart, MessageSquare, Package, Plus, Search, X } from 'lucide-react';
 import { fold, novaBadge, type Nutrition, type Product, type Purchase, type Store } from './logic';
-import { photoUrl } from './photos';
+import { photoUrl, shortName } from './photos';
+import { ProductPicture } from './ProductPicture';
 
 const NUTRIENTS: Array<[keyof Nutrition, string, string]> = [
   ['kcal', 'Energy', 'kcal'], ['fat', 'Fat', 'g'], ['sat_fat', '  of which saturates', 'g'], ['carbs', 'Carbohydrates', 'g'],
@@ -24,9 +25,31 @@ export function NovaBadge({ nova, small }: { nova?: number; small?: boolean }) {
 }
 
 function Thumb({ p, size = 48 }: { p: Product; size?: number }) {
-  return p.photos[0]
-    ? <img src={photoUrl(p.photos[0])} alt="" loading="lazy" className="shrink-0 rounded-[12px] bg-pc-surface object-cover" style={{ width: size, height: size }} />
-    : <span className="flex shrink-0 items-center justify-center rounded-[12px] bg-pc-surface text-pc-text-faint" style={{ width: size, height: size }}><Package size={size / 2.4} /></span>;
+  return <ProductPicture p={p} size={size} />;
+}
+
+/** A product in the grid (2026-11-01): its picture with the short name on a pill; badges in the corners. */
+function ProductTile({ p, onOpen, liked, onAdd, atHome }: { p: Product; onOpen: (id: string) => void; liked?: boolean; onAdd?: () => void; atHome?: string }) {
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => onOpen(p.id)} className="press block w-full" aria-label={p.name}>
+        <ProductPicture p={p} label={shortName(p)}>
+          {p.health?.nova && <span className="absolute left-1.5 top-1.5"><NovaBadge nova={p.health.nova} small /></span>}
+          {!onAdd && (atHome || liked) && (
+            <span className="absolute right-1.5 top-1.5 flex items-center gap-1">
+              {liked && <Heart size={15} className="fill-red-500 text-red-500" aria-label="favourite" />}
+              {atHome && <span className="rounded-[8px] bg-[var(--pc-accent)] px-1.5 text-[12px] font-semibold text-[var(--pc-on-accent)]">{atHome}</span>}
+            </span>
+          )}
+        </ProductPicture>
+      </button>
+      {onAdd && (
+        <button type="button" onClick={onAdd} aria-label={`Add ${p.name} to the list`} className="press absolute -right-1 -top-1 flex h-10 w-10 items-center justify-center">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pc-accent text-[var(--pc-on-accent)] shadow"><Plus size={18} strokeWidth={2.5} /></span>
+        </button>
+      )}
+    </div>
+  );
 }
 
 
@@ -61,7 +84,7 @@ export function ProductRow({ p, onOpen, storeName, liked, onAdd, atHome }: { p: 
 }
 
 /** All products, searchable. */
-export function ProductsSheet({ products, onOpen, onClose, storeName, person, onList, onAdd, onTab, counts, atHome }: {
+export function ProductsSheet({ products, onOpen, onClose, person, onList, onAdd, onTab, counts, atHome }: {
   products: Product[]; onOpen: (id: string) => void; onClose: () => void; storeName: (t: string) => string;
   person: string; onList: (id: string) => boolean; onAdd: (p: Product) => void;
   /** The other tabs of the same screen. */
@@ -106,7 +129,7 @@ export function ProductsSheet({ products, onOpen, onClose, storeName, person, on
           ) : shown.length === 0 ? (
             <p className="px-8 py-12 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
           ) : (
-            <div className="divide-y divide-[var(--pc-separator)]">{shown.map(p => <ProductRow key={p.id} p={p} onOpen={onOpen} storeName={storeName} liked={likedByMe(p)} atHome={atHome(p.id)}
+            <div className="grid grid-cols-3 gap-2 px-3 pb-4 pt-1 md:grid-cols-4">{shown.map(p => <ProductTile key={p.id} p={p} onOpen={onOpen} liked={tab === 'all' && likedByMe(p)} atHome={atHome(p.id)}
               onAdd={tab === 'fav' && !onList(p.id) ? () => onAdd(p) : undefined} />)}</div>
           )}
         </div>
@@ -121,17 +144,20 @@ export function ProductSheet({ product: p, purchases, stores, onClose, onAdd, on
 }) {
   const [showIngredients, setShowIngredients] = useState(false);
   const [photo, setPhoto] = useState(0);
+  // The cut-out first (when there is one), then the photos as taken.
+  const views = [...(p.look?.cut ? [p.look.cut] : []), ...p.photos];
   const storeName = (t?: string) => (t ? stores.find(s => s.tag === t)?.name ?? t : '');
   const mine = purchases.filter(x => x.product === p.id).slice(0, 6);
   const n = p.nutrition;
   return (
     <Sheet label={p.name} onClose={onClose} z={50} className="max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))] md:max-w-lg">
-        {p.photos.length > 0 ? (
+        {views.length > 0 ? (
           <div className="relative">
-            <img src={photoUrl(p.photos[photo] ?? p.photos[0])} alt={p.name} className="h-64 w-full rounded-t-[20px] bg-pc-surface object-contain md:rounded-t-[20px]" />
-            {p.photos.length > 1 && (
+            <img src={photoUrl(views[photo] ?? views[0])} alt={p.name}
+              className={`h-64 w-full rounded-t-[20px] bg-pc-surface object-contain md:rounded-t-[20px] ${(views[photo] ?? views[0]) === p.look?.cut ? 'p-6 [filter:drop-shadow(0_4px_6px_rgba(0,0,0,0.18))]' : ''}`} />
+            {views.length > 1 && (
               <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                {p.photos.map((_, i) => <button key={i} type="button" onClick={() => setPhoto(i)} aria-label={`Photo ${i + 1}`} className={`h-2 w-2 rounded-full ${i === photo ? 'bg-white' : 'bg-white/50'}`} />)}
+                {views.map((_, i) => <button key={i} type="button" onClick={() => setPhoto(i)} aria-label={`Photo ${i + 1}`} className={`h-2 w-2 rounded-full ${i === photo ? 'bg-white' : 'bg-white/50'}`} />)}
               </div>
             )}
             <button type="button" onClick={onClose} className="press absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white" aria-label="Close"><X size={16} strokeWidth={2.5} /></button>

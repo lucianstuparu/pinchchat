@@ -22,6 +22,10 @@ export interface Ask { id: string; text: string; photos?: string[]; store?: stri
 export interface Nutrition { kcal?: number; protein?: number; fat?: number; sat_fat?: number; carbs?: number; sugar?: number; fiber?: number; salt?: number }
 export interface Product {
   id: string; name: string; brand?: string; size?: string; barcode?: string; photos: string[]; ingredients?: string;
+  /** The few words shown on the product's picture ("Confiture fraises"). */
+  short?: string;
+  /** The picture made from photos[0] by the server: a transparent cut-out, or why the photo is shown instead. */
+  look?: { from: string; cut?: string; failed?: string; date?: string };
   nutrition?: Nutrition; health?: { nova?: number; flags?: string[]; note?: string; date?: string }; tags?: string[]; aliases?: string[];
   added_by?: string; created?: string; updated?: string;
   /** People who like it (to buy again some time). */
