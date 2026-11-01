@@ -13,7 +13,7 @@ import { Sheet } from '../ui/Sheet';
 import { useExactSizes } from '../ui/useBackLayer';
 import { AppHeader, IconButton, SearchHeader } from '../ui/Controls';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Camera, Check, ChevronDown, ChevronRight, ClipboardPaste, CloudOff, Lock, Paperclip, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, ClipboardPaste, CloudOff, Images, Lock, Plus, RefreshCw, Refrigerator, Search, ShoppingBasket, ShoppingCart, Sparkles, Store as StoreIcon, Undo2, X } from 'lucide-react';
 import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from '../app/themes';
 import { SettingsSheet } from '../app/SettingsSheet';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
@@ -524,8 +524,9 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
   // sent until Send.
   const speech = useSpeech(text, setText, transcribeShop);
   const input = useRef<HTMLTextAreaElement>(null);
-  // Straight to Android's photo picker (`accept="image/*"`, the same as oc's Photo): without `accept`
-  // Android first asks Camera / Camera Video / Files, an extra step (2026-11-01). Non-pictures are left out.
+  // The same as oc: Take a photo opens the camera itself (`capture`), Pick a photo the gallery; an input
+  // with neither first asks Camera / Camera Video / Files, an extra step (2026-11-01).
+  const camera = useRef<HTMLInputElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
@@ -546,6 +547,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
     }
     setBusy(false);
     if (picker.current) picker.current.value = '';
+    if (camera.current) camera.current.value = '';
     if (!added.length) setPasteError('Only pictures can go here');
     setStaged(prev => [...prev, ...added].slice(0, 6));
     input.current?.focus();
@@ -621,6 +623,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
           ))}
         </div>
       )}
+      <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void stagePhotos(e.target.files)} />
       <input ref={picker} type="file" accept="image/*" multiple className="hidden" onChange={e => void stagePhotos(e.target.files)} />
       {staged.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1.5" aria-label="Photos to send">
@@ -640,10 +643,7 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
       {(speech.error || pasteError) && <p className="mb-1.5 px-2 text-[13px] text-red-500" role="alert">{speech.error || pasteError}</p>}
       <form onSubmit={e => { e.preventDefault(); add(); }} className="flex items-end gap-2">
         <div className="relative shrink-0">
-          {/* A tap goes straight to the photos (2026-11-01, Lucian: no extra step); a long press offers
-              Paste a screenshot, for a phone whose keyboard cannot paste a picture into the box. */}
-          <button type="button" disabled={busy} onClick={() => picker.current?.click()} aria-expanded={photoMenu}
-            onContextMenu={canReadClipboard() ? e => { e.preventDefault(); setPhotoMenu(true); } : undefined}
+          <button type="button" disabled={busy} onClick={() => setPhotoMenu(m => !m)} aria-expanded={photoMenu}
             className="press mb-[4px] flex h-12 w-12 items-center justify-center rounded-full bg-pc-surface text-pc-text-secondary disabled:opacity-50" aria-label="Photo of a label, a shelf or a receipt">
             <Camera size={24} />
           </button>
@@ -651,15 +651,22 @@ function AddBar({ prefill, store, stores, known, items, asks, onAdd }: {
             <>
               <div className="fixed inset-0 z-20" onClick={() => setPhotoMenu(false)} />
               <div className="absolute bottom-[58px] left-0 z-30 w-56 overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); camera.current?.click(); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                  <Camera size={19} className="text-[var(--pc-accent-ink)]" /> Take a photo
+                </button>
+                <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                 <button type="button" role="menuitem" onClick={() => { setPhotoMenu(false); picker.current?.click(); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
-                  <Paperclip size={19} className="text-[var(--pc-accent-ink)]" /> Photo
+                  <Images size={19} className="text-[var(--pc-accent-ink)]" /> Pick a photo
                 </button>
+                {canReadClipboard() && <>
                 <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                 <button type="button" role="menuitem" onClick={() => void pasteFromClipboard()}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
                   <ClipboardPaste size={19} className="text-[var(--pc-accent-ink)]" /> Paste a screenshot
                 </button>
+                </>}
               </div>
             </>
           )}

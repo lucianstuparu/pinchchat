@@ -19,6 +19,8 @@ const ro: Record<string, string> = {
   'Assistant': 'Asistentul',
   'Photo': 'Fotografie',
   'File': 'Fișier',
+  'Take a photo': 'Fă o fotografie',
+  'Pick a photo': 'Alege o fotografie',
   'Cancel reply': 'Renunță la răspuns',
   'Photo or file': 'Fotografie sau fișier',
   'Paste a screenshot': 'Lipește o captură de ecran',

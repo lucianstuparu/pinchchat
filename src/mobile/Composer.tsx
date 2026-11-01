@@ -2,7 +2,7 @@ import { L } from '../ui/lang';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { SpeechStatus } from '../app/SpeechStatus';
 import { useBusy, useDraft } from '../ui/draft';
-import { ArrowUp, AudioLines, ClipboardPaste, Images, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { ArrowUp, AudioLines, Camera, ClipboardPaste, Images, Paperclip, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
 import { canReadClipboard, clipboardImages, pastedFiles } from '../lib/clipboard';
 import { SILENT, canRecord, record, type Recorder } from '../app/voice';
 import { FieldControls, PrimaryButton } from '../app/MicButton';
@@ -102,8 +102,10 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
   const [plusOpen, setPlusOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Photos straight to Android's photo picker (2026-11-01, Lucian: no extra step choosing Camera /
-  // Camera Video / Files, which an input without `accept` shows); other files from their own item.
+  // Take a photo opens the camera itself (`capture`), Pick a photo the gallery (`accept` images): an
+  // input with neither first asks Camera / Camera Video / Files (2026-11-01, Lucian: "I want to have both
+  // options pick a photo and take a photo", without that extra step). File keeps the system chooser.
+  const cameraRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const speech = useSpeech(text, setText, transcribe ?? noTranscriber, { autoStop: handsFree });
   const byVoice = useRef(false);
@@ -218,6 +220,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
     setBusy(false);
     if (fileRef.current) fileRef.current.value = '';
     if (photoRef.current) photoRef.current.value = '';
+    if (cameraRef.current) cameraRef.current.value = '';
   };
 
   // A screenshot pasted into the box (the keyboard's clipboard, Ctrl+V) or with Paste in the + menu.
@@ -268,6 +271,7 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
       )}
       {shownError && <p className="mx-3 mb-1 text-[13px] text-red-500" role="alert">{shownError}</p>}
 
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void addFiles(e.target.files)} />
       <input ref={photoRef} type="file" accept="image/*" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <input ref={fileRef} type="file" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
       <div className="flex items-end gap-2">
@@ -286,9 +290,14 @@ export function Composer({ onSend, prefill, hint, onHintDismiss, replyTo, onRepl
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setPlusOpen(false)} />
                 <div className="absolute bottom-12 left-0 z-30 w-56 overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated shadow-xl" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); cameraRef.current?.click(); }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
+                    <Camera size={19} className="text-[var(--pc-accent-ink)]" /> {L('Take a photo')}
+                  </button>
+                  <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                   <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); photoRef.current?.click(); }}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] active:bg-[var(--pc-hover-strong)]">
-                    <Images size={19} className="text-[var(--pc-accent-ink)]" /> {L('Photo')}
+                    <Images size={19} className="text-[var(--pc-accent-ink)]" /> {L('Pick a photo')}
                   </button>
                   <div className="mx-4 h-px bg-[var(--pc-separator)]" />
                   <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}
