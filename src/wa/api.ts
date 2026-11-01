@@ -58,6 +58,9 @@ export const compose = (c: Contact, said: string, replyTo?: string) =>
 export const translate = (text: string, c?: Contact, msgId?: string) =>
   post<{ translation: string; lang: string }>('/relay/translate', { text, contact: c ? asAgent(c) : undefined, msg_id: msgId });
 /** Dictated with what to do ("translate this into French informal: …"): the text in that language, ready to copy. */
+/** An answer for someone not in Relay: their message and what to say -> the answer in their language (nothing kept). */
+export const reply = (message: string, said: string) =>
+  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string }>('/relay/reply', { message, said });
 export const phrase = (said: string, to?: string, tone?: 'formal' | 'informal') =>
   post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string; from?: string }>('/relay/phrase', { said, to, tone });
 /** The Translate box's languages (Lucian 2026-10-29: "4-5 languages in total"). */

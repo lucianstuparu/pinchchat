@@ -10,16 +10,21 @@
  * Romanian or English and have it translated to French or any combination, 4-5 languages"): pick the
  * language it goes into (and the register); written in any language. Into Romanian is the reading way,
  * with Answer it; into any other language it is a message to copy. The choice is remembered.
+ * Answer it for someone not in Relay (Lucian 2026-11-01: "paste a message from someone and ask relay app to draft an
+ * answer ... saying it is possible and I am available at the time proposed", "not a contact in Relay"): Just answer,
+ * say what to answer, and it comes out in their language with the details from their message, to copy. Nothing kept.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Languages, Plus, Share2, Square, Volume2 } from 'lucide-react';
+import { Check, Copy, Languages, MessageSquareReply, Plus, Share2, Square, Volume2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented } from '../ui/Controls';
 import { ProgressRow } from '../ui/ProgressRow';
 import { useBusy } from '../ui/draft';
+import { Composer } from '../mobile/Composer';
+import { transcribeAudio } from '../app/api';
 import { canSpeak, speak } from '../ui/speak';
 import { Face } from './Face';
-import { BOX_LANGS, MY_LANG, asksTranslation, langName, phrase, translate, type Contact } from './api';
+import { BOX_LANGS, MY_LANG, asksTranslation, langName, phrase, reply, translate, type Contact } from './api';
 
 type Tone = 'formal' | 'informal';
 type Phrased = { text: string; lang: string; tone: Tone; back: string; from?: string };
@@ -50,13 +55,17 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answering, setAnswering] = useState(false);
+  // Just answer: what to say (the Composer), then the answer.
+  const [oneOff, setOneOff] = useState(false);
+  const [answer, setAnswer] = useState<Phrased | null>(null);
+  const [writing, setWriting] = useState(false);
   const [stop, setStop] = useState<(() => void) | null>(null);
   useBusy('wa-translate', text.length > 0);
   const reading = into.to === MY_LANG;
 
   const go = async (t = text.trim(), to = into) => {
     if (!t) return;
-    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false); setAnswering(false);
+    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false); setAnswering(false); setOneOff(false); setAnswer(null);
     try {
       if (asksTranslation(t)) setMade(await phrase(t));
       else if (to.to === MY_LANG) setOut(await translate(t));
@@ -77,21 +86,51 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
     started.current = true;
     void go(said.trim());
   }, [said]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const hear = () => {
+  const hear = (t: string, lang: string) => {
     if (stop) { stop(); return; }
-    const s = made ? speak([made.text], made.lang, () => setStop(null)) : out ? speak([out.translation], MY_LANG, () => setStop(null)) : null;
+    const s = speak([t], lang, () => setStop(null));
     if (s) setStop(() => s);
   };
-  const copy = async () => {
-    if (!made) return;
-    try { await navigator.clipboard.writeText(made.text); setCopied(true); }
+  const copy = async (m: Phrased) => {
+    try { await navigator.clipboard.writeText(m.text); setCopied(true); }
     catch { setError('Could not copy it: hold the text to select it'); }
   };
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   // Those who write in that language first.
   const ordered = out ? [...people].sort((a, b) => Number(b.lang === out.lang) - Number(a.lang === out.lang)) : people;
-  // What it says, in my language: not when it was written in my language or goes into it.
-  const showBack = made?.back && made.lang !== MY_LANG && made.from !== MY_LANG;
+  const answerIt = async (said: string) => {
+    const t = said.trim();
+    if (!t || !out) return;
+    setWriting(true); setError(null); setAnswer(null); setCopied(false);
+    try { setAnswer(await reply(text.trim(), t)); }
+    catch (e) { setError(navigator.onLine ? (e instanceof Error ? e.message : 'Could not write the answer') : 'No connection'); }
+    finally { setWriting(false); }
+  };
+  // A message to copy: what it says in my language (not when written in my language or going into it), Hear, Share, Copy.
+  const card = (m: Phrased, big?: boolean) => (
+    <>
+      <section className="mt-3 rounded-[20px] bg-pc-surface px-4 py-3">
+        <div className="flex items-start gap-2">
+          <p className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">In {langName(m.lang)} · {m.tone}</p>
+          {canSpeak() && (
+            <button type="button" onClick={() => hear(m.text, m.lang)} aria-label={stop ? 'Stop' : 'Hear how it sounds'} className="press -mr-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--pc-accent-ink)]">
+              {stop ? <Square size={16} /> : <Volume2 size={19} />}
+            </button>
+          )}
+        </div>
+        <p className="select-text whitespace-pre-wrap text-[19px] leading-snug">{m.text}</p>
+        {m.back && m.lang !== MY_LANG && m.from !== MY_LANG && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-muted">{m.back}</p>}
+      </section>
+      <div className="mt-3 flex items-center gap-2">
+        {canShare && <button type="button" onClick={() => void navigator.share({ text: m.text }).catch(() => undefined)} aria-label="Share" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-pc-surface"><Share2 size={20} /></button>}
+        <button type="button" onClick={() => void copy(m)}
+          className={`press flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[24px] bg-pc-accent font-bold text-[var(--pc-on-accent)] ${big ? 'h-[88px] text-[24px]' : 'h-14 text-[17px]'}`}>
+          {copied ? <><Check size={big ? 28 : 19} /> Copied</> : <><Copy size={big ? 28 : 19} /> Copy</>}
+        </button>
+      </div>
+      {copied && <p className="mt-2 text-center text-[13px] text-pc-text-muted" role="status">Paste it where you write to them</p>}
+    </>
+  );
 
   return (
     <Sheet label="Translate" onClose={onClose} className="flex max-h-[92dvh] flex-col px-4 pt-2">
@@ -121,36 +160,13 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
           </button>
         )}
         {error && <p className="mt-2 text-[15px] text-red-500" role="alert">{error}</p>}
-        {made && (
-          <>
-            <section className="mt-3 rounded-[20px] bg-pc-surface px-4 py-3">
-              <div className="flex items-start gap-2">
-                <p className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">In {langName(made.lang)} · {made.tone}</p>
-                {canSpeak() && (
-                  <button type="button" onClick={hear} aria-label={stop ? 'Stop' : 'Hear how it sounds'} className="press -mr-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--pc-accent-ink)]">
-                    {stop ? <Square size={16} /> : <Volume2 size={19} />}
-                  </button>
-                )}
-              </div>
-              <p className="select-text whitespace-pre-wrap text-[19px] leading-snug">{made.text}</p>
-              {showBack && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-muted">{made.back}</p>}
-            </section>
-            <div className="mt-3 flex items-center gap-2">
-              {canShare && <button type="button" onClick={() => void navigator.share({ text: made.text }).catch(() => undefined)} aria-label="Share" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-pc-surface"><Share2 size={20} /></button>}
-              <button type="button" onClick={() => void copy()}
-                className={`press flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[24px] bg-pc-accent font-bold text-[var(--pc-on-accent)] ${voice ? 'h-[88px] text-[24px]' : 'h-14 text-[17px]'}`}>
-                {copied ? <><Check size={voice ? 28 : 19} /> Copied</> : <><Copy size={voice ? 28 : 19} /> Copy</>}
-              </button>
-            </div>
-            {copied && <p className="mt-2 text-center text-[13px] text-pc-text-muted" role="status">Paste it where you write to them</p>}
-          </>
-        )}
+        {made && card(made, voice)}
         {out && (
           <section className="mt-3 rounded-[20px] bg-pc-surface px-4 py-3">
             <div className="flex items-start gap-2">
               <p className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-wide text-[var(--pc-accent-ink)]">From {langName(out.lang)}</p>
               {canSpeak() && (
-                <button type="button" onClick={hear} aria-label={stop ? 'Stop' : 'Read aloud'} className="press -mr-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--pc-accent-ink)]">
+                <button type="button" onClick={() => hear(out.translation, MY_LANG)} aria-label={stop ? 'Stop' : 'Read aloud'} className="press -mr-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--pc-accent-ink)]">
                   {stop ? <Square size={16} /> : <Volume2 size={19} />}
                 </button>
               )}
@@ -164,8 +180,13 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
             Answer it
           </button>
         )}
-        {out && answering && (
+        {out && answering && !oneOff && (
           <>
+            <button type="button" onClick={() => setOneOff(true)}
+              className="press mt-4 flex h-14 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 text-left text-[17px] font-medium">
+              <MessageSquareReply size={20} className="shrink-0 text-[var(--pc-accent-ink)]" />
+              <span className="min-w-0 flex-1">Just answer<span className="block text-[13px] font-normal text-pc-text-muted">Not in Relay: nothing is kept</span></span>
+            </button>
             <p className="mb-2 mt-4 text-[13px] font-semibold text-pc-text-muted">Who is it from?</p>
             <div className="grid grid-cols-4 gap-x-1 gap-y-3">
               {ordered.map(c => (
@@ -181,7 +202,21 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
             </div>
           </>
         )}
+        {out && oneOff && (
+          <>
+            <p className="mb-1 mt-4 text-[13px] font-semibold text-pc-text-muted">Your answer, in any language</p>
+            {writing && <div className="mt-2"><ProgressRow tile={<MessageSquareReply size={18} />} name="Writing the answer" status={`In ${langName(out.lang)}…`} progress={null} /></div>}
+            {answer && card(answer, true)}
+          </>
+        )}
       </div>
+      {out && oneOff && (
+        <div className="-mx-4 shrink-0">
+          <Composer key="oneoff" onSend={said => void answerIt(said)} voice transcribe={transcribeAudio} handsFree
+            draftKey="wa:oneoff" attach={false} sendLabel="Write the answer"
+            placeholder={answer ? 'Say it differently' : '“E posibil, sunt disponibil la ora propusă”'} />
+        </div>
+      )}
     </Sheet>
   );
 }
