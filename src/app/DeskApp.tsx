@@ -143,6 +143,26 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [rulesOpen, setRulesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notice, dismissNotice] = useNotice();
+  // A reminder opens its item (/?item=<id>) and the "N more" summary the To do list (/?todo=1)
+  // (2026-11-01, Lucian: "notifications opened nothing"). Read once at start, or from the service
+  // worker's message when the app is already open; the card above the chat is then not needed.
+  useEffect(() => {
+    const take = (href: string) => {
+      const u = new URL(href, window.location.origin);
+      const id = u.searchParams.get('item');
+      if (id) { setSheet(id); dismissNotice(); return true; }
+      if (u.searchParams.has('todo')) { setTab('todo'); setTodoOpen(true); dismissNotice(); return true; }
+      return false;
+    };
+    const url = new URL(window.location.href);
+    if (take(url.href)) {
+      url.searchParams.delete('item'); url.searchParams.delete('todo');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+    const on = (e: MessageEvent) => { if (e.data?.type === 'notice' && e.data.url) take(e.data.url); };
+    navigator.serviceWorker?.addEventListener('message', on);
+    return () => navigator.serviceWorker?.removeEventListener('message', on);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [refreshing, setRefreshing] = useState(false);
   const refresh = useCallback(async () => {
