@@ -387,7 +387,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         return item ? <ItemSheet item={item} stores={stores} today={snap.today} mode={mode} onClose={() => setEditing(null)} apply={op => { apply(op); if (op.op === 'drop') offerUndo(item, 'Removed'); }} product={productOf(item.product)} onProduct={(id) => { setEditing(null); setProductId(id); }} /> : null;
       })()}
       {showPantry && (
-        <PantrySheet pantry={pantry} today={snap.today || new Date().toISOString().slice(0, 10)} onClose={() => setShowPantry(false)} footer={<UndoBar info={undo} onClose={closeUndo} />}
+        <PantrySheet pantry={pantry} products={products} today={snap.today || new Date().toISOString().slice(0, 10)} onClose={() => setShowPantry(false)} footer={<UndoBar info={undo} onClose={closeUndo} />}
           onOp={op => {
             apply(op);
             if (op.op === 'pantry-close') {

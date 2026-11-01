@@ -8,7 +8,8 @@ import { useBusy, useDraft } from '../ui/draft';
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Refrigerator, Trash2, Undo2 } from 'lucide-react';
 import { WHERE, expiryLabel, groupOf, type PantryEntry, type PantryGroup, type PantryOp, type Where } from './pantry';
-import { plainReply, type Ask } from './logic';
+import { plainReply, type Ask, type Product } from './logic';
+import { ProductPicture } from './ProductPicture';
 import { HomeTabs, type HomeTab } from './Products';
 import { WhereIcon } from './WhereIcon';
 import { transcribeShop } from './useShop';
@@ -21,8 +22,10 @@ const GROUPS: Array<[PantryGroup, string, string]> = [
   ['later', 'Later', 'text-pc-text-muted'], ['nodate', 'No date', 'text-pc-text-muted'],
 ];
 
-export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onTab, counts, footer }: {
-  pantry: PantryEntry[]; today: string; onOp: (op: PantryOp) => void; onAsk: (text: string) => void; onClose: () => void; lastAsk?: Ask;
+export function PantrySheet({ pantry, products = [], today, onOp, onAsk, onClose, lastAsk, onTab, counts, footer }: {
+  pantry: PantryEntry[]; today: string;
+  /** The catalogue: an entry linked to a product shows its picture (2026-11-01). */
+  products?: Product[]; onOp: (op: PantryOp) => void; onAsk: (text: string) => void; onClose: () => void; lastAsk?: Ask;
   /** The other tab of the same screen: the catalogue. */
   onTab: (t: HomeTab) => void; counts: Record<HomeTab, number>;
   /** The undo bar, at the foot of the sheet. */
@@ -65,10 +68,16 @@ export function PantrySheet({ pantry, today, onOp, onAsk, onClose, lastAsk, onTa
                 <div className="divide-y divide-[var(--pc-separator)]">
                   {rows.map(e => (
                     <div key={e.id} className="flex items-center gap-2 py-2 pl-4 pr-2">
-                      <WhereIcon where={e.where} size={20} className="shrink-0 text-pc-text-muted" />
-                      <button type="button" onClick={() => setEditing(e.id)} className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-[16px]">{e.title}{e.qty ? <span className="text-pc-text-muted"> ×{e.qty}</span> : null}</span>
-                        <span className={`text-[13px] ${g === 'expired' ? 'text-red-500' : g === 'week' ? 'text-[var(--pc-accent-ink)]' : 'text-pc-text-muted'}`}>{expiryLabel(e, today)}</span>
+                      <button type="button" onClick={() => setEditing(e.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                        {(() => { const pr = products.find(x => x.id === e.product); return pr && (pr.look?.cut || pr.photos[0])
+                          ? <ProductPicture p={pr} size={44} radius={8} />
+                          : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-pc-surface"><WhereIcon where={e.where} size={20} className="text-pc-text-muted" /></span>; })()}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[16px]">{e.title}{e.qty ? <span className="text-pc-text-muted"> ×{e.qty}</span> : null}</span>
+                          <span className={`flex items-center gap-1 text-[13px] ${g === 'expired' ? 'text-red-500' : g === 'week' ? 'text-[var(--pc-accent-ink)]' : 'text-pc-text-muted'}`}>
+                            <WhereIcon where={e.where} size={13} className="shrink-0 text-pc-text-muted" />{expiryLabel(e, today)}
+                          </span>
+                        </span>
                       </button>
                       <button type="button" onClick={() => onOp({ op: 'pantry-close', id: e.id, how: 'used' })} className="press inline-flex h-10 items-center gap-1 rounded-full bg-pc-surface px-3 text-[15px] font-medium" aria-label={`${e.title} used`}>
                         <Check size={15} className="text-emerald-600" /> Used
