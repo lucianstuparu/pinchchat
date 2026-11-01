@@ -1,6 +1,7 @@
 import { L } from '../ui/lang';
-import { memo, useRef, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply, Volume2 } from 'lucide-react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply, TextSelect, Volume2 } from 'lucide-react';
+import { markCopyables } from './copyables';
 import { AgentAvatar, MeAvatar, PersonAvatar } from '../app/avatars';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
@@ -12,10 +13,47 @@ import { ItemActions } from './ItemActions';
 import { failedTurn, isLong, voiceMessage } from './notice';
 import { canSpeak, speak } from '../ui/speak';
 
+/** A small copy button after a value (a link, a number, an email); a tick for a moment once copied. */
+function CopyButton({ value, className = '' }: { value: string; className?: string }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const t = window.setTimeout(() => setDone(false), 1500);
+    return () => window.clearTimeout(t);
+  }, [done]);
+  return (
+    <button type="button" aria-label={done ? L('Copied') : L('Copy {value}', { value })}
+      // its own tap: no long-press menu, no unfolding, no swipe
+      onTouchStart={e => e.stopPropagation()} onContextMenu={e => e.stopPropagation()}
+      onClick={e => { e.stopPropagation(); void navigator.clipboard?.writeText(value).then(() => setDone(true)).catch(() => undefined); }}
+      className={`relative inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] align-[-5px] text-pc-text-muted select-none before:absolute before:-inset-[9px] before:content-[''] active:bg-[var(--pc-hover-strong)] ${className}`}>
+      {done ? <Check size={14} strokeWidth={2.5} className="text-pc-accent" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
+const textOf = (n: ReactNode): string =>
+  typeof n === 'string' || typeof n === 'number' ? String(n)
+    : Array.isArray(n) ? n.map(textOf).join('')
+    : n && typeof n === 'object' && 'props' in n ? textOf((n.props as { children?: ReactNode }).children) : '';
+
 const mdComponents: Components = {
-  a: ({ node, ...props }) => {
+  a: ({ node, children, ...props }) => {
     void node;
-    return <a {...props} target="_blank" rel="noreferrer noopener" />;
+    const href = props.href ?? '';
+    return <><a {...props} target="_blank" rel="noreferrer noopener">{children}</a>{href && <CopyButton value={href.replace(/^mailto:|^tel:/, '')} className="ml-0.5" />}</>;
+  },
+  // Inline code is what can be copied: the agents write addresses, references and numbers that way,
+  // and markCopyables() turns the ones it recognises into it.
+  code: ({ node, className, children, ...props }) => {
+    void node;
+    const value = textOf(children);
+    if (className || value.includes('\n')) return <code className={className} {...props}>{children}</code>;
+    return <span className="whitespace-nowrap"><code {...props}>{children}</code><CopyButton value={value} className="ml-0.5" /></span>;
+  },
+  pre: ({ node, children, ...props }) => {
+    void node;
+    return <div className="relative"><pre {...props}>{children}</pre><CopyButton value={textOf(children).replace(/\n$/, '')} className="absolute right-1 top-1 bg-pc-code" /></div>;
   },
 };
 
@@ -96,6 +134,28 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   const [dx, setDx] = useState(0);
   const [menu, setMenu] = useState(false);
   const [unfolded, setUnfolded] = useState(false);
+  // "Select text" (the long-press menu, on the phone): the bubble lets the browser select until a tap
+  // elsewhere. With a mouse, text is always selectable.
+  const [selectable, setSelectable] = useState(false);
+  const bubble = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectable) return;
+    const away = (e: PointerEvent) => { if (!bubble.current?.contains(e.target as Node)) setSelectable(false); };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [selectable]);
+  const selectText = () => {
+    setMenu(false); setUnfolded(true); setSelectable(true);
+    window.setTimeout(() => {
+      const el = bubble.current?.querySelector('[data-text]');
+      if (!el) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(range);
+    }, 50);
+  };
+  const touchMenu = canReply && !selectable;
   const failed = !mine && !msg.isStreaming ? failedTurn(text) : null;
   const long = isLong(text);
   const folded = long && !unfolded;
@@ -109,7 +169,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (!canReply) return;
+    if (!touchMenu) return;
     const t = e.touches[0];
     noTap.current = false;
     touch.current = {
@@ -167,17 +227,19 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
         </span>
       )}
       <div
+        ref={bubble}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
-        onContextMenu={canReply ? e => { e.preventDefault(); setMenu(true); } : undefined}
+        // Right-click with text selected keeps the browser's own menu (Copy); otherwise ours.
+        onContextMenu={touchMenu ? e => { if (window.getSelection()?.toString()) return; e.preventDefault(); setMenu(true); } : undefined}
         onClick={folded && !selecting ? () => { if (!noTap.current) setUnfolded(true); } : undefined}
         // pan-y: the browser keeps vertical scrolling but leaves sideways drags to the swipe-to-reply
         // handler; without it Chrome on Android claims the gesture and the swipe never arrives.
         style={{ ...(canReply ? { touchAction: 'pan-y' } : {}), ...(dx ? { transform: `translateX(${-dx}px)` } : {}) }}
         className={`relative ${folded ? 'cursor-pointer' : ''} ${items.length > 0 ? 'min-w-0 flex-1' : 'max-w-[80%]'} rounded-[20px] px-3 pt-1.5 pb-1 shadow-none ${dx ? '' : 'transition-transform'} ${
-          canReply ? 'select-none [-webkit-touch-callout:none]' : ''
+          touchMenu ? '[@media(pointer:coarse)]:select-none [@media(pointer:coarse)]:[-webkit-touch-callout:none]' : ''
         } ${
           mine
             ? 'rounded-tr-md bg-[var(--pc-mine,rgba(var(--pc-accent-rgb),0.18))] text-pc-text'
@@ -207,8 +269,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           <>
             {/* Long messages start folded at about eight lines; the rest is a tap away. */}
             {voiceNote && <Mic size={15} className="float-left mr-1.5 mt-[3px] text-[var(--pc-accent-ink)]" aria-label={L('Voice message')} />}
-            <div className={`text-[16px] leading-[22px] ${MD_CLASSES} ${folded ? 'max-h-[176px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
-              <LazyMarkdown components={mdComponents}>{text}</LazyMarkdown>
+            <div data-text className={`text-[16px] leading-[22px] ${MD_CLASSES} ${folded ? 'max-h-[176px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]' : ''}`}>
+              <LazyMarkdown components={mdComponents}>{mine ? text : markCopyables(text)}</LazyMarkdown>
             </div>
             {long && (
               <button type="button" onClick={e => { e.stopPropagation(); setUnfolded(u => !u); }} aria-expanded={!folded}
@@ -242,6 +304,11 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             {text && (
               <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={copy}>
                 <Copy size={16} /> {L('Copy')}
+              </button>
+            )}
+            {text && (
+              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--pc-hover)]" onClick={selectText}>
+                <TextSelect size={16} /> {L('Select text')}
               </button>
             )}
             {text && canSpeak() && (

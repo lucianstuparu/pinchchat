@@ -313,10 +313,12 @@ const LONG = [
 function reply(sessionKey, message, attachments) {
   const m = (message || '').trim();
   const first = m.split(/\s+/)[0]?.toLowerCase();
+  const COPY = 'SFR: write to service.client@sfr.fr or call 06 12 34 56 78. Contract FR123456, IBAN FR76 3000 6000 0112 3456 7890 189.\nAddress: `12 rue de la Paix, 75002 Paris`. Due 2026-11-05, 42,50 €.\nInvoice: https://www.sfr.fr/espace-client/factures';
   const shortcuts = { buy: 'shopping', tech: 'my.tech', idea: 'my.thinking', home: 'my.home' };
   if (shortcuts[first]) return streamReply(sessionKey, `✓ ${shortcuts[first]}: ${m.slice(first.length).trim()}`);
   if (first === 'ask') { const r = streamReply(sessionKey, 'Let me check one thing first.'); setTimeout(() => askQuestion(sessionKey), 900); return r; }
   if (first === 'long') return streamReply(sessionKey, LONG, 8);
+  if (first === 'copy') return streamReply(sessionKey, COPY, 8);
   // "scrie-i bunicii că …": a WhatsApp draft card (ai.manager whatsapp-send.md); nothing is ever sent here
   const wa = m.match(/^scrie-i\s+(\S+)\s+(?:că|ca)\s+(.+)$/i) || m.match(/^scrie-i\s+lui\s+([^:]+):\s+(.+)$/i);
   if (wa) {
