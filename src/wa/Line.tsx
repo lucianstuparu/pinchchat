@@ -112,7 +112,8 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
       // From the agent's history: pasted messages always; for other channels also what was sent.
       if (prof.translations) setTranslations(t => ({ ...prof.translations, ...t }));
       setPasted(prof.history.filter(e => e.src === 'pasted' || (!wa && e.kind === 'mine'))
-        .map(e => ({ id: `h-${e.ts}`, from: e.kind === 'mine' ? 'me' : 'them', text: e.text, ts: e.ts })));
+        // h- pasted (theirs, or both sides of a copied chat), s- written here and copied to send elsewhere.
+        .map(e => ({ id: `${e.src === 'pasted' ? 'h' : 's'}-${e.ts}`, from: e.kind === 'mine' ? 'me' : 'them', text: e.text, ts: e.ts })));
       setLoadError(null);
     } catch (e) { setLoadError(navigator.onLine ? (e instanceof Error ? e.message : 'Could not load') : 'No connection'); }
   }, [contact, wa]);
@@ -406,7 +407,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
               <div key={m.id}>{divider}<div className="flex justify-end">
                 <div className="max-w-[85%] rounded-[20px] rounded-tr-[8px] bg-[rgba(var(--pc-accent-rgb),0.18)] px-3.5 py-2">
                   <p className="whitespace-pre-wrap text-[17px] leading-snug">{m.text}</p>
-                  <p className="mt-0.5 text-right text-[12px] text-pc-text-muted">{clockOf(m.ts)}{m.id.startsWith('h-') ? ' · pasted' : ''}</p>
+                  <p className="mt-0.5 text-right text-[12px] text-pc-text-muted">{clockOf(m.ts)}{m.id.startsWith('h-') ? ' · pasted' : m.id.startsWith('s-') ? ' · copied' : ''}</p>
                 </div>
               </div></div>
             ) : (
@@ -429,6 +430,15 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
             );
           })}
         </div>
+        {/* Their answer by SMS or email can only come in here: the way in sits where the eye is after sending
+            (Lucian 2026-11-02: pasted Cécile's reply in the bottom bar, "it is interpreted as my own reply"). */}
+        {!wa && msgs?.at(-1)?.from === 'me' && stage.kind === 'idle' && (
+          <div className="mt-3 flex justify-start">
+            <button type="button" onClick={() => setPaste('')} className="press inline-flex h-12 items-center gap-2 rounded-full bg-pc-surface px-5 text-[16px] font-medium">
+              <ClipboardPaste size={18} /> Paste their reply
+            </button>
+          </div>
+        )}
         <div ref={endRef} />
         </div>
       </main>
@@ -553,7 +563,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
         {stage.kind !== 'sending' && edit === null && !big && (
           <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={(text, _a, meta) => void prepare(text, !!meta?.voice)} voice transcribe={transcribeAudio} handsFree
             draftKey={`wa:${contact.id}`} attach={false} sendLabel="Prepare the message"
-            placeholder={stage.kind === 'draft' ? 'Say it differently' : lastTheirs ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
+            placeholder={stage.kind === 'draft' ? 'Say it differently' : msgs?.at(-1)?.from === 'them' ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
         )}
         </div>
       </div>
