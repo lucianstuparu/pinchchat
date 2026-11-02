@@ -736,8 +736,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       )}
 
       {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
-        onActed={(id, action, title) => {
-          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: 'Reminder in 3 days', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
+        onActed={(id, action, title, later) => {
+          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: later ?? 'Put off', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
         }} />}
       {settings && (

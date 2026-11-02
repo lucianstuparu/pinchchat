@@ -5,7 +5,11 @@ import { CloseButton, Sheet } from '../ui/Sheet';
 import { AlertTriangle, Ban, CalendarClock, Check, Clock, Eye, ListChecks, MessageSquare, MessagesSquare, Pencil, Pin, PinOff, Receipt, Repeat, ShoppingCart, Undo2 } from 'lucide-react';
 import { act, fetchSheet, formatAmount, formatDay, type ItemAction, type Sheet as ItemData } from './api';
 import { Title } from './Todo';
-import { TOPIC_COLORS, railOf } from './todoRules';
+import { TOPIC_COLORS, daysBetween, railOf } from './todoRules';
+
+const LATER: Array<[string, number]> = [['Tomorrow', 1], ['In 3 days', 3], ['In a week', 7]];
+const localDay = (plus = 0) => { const d = new Date(); d.setDate(d.getDate() + plus); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const laterSaid = (days: number) => days === 1 ? 'Tomorrow' : days === 7 ? 'In a week' : `In ${days} days`;
 
 /**
  * Details of one item (app v2 §2): what it is, where it came from, and what can be done with it.
@@ -18,7 +22,7 @@ interface Props {
   /** Put text into the composer (ask about it, continue, schedule). */
   onAsk: (text: string, send?: boolean) => void;
   /** After a change: the parent offers Undo. */
-  onActed?: (id: string, action: ItemAction, title: string) => void;
+  onActed?: (id: string, action: ItemAction, title: string, said?: string) => void;
   /** The undo bar, shown at the foot of the sheet while it is open. */
   footer?: ReactNode;
 }
@@ -52,15 +56,16 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
   const [edit, setEdit] = useState<{ title: string; due: string; topics: string[]; repeat: string; amount: string; place: string; check: string } | null>(null);
   // "Went wrong…" on a watch-out: why, and the one thing to do now; it becomes a task (Undo brings it back).
   const [wrong, setWrong] = useState<{ reason: string; step: string } | null>(null);
+  const [later, setLater] = useState(false);
   useBusy('item-edit', edit !== null || wrong !== null);
   const saving = useDelayedFlag(busy && edit !== null);   // an update never reloads over unsaved edits
 
   const load = () => fetchSheet(id).then(s => { setSheet(s); setError(null); }).catch(e => setError(e.message));
   useEffect(() => { void load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = async (action: ItemAction, extra?: Record<string, unknown>) => {
+  const run = async (action: ItemAction, extra?: Record<string, unknown>, said?: string) => {
     setBusy(true);
-    try { await act(id, action, extra); await load(); onChanged(); if (sheet) onActed?.(id, action, sheet.item.title); }
+    try { await act(id, action, extra); await load(); onChanged(); if (sheet) onActed?.(id, action, sheet.item.title, said); }
     catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
     finally { setBusy(false); }
   };
@@ -240,7 +245,7 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                 <div className="mt-2 flex gap-2 [&>*]:min-w-0 [&>*]:flex-1">
                   {isTopic
                     ? <button type="button" onClick={() => { onAsk(`Continue: ${it.title} ⟨${id}⟩`, true); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Continue</button>
-                    : <button type="button" disabled={busy} onClick={() => void run('snooze')} className={secondary}><Clock size={19} className="text-pc-accent" /> Remind in 3 days</button>}
+                    : <button type="button" disabled={busy} aria-expanded={later} onClick={() => setLater(!later)} className={secondary}><Clock size={19} className="text-pc-accent" /> Later</button>}
                   {!isTopic && <button type="button" onClick={() => { onAsk(`About ⟨${id}⟩: `); onClose(); }} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Ask</button>}
                   {it.store === 'tasks' && !str('scheduled') && (
                     <button type="button" onClick={() => { onAsk(`Schedule ⟨${id}⟩ for `); onClose(); }} className={secondary}><CalendarClock size={19} className="text-pc-accent" /> Schedule</button>
@@ -251,6 +256,28 @@ export function ItemSheet({ id, onClose, onChanged, onAsk, onActed, footer }: Pr
                   {!edit && <button type="button" onClick={startEdit} className={secondary}><Pencil size={19} className="text-[var(--pc-accent-ink)]" /> Edit</button>}
                   <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Not needed</button>
                 </div>
+                {later && !isTopic && (() => {
+                  const moves = it.store === 'tasks' && !!str('due_date');
+                  const putOff = (days: number) => void run('snooze', { days, move_due: true }, laterSaid(days)).then(() => setLater(false));
+                  return (
+                    <div className="mt-2 rounded-[12px] bg-pc-surface p-2" role="group" aria-label="Later">
+                      <div className="grid grid-cols-3 gap-2">
+                        {LATER.map(([label, days]) => (
+                          <button key={label} type="button" disabled={busy} onClick={() => putOff(days)}
+                            className="press h-12 rounded-[10px] bg-pc-elevated text-[15px] font-medium disabled:opacity-50">{label}</button>
+                        ))}
+                      </div>
+                      <label className="mt-2 flex h-12 items-center justify-between gap-3 rounded-[10px] bg-pc-elevated px-3 text-[15px]">
+                        <span>Pick a date</span>
+                        <input type="date" min={localDay(1)} max={localDay(60)} disabled={busy} aria-label="Pick a date"
+                          onChange={e => { const d = e.target.value; if (d) putOff(daysBetween(localDay(), d)); }} className="bg-transparent text-right outline-none" />
+                      </label>
+                      <p className="mt-2 px-1 text-[13px] text-pc-text-muted">
+                        {moves ? 'Its due date moves too.' : kind === 'bill' ? 'Out of the way until then; the bill’s date stays.' : 'Out of the way until then.'}
+                      </p>
+                    </div>
+                  );
+                })()}
                 {!isTopic && (
                   <div className="mt-4">
                     <p className="mb-1.5 px-1 text-[13px] text-pc-text-muted">Priority</p>
