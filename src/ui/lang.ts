@@ -1,11 +1,11 @@
 /**
  * The words on shared screens, in the build's language. oc and Shopping are English; the Casa
- * Artlia app (VITE_APP=artlia) is Romanian, with French technical terms kept as they are
+ * Artlia app (VITE_APP=artlia) and the kids app (VITE_APP=kids) are Romanian, with French terms kept as they are
  * (ai.manager casa-artlia-app.md). `L('Undo')` returns the Romanian when the build is Romanian and
  * the English otherwise; `{x}` in a string is filled from `vars`. A string missing from the table
  * stays English, so nothing breaks while a word waits for its translation.
  */
-export const RO = import.meta.env.VITE_APP === 'artlia';
+export const RO = import.meta.env.VITE_APP === 'artlia' || import.meta.env.VITE_APP === 'kids';
 
 const ro: Record<string, string> = {
   // input bar and voice

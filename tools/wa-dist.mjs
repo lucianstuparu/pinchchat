@@ -7,7 +7,7 @@ import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:f
 const base = process.env.VITE_BASE || '/';
 for (const f of readdirSync('dist/wa')) cpSync(`dist/wa/${f}`, `dist/${f}`);
 cpSync('dist/logo-512.png', 'dist/logo.png');
-for (const d of ['wa', 'artlia', 'shop', 'shortcuts']) rmSync(`dist/${d}`, { recursive: true, force: true });
+for (const d of ['wa', 'artlia', 'kids', 'shop', 'shortcuts']) rmSync(`dist/${d}`, { recursive: true, force: true });
 for (const f of ['og-card.png', 'screenshot.png', 'vite.svg']) rmSync(`dist/${f}`, { force: true });
 const version = `${Date.now()}`;
 writeFileSync('dist/sw.js', readFileSync('dist/sw.js', 'utf8').replace(/__SW_VERSION__/g, version));

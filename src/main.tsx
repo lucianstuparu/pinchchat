@@ -17,6 +17,10 @@ const isShop = import.meta.env.VITE_APP === 'shop'
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const ArtliaApp = lazy(() => import('./artlia/ArtliaApp'))
 const isArtlia = import.meta.env.VITE_APP === 'artlia'
+// The kids app (kids.stuparu.eu): VITE_APP=kids.
+// eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
+const KidsApp = lazy(() => import('./kids/KidsApp'))
+const isKids = import.meta.env.VITE_APP === 'kids'
 // Relay, the messages app (msg.stuparu.eu): VITE_APP=wa, built with VITE_BASE.
 // eslint-disable-next-line react-refresh/only-export-components -- the entry file, never hot-reloaded as a module
 const WaApp = lazy(() => import('./wa/WaApp'))
@@ -55,6 +59,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Suspense fallback={null}><ShopApp /></Suspense>
       ) : isArtlia ? (
         <Suspense fallback={null}><ArtliaApp /></Suspense>
+      ) : isKids ? (
+        <Suspense fallback={null}><KidsApp /></Suspense>
       ) : isWa ? (
         <Suspense fallback={null}><WaApp /></Suspense>
       ) : (

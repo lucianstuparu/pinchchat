@@ -17,6 +17,15 @@ export function AgentAvatar({ className = 'h-7 w-7' }: { className?: string }) {
       <path d="M16 7.5 7 15.5h2.6v8.5h4.4v-5h4v5h4.4v-8.5H25z" fill="#fff" />
     </svg>
   );
+  // The kids app's assistant: two small heads (the app's icon) on the accent's pair.
+  if (import.meta.env.VITE_APP === 'kids') return (
+    <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Asistent" role="img">
+      <circle cx="16" cy="16" r="16" fill="var(--pc-pair)" />
+      <circle cx="11.5" cy="12.5" r="3.4" fill="#fff" />
+      <circle cx="20.5" cy="14" r="2.8" fill="#fff" />
+      <path d="M5.8 24.5c.6-4.2 3-6.6 5.7-6.6s5.1 2.4 5.7 6.6zM15.4 24.5c.5-3.4 2.6-5.4 5.1-5.4s4.6 2 5.1 5.4z" fill="#fff" />
+    </svg>
+  );
   // The assistant's face, as in the app icon (a smiling bubble on a sunrise gradient, Lucian 2026-10-24).
   return (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Assistant" role="img">

@@ -190,6 +190,7 @@ const waContacts = [
   { id: 'ct-2026-10-25-0000e1', name: 'Me Cécile Fouillet', label: 'Notaire', aliases: ['notara'], phone: '', email: 'etude@example.fr', lang: 'fr', tone: 'formal', channel: 'email', sent: 0 },
 ];
 const artlia = JSON.parse(readFileSync(new URL('./artlia-sample.json', import.meta.url), 'utf8'));
+const kids = JSON.parse(readFileSync(new URL('./kids-sample.json', import.meta.url), 'utf8'));
 // Search (register-api /artlia/search, /reg/search, /artlia/doc; gateway sessions.search).
 const sfold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const MEANING = [['arhitect', 'architecte', 'maitrise', 'oeuvre'], ['banca', 'banque', 'credit', 'pret', 'imprumut'], ['notar', 'notaire', 'promesse', 'vanzare']];
@@ -333,7 +334,7 @@ function reply(sessionKey, message, attachments) {
 
 const handlers = {
   'agent.identity.get': () => ({ name: 'OpenClaw' }),
-  'agents.list': () => ({ agents: [...AGENTS, 'artlia'].map(id => ({ id, name: id })) }),
+  'agents.list': () => ({ agents: [...AGENTS, 'artlia', 'kids'].map(id => ({ id, name: id })) }),
   'sessions.list': () => ({ sessions: [...sessions.keys()].map(key => ({ key, agentId: key.split(':')[1], label: key.split(':').pop(), updatedAt: now() })) }),
   'chat.history': (p) => ({ messages: hist(p.sessionKey) }),
   'sessions.search': (p) => {
@@ -592,6 +593,38 @@ const server = http.createServer((req, res) => {
       }
       const { _prev, ...out } = it; void _prev;
       res.end(JSON.stringify({ ok: true, item: out }));
+    });
+    return;
+  }
+  // The kids app's API (/kids/*; ai.manager kids-app.md). In-memory sample; calendar answers after a second.
+  if (url.pathname.startsWith('/kids/')) {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const p = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      if (url.pathname === '/kids/list') { res.end(JSON.stringify({ today: '2026-11-03', ...kids })); return; }
+      const it = kids.items.find(i => i.id === p.item || String(i.n) === String(p.item));
+      if (!it) { res.statusCode = 404; res.end(JSON.stringify({ error: 'no such kids item' })); return; }
+      const reply = () => { const { _prev, ...out } = it; void _prev; res.end(JSON.stringify({ ok: true, item: out })); };
+      if (p.action === 'calendar') { setTimeout(() => { it.calendar = [{ id: 'mock', start: it.due_date || '2026-11-04' }]; reply(); }, 1000); return; }
+      if (p.action === 'uncalendar') { setTimeout(() => { delete it.calendar; reply(); }, 600); return; }
+      const prev = { ...it };
+      if (p.action === 'undo') { if (!it._prev) { res.statusCode = 400; res.end(JSON.stringify({ error: 'nothing to undo' })); return; } const back = it._prev; Object.keys(it).forEach(k => delete it[k]); Object.assign(it, back, { _prev: prev }); }
+      else {
+        it._prev = prev;
+        if (p.action === 'done') it.status = 'done';
+        if (p.action === 'reopen') it.status = 'todo';
+        if (p.action === 'drop') it.status = 'cancelled';
+        if (p.action === 'snooze') it.snoozed_until = '2026-11-06';
+        if (p.action === 'note') it.notes = [it.notes, `${p.text} (lucian, 2026-11-03)`].filter(Boolean).join(' | ');
+        if (p.action === 'edit') for (const [k, v] of Object.entries(p)) {
+          if (['item', 'action'].includes(k)) continue;
+          const key = k === 'due' ? 'due_date' : k;
+          if (v === '' || v === null || v === false || (Array.isArray(v) && !v.length)) delete it[key]; else it[key] = k === 'tried' && v === true ? '2026-11-03' : v;
+        }
+      }
+      reply();
     });
     return;
   }
