@@ -13,8 +13,10 @@
  * Answer it for someone not in Relay (Lucian 2026-11-01: "paste a message from someone and ask relay app to draft an
  * answer ... saying it is possible and I am available at the time proposed", "not a contact in Relay"): Just answer,
  * say what to answer, and it comes out in their language with the details from their message, to copy. Nothing kept.
+ * Answer it right under the pasted text, no translating first and no choosing who (Lucian 2026-11-04: "no time to add the
+ * person ... paste the message in French and ask for a reply in the same formal style"); the person stays one tap away.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Copy, Languages, MessageSquareReply, Plus, Share2, Square, Volume2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented } from '../ui/Controls';
@@ -24,6 +26,7 @@ import { Composer } from '../mobile/Composer';
 import { transcribeAudio } from '../app/api';
 import { canSpeak, speak } from '../ui/speak';
 import { Face } from './Face';
+import { Refine } from './Refine';
 import { BOX_LANGS, MY_LANG, asksTranslation, langName, phrase, reply, translate, type Contact } from './api';
 
 type Tone = 'formal' | 'informal';
@@ -55,8 +58,8 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answering, setAnswering] = useState(false);
-  // Just answer: what to say (the Composer), then the answer.
-  const [oneOff, setOneOff] = useState(false);
+  // Answering: what to say (the Composer), then the answer; who it is from only if asked.
+  const [who, setWho] = useState(false);
   const [answer, setAnswer] = useState<Phrased | null>(null);
   const [writing, setWriting] = useState(false);
   const [stop, setStop] = useState<(() => void) | null>(null);
@@ -65,7 +68,7 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
 
   const go = async (t = text.trim(), to = into) => {
     if (!t) return;
-    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false); setAnswering(false); setOneOff(false); setAnswer(null);
+    setBusy(true); setError(null); setOut(null); setMade(null); setCopied(false); setAnswering(false); setWho(false); setAnswer(null);
     try {
       if (asksTranslation(t)) setMade(await phrase(t));
       else if (to.to === MY_LANG) setOut(await translate(t));
@@ -100,14 +103,15 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
   const ordered = out ? [...people].sort((a, b) => Number(b.lang === out.lang) - Number(a.lang === out.lang)) : people;
   const answerIt = async (said: string) => {
     const t = said.trim();
-    if (!t || !out) return;
-    setWriting(true); setError(null); setAnswer(null); setCopied(false);
-    try { setAnswer(await reply(text.trim(), t)); }
+    if (!t) return;
+    setWriting(true); setError(null); setCopied(false);
+    // An answer already there is changed ("shorter", "more formal"), and stays if that fails.
+    try { setAnswer(await reply(text.trim(), t, answer?.text)); }
     catch (e) { setError(navigator.onLine ? (e instanceof Error ? e.message : 'Could not write the answer') : 'No connection'); }
     finally { setWriting(false); }
   };
   // A message to copy: what it says in my language (not when written in my language or going into it), Hear, Share, Copy.
-  const card = (m: Phrased, big?: boolean) => (
+  const card = (m: Phrased, big?: boolean, more?: ReactNode) => (
     <>
       <section className="mt-3 rounded-[20px] bg-pc-surface px-4 py-3">
         <div className="flex items-start gap-2">
@@ -121,6 +125,7 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
         <p className="select-text whitespace-pre-wrap text-[19px] leading-snug">{m.text}</p>
         {m.back && m.lang !== MY_LANG && m.from !== MY_LANG && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-muted">{m.back}</p>}
       </section>
+      {more}
       <div className="mt-3 flex items-center gap-2">
         {canShare && <button type="button" onClick={() => void navigator.share({ text: m.text }).catch(() => undefined)} aria-label="Share" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-pc-surface"><Share2 size={20} /></button>}
         <button type="button" onClick={() => void copy(m)}
@@ -148,16 +153,24 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
               options={[{ value: 'informal', label: 'Informal (tu)' }, { value: 'formal', label: 'Formal (vous, Вы)' }]} />
           </div>
         )}
-        <textarea value={text} onChange={e => { setText(e.target.value); setOut(null); setMade(null); setAnswering(false); setError(null); }} rows={made ? 3 : 5} autoFocus={!said} aria-label="Text to translate"
+        <textarea value={text} onChange={e => { setText(e.target.value); setOut(null); setMade(null); setAnswering(false); setWho(false); setAnswer(null); setError(null); }} rows={made || answering ? 3 : 5} autoFocus={!said} aria-label="Text to translate"
           placeholder={reading ? 'Paste a message in any language…' : 'Write in any language…'}
           className="mt-3 w-full resize-none rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] leading-snug outline-none focus:border-pc-accent" />
         {busy ? (
           <div className="mt-3"><ProgressRow tile={<Languages size={18} />} name="Translating" status={asksTranslation(text) ? 'As you asked…' : `Into ${langName(into.to)}…`} progress={null} /></div>
-        ) : !out && !made && (
-          <button type="button" disabled={!text.trim()} onClick={() => void go()}
-            className="press mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">
-            <Languages size={19} /> {asksTranslation(text) ? 'Translate' : `Translate into ${langName(into.to)}`}
-          </button>
+        ) : !out && !made && !answering && (
+          <>
+            <button type="button" disabled={!text.trim()} onClick={() => void go()}
+              className="press mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">
+              <Languages size={19} /> {asksTranslation(text) ? 'Translate' : `Translate into ${langName(into.to)}`}
+            </button>
+            {!asksTranslation(text) && (
+              <button type="button" disabled={!text.trim()} onClick={() => setAnswering(true)}
+                className="press mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-surface text-[17px] font-semibold text-[var(--pc-accent-ink)] disabled:opacity-50">
+                <MessageSquareReply size={19} /> Answer it
+              </button>
+            )}
+          </>
         )}
         {error && <p className="mt-2 text-[15px] text-red-500" role="alert">{error}</p>}
         {made && card(made, voice)}
@@ -174,47 +187,42 @@ export function Translate({ people, said, voice, onAnswer, onAddPerson, onClose 
             <p className="whitespace-pre-wrap text-[17px] leading-snug">{out.translation}</p>
           </section>
         )}
-        {out && !answering && (
+        {(out || (made?.from && made.from !== MY_LANG)) && !answering && (
           <button type="button" onClick={() => setAnswering(true)}
             className="press mt-3 flex h-14 w-full items-center justify-center rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)]">
             Answer it
           </button>
         )}
-        {out && answering && !oneOff && (
+        {answering && (
           <>
-            <button type="button" onClick={() => setOneOff(true)}
-              className="press mt-4 flex h-14 w-full items-center gap-3 rounded-[12px] bg-pc-surface px-4 text-left text-[17px] font-medium">
-              <MessageSquareReply size={20} className="shrink-0 text-[var(--pc-accent-ink)]" />
-              <span className="min-w-0 flex-1">Just answer<span className="block text-[13px] font-normal text-pc-text-muted">Not in Relay: nothing is kept</span></span>
-            </button>
-            <p className="mb-2 mt-4 text-[13px] font-semibold text-pc-text-muted">Who is it from?</p>
-            <div className="grid grid-cols-4 gap-x-1 gap-y-3">
-              {ordered.map(c => (
-                <button key={c.id} type="button" onClick={() => onAnswer(c, text.trim())} className="press flex min-w-0 flex-col items-center gap-1 rounded-[12px] px-1 py-2 active:bg-[var(--pc-hover-strong)]">
-                  <Face contact={c} size={48} />
-                  <span className="max-w-full truncate text-[13px] font-medium">{c.label}</span>
-                </button>
-              ))}
-              <button type="button" onClick={() => onAddPerson(out.lang, text.trim())} className="press flex flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-pc-text-muted">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-pc-border-strong"><Plus size={20} /></span>
-                <span className="text-[13px]">Someone new</span>
-              </button>
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <p className="text-[13px] font-semibold text-pc-text-muted">Your answer, in any language</p>
+              <button type="button" onClick={() => setWho(w => !w)} className="press h-10 shrink-0 text-[13px] font-semibold text-[var(--pc-accent-ink)]">From someone in Relay?</button>
             </div>
-          </>
-        )}
-        {out && oneOff && (
-          <>
-            <p className="mb-1 mt-4 text-[13px] font-semibold text-pc-text-muted">Your answer, in any language</p>
-            {writing && <div className="mt-2"><ProgressRow tile={<MessageSquareReply size={18} />} name="Writing the answer" status={`In ${langName(out.lang)}…`} progress={null} /></div>}
-            {answer && card(answer, true)}
+            {who && (
+              <div className="grid grid-cols-4 gap-x-1 gap-y-3">
+                {ordered.map(c => (
+                  <button key={c.id} type="button" onClick={() => onAnswer(c, text.trim())} className="press flex min-w-0 flex-col items-center gap-1 rounded-[12px] px-1 py-2 active:bg-[var(--pc-hover-strong)]">
+                    <Face contact={c} size={48} />
+                    <span className="max-w-full truncate text-[13px] font-medium">{c.label}</span>
+                  </button>
+                ))}
+                <button type="button" onClick={() => onAddPerson(out?.lang ?? answer?.lang ?? 'fr', text.trim())} className="press flex flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-pc-text-muted">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-pc-border-strong"><Plus size={20} /></span>
+                  <span className="text-[13px]">Someone new</span>
+                </button>
+              </div>
+            )}
+            {writing && <div className="mt-2"><ProgressRow tile={<MessageSquareReply size={18} />} name={answer ? 'Changing the answer' : 'Writing the answer'} status="In their language…" progress={null} /></div>}
+            {answer && card(answer, false, <Refine disabled={writing} onChange={c => void answerIt(c)} />)}
           </>
         )}
       </div>
-      {out && oneOff && (
+      {answering && (
         <div className="-mx-4 shrink-0">
           <Composer key="oneoff" onSend={said => void answerIt(said)} voice transcribe={transcribeAudio} handsFree
             draftKey="wa:oneoff" attach={false} sendLabel="Write the answer"
-            placeholder={answer ? 'Say it differently' : '“E posibil, sunt disponibil la ora propusă”'} />
+            placeholder={answer ? 'Change it: “add that I come Tuesday”' : '“E posibil, sunt disponibil la ora propusă”'} />
         </div>
       )}
     </Sheet>

@@ -445,6 +445,7 @@ const server = http.createServer((req, res) => {
         const d = { id, name: c?.name ?? '?', lang: c?.lang ?? 'ro', text: p.text, back: p.back, status: 'draft' };
         waDrafts.set(id, d); return later({ ok: true, draft: d }, 200);
       }
+      if (p.draft && (what === 'reply' || what === 'compose')) return later({ text: `${p.draft} [${p.said}]`, lang: 'fr', tone: 'formal', back: 'Schimbat.' }, 1200);
       if (what === 'reply') return later({ text: 'Bonjour, oui c\'est possible, je suis disponible jeudi à 14h30.\nBien à vous, Lucian', lang: 'fr', tone: 'formal', back: 'Da, e posibil, sunt disponibil joi la 14:30.' }, 1500);
       if (what === 'compose') {
         const fr = p.contact.lang === 'fr';

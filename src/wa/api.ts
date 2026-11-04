@@ -53,14 +53,15 @@ export const keepDraft = (contact: string, text: string, back?: string) =>
 // ---- CT 113: the person's agents
 type AgentContact = Pick<Contact, 'id' | 'name' | 'label' | 'lang' | 'tone' | 'channel'>;
 const asAgent = (c: Contact): AgentContact => ({ id: c.id, name: c.name, label: c.label, lang: c.lang, tone: c.tone, channel: c.channel });
-export const compose = (c: Contact, said: string, replyTo?: string) =>
-  post<{ text: string; back?: string }>('/relay/compose', { contact: asAgent(c), said, reply_to: replyTo });
+/** With a draft: that draft changed as said ("shorter", "more formal"), not written again from nothing. */
+export const compose = (c: Contact, said: string, replyTo?: string, draft?: string) =>
+  post<{ text: string; back?: string }>('/relay/compose', { contact: asAgent(c), said, reply_to: replyTo, draft });
 export const translate = (text: string, c?: Contact, msgId?: string) =>
   post<{ translation: string; lang: string }>('/relay/translate', { text, contact: c ? asAgent(c) : undefined, msg_id: msgId });
 /** Dictated with what to do ("translate this into French informal: …"): the text in that language, ready to copy. */
 /** An answer for someone not in Relay: their message and what to say -> the answer in their language (nothing kept). */
-export const reply = (message: string, said: string) =>
-  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string }>('/relay/reply', { message, said });
+export const reply = (message: string, said: string, draft?: string) =>
+  post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string }>('/relay/reply', { message, said, draft });
 export const phrase = (said: string, to?: string, tone?: 'formal' | 'informal') =>
   post<{ text: string; lang: string; tone: 'formal' | 'informal'; back: string; from?: string }>('/relay/phrase', { said, to, tone });
 /** The Translate box's languages (Lucian 2026-10-29: "4-5 languages in total"). */

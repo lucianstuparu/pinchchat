@@ -26,6 +26,7 @@ import { IconButton } from '../ui/Controls';
 import { ProgressRow } from '../ui/ProgressRow';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { useBusy } from '../ui/draft';
+import { Refine } from './Refine';
 import { canSpeak, speak, speakParts } from '../ui/speak';
 import { useDelayedFlag } from '../ui/progress';
 import { Face } from './Face';
@@ -210,21 +211,29 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
     });
   };
   const sayAgain = () => { setPrefill({ nonce: Date.now(), text: '', attachments: [], dictate: true }); };
+  const boxWith = (text: string) => { setPrefill({ nonce: Date.now(), text, attachments: [] }); };
 
-  const prepare = async (said: string, voice = false) => {
-    if (stage.kind === 'draft' && !isLocal(stage.draft)) void act(stage.draft.id, 'cancel').catch(() => undefined);   // a new message replaces the old draft
+  // A draft on the card and more words: that draft is changed, and stays if the change fails. `fresh`: a new message.
+  const prepare = async (said: string, voice = false, fresh = false) => {
+    const was = stage.kind === 'draft' ? stage : null;
+    const cancel = () => { if (was && !isLocal(was.draft)) void act(was.draft.id, 'cancel').catch(() => undefined); };   // a new message replaces the old draft
+    if (fresh) cancel();
     setStage({ kind: 'preparing', said, voice });
     setPrefill(p => (p?.dictate ? null : p));   // the mic's start was used: the box must not listen again when it comes back after Send
     keep(`draft:wa:${contact.id}`, null);   // and the words are used: the box comes back empty (Lucian 2026-10-26: "după send trebuie șters și textbox-ul")
     try {
-      const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined);
+      const w = await compose(contact, said, lastTheirs ? (lastTheirs.transcript || lastTheirs.text) : undefined, fresh ? undefined : was?.draft.text);
       const d: Draft = wa ? await waDraft(contact.id, w.text, w.back)
         : { id: localId(), name: contact.name, lang: contact.lang, text: w.text, back: w.back, status: 'draft' };
+      if (!fresh) cancel();
       keepDraft(d);
-      setStage({ kind: 'draft', draft: d, said, voice });
-      if (voice) readBack(d, said);
+      // What the message came from stays what was first said, not "shorter".
+      const from = (!fresh && was?.said) || said;
+      setStage({ kind: 'draft', draft: d, said: from, voice });
+      if (voice) readBack(d, from);
     } catch (e) {
       const error = navigator.onLine ? (e instanceof Error ? e.message : 'Could not write it') : 'No connection';
+      if (was && !fresh) { setStage({ ...was, voice: false, error: `Could not change it · ${error}` }); boxWith(said); return; }
       setStage({ kind: 'failed', said, error, voice });
       if (voice) speak(['Nu am reușit să scriu mesajul.'], MY_LANG);
     }
@@ -235,7 +244,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
   useEffect(() => {
     // After the conversation loaded, so an answer follows their last message.
     if (!autoSay?.text.trim() || autoDone.current || (msgs === null && !loadError)) return;
-    const t = window.setTimeout(() => { autoDone.current = true; void prepare(autoSay.text.trim(), autoSay.voice); }, 0);
+    const t = window.setTimeout(() => { autoDone.current = true; void prepare(autoSay.text.trim(), autoSay.voice, true); }, 0);
     return () => window.clearTimeout(t);
   }, [msgs, loadError]);   // eslint-disable-line react-hooks/exhaustive-deps -- once, when the conversation is there
   const [dropped, setDropped] = useState<Draft | null>(null);
@@ -486,6 +495,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
             {draft.back && edit === null && <p className="mt-1.5 text-[15px] leading-snug text-pc-text-muted">Means: “{draft.back}”</p>}
             {stage.kind === 'draft' && stage.error && <p className="mt-1.5 text-[13px] text-red-500" role="alert">{stage.error}</p>}
 
+            {stage.kind === 'draft' && edit === null && <Refine onChange={c => void prepare(c, !!voiceOf)} />}
             {stage.kind === 'draft' && big && (
               <div className="mt-3">
                 <div className="grid grid-cols-4 gap-2">
@@ -493,7 +503,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
                   <button type="button" onClick={() => { quiet(); setEdit(stage.draft.text); }} aria-label="Change the text" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface"><Pencil size={22} /></button>
                   <button type="button" onClick={() => (speaking === 'draft' ? quiet() : readBack(stage.draft, said))} aria-label={speaking === 'draft' ? 'Stop' : 'Hear it again'}
                     className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface">{speaking === 'draft' ? <Square size={20} /> : <Volume2 size={24} />}</button>
-                  <button type="button" onClick={() => { discard(stage.draft); sayAgain(); }} aria-label="Say it again" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-[var(--pc-accent-ink)]"><Mic size={24} /></button>
+                  <button type="button" onClick={() => { quiet(); setStage({ ...stage, voice: false }); sayAgain(); }} aria-label="Say how to change it" className="press flex h-14 items-center justify-center rounded-[12px] bg-pc-surface text-[var(--pc-accent-ink)]"><Mic size={24} /></button>
                 </div>
                 {asking && (
                   <button type="button" onClick={quiet} aria-label="Stop listening"
@@ -563,7 +573,7 @@ export function Line({ contact, waOwner, replyTo, startVoice, autoSay, openDraft
         {stage.kind !== 'sending' && edit === null && !big && (
           <Composer key={prefill?.nonce ?? 0} prefill={prefill} onSend={(text, _a, meta) => void prepare(text, !!meta?.voice)} voice transcribe={transcribeAudio} handsFree
             draftKey={`wa:${contact.id}`} attach={false} sendLabel="Prepare the message"
-            placeholder={stage.kind === 'draft' ? 'Say it differently' : msgs?.at(-1)?.from === 'them' ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
+            placeholder={stage.kind === 'draft' ? 'Change it: “add that I come Tuesday”' : msgs?.at(-1)?.from === 'them' ? `Your answer to ${contact.label}, in any language` : `Tell ${contact.label}, in any language`} />
         )}
         </div>
       </div>
