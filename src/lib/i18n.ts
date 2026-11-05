@@ -9,7 +9,7 @@ const STORAGE_KEY = 'pinchchat-locale';
 
 const en = {
   // Login screen
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Connect to your OpenClaw gateway',
   'login.gatewayUrl': 'Gateway URL',
   'login.token': 'Token',
@@ -29,7 +29,7 @@ const en = {
   'login.clientIdHint': 'Sent in the WebSocket connect frame. Default: webchat',
 
   // Header
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Connected',
   'header.disconnected': 'Disconnected',
   'header.logout': 'Logout',
@@ -39,7 +39,7 @@ const en = {
   'header.soundOff': 'Disable notification sound',
 
   // Chat
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Send a message to get started',
   'chat.suggestions': 'Try asking...',
   'chat.suggestion1': 'Summarize my recent emails',
@@ -230,7 +230,7 @@ const en = {
 } as const;
 
 const fr: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Connectez-vous à votre gateway OpenClaw',
   'login.gatewayUrl': 'URL de la gateway',
   'login.token': 'Token',
@@ -249,7 +249,7 @@ const fr: Record<keyof typeof en, string> = {
   'login.clientId': 'ID client',
   'login.clientIdHint': 'Envoyé dans la trame de connexion WebSocket. Par défaut : webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Connecté',
   'header.disconnected': 'Déconnecté',
   'header.logout': 'Déconnexion',
@@ -258,7 +258,7 @@ const fr: Record<keyof typeof en, string> = {
   'header.soundOn': 'Activer le son de notification',
   'header.soundOff': 'Désactiver le son de notification',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Envoyez un message pour commencer',
   'chat.suggestions': 'Essayez par exemple...',
   'chat.suggestion1': 'Résume mes derniers emails',
@@ -434,7 +434,7 @@ const fr: Record<keyof typeof en, string> = {
 };
 
 const es: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Conéctate a tu gateway OpenClaw',
   'login.gatewayUrl': 'URL del gateway',
   'login.token': 'Token',
@@ -453,7 +453,7 @@ const es: Record<keyof typeof en, string> = {
   'login.clientId': 'ID de cliente',
   'login.clientIdHint': 'Enviado en la trama de conexión WebSocket. Por defecto: webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Conectado',
   'header.disconnected': 'Desconectado',
   'header.logout': 'Cerrar sesión',
@@ -462,7 +462,7 @@ const es: Record<keyof typeof en, string> = {
   'header.soundOn': 'Activar sonido de notificación',
   'header.soundOff': 'Desactivar sonido de notificación',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Envía un mensaje para comenzar',
   'chat.suggestions': 'Prueba a preguntar...',
   'chat.suggestion1': 'Resume mis últimos correos',
@@ -640,7 +640,7 @@ const es: Record<keyof typeof en, string> = {
 export type TranslationKey = keyof typeof en;
 
 const de: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Mit deinem OpenClaw-Gateway verbinden',
   'login.gatewayUrl': 'Gateway-URL',
   'login.token': 'Token',
@@ -659,7 +659,7 @@ const de: Record<keyof typeof en, string> = {
   'login.clientId': 'Client-ID',
   'login.clientIdHint': 'Wird im WebSocket-Connect-Frame gesendet. Standard: webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Verbunden',
   'header.disconnected': 'Getrennt',
   'header.logout': 'Abmelden',
@@ -668,7 +668,7 @@ const de: Record<keyof typeof en, string> = {
   'header.soundOn': 'Benachrichtigungston aktivieren',
   'header.soundOff': 'Benachrichtigungston deaktivieren',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Sende eine Nachricht, um zu beginnen',
   'chat.suggestions': 'Probiere z.\u00a0B. …',
   'chat.suggestion1': 'Fasse meine letzten E-Mails zusammen',
@@ -844,7 +844,7 @@ const de: Record<keyof typeof en, string> = {
 };
 
 const ja: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'OpenClawゲートウェイに接続',
   'login.gatewayUrl': 'ゲートウェイURL',
   'login.token': 'トークン',
@@ -863,7 +863,7 @@ const ja: Record<keyof typeof en, string> = {
   'login.clientId': 'クライアントID',
   'login.clientIdHint': 'WebSocket接続フレームで送信されます。デフォルト: webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': '接続済み',
   'header.disconnected': '切断',
   'header.logout': 'ログアウト',
@@ -872,7 +872,7 @@ const ja: Record<keyof typeof en, string> = {
   'header.soundOn': '通知音を有効にする',
   'header.soundOff': '通知音を無効にする',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'メッセージを送信して始めましょう',
   'chat.suggestions': '例えば…',
   'chat.suggestion1': '最近のメールをまとめて',
@@ -1048,7 +1048,7 @@ const ja: Record<keyof typeof en, string> = {
 };
 
 const pt: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Conectar ao seu gateway OpenClaw',
   'login.gatewayUrl': 'URL do Gateway',
   'login.token': 'Token',
@@ -1067,7 +1067,7 @@ const pt: Record<keyof typeof en, string> = {
   'login.clientId': 'ID do cliente',
   'login.clientIdHint': 'Enviado no frame de conexão WebSocket. Padrão: webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Conectado',
   'header.disconnected': 'Desconectado',
   'header.logout': 'Sair',
@@ -1076,7 +1076,7 @@ const pt: Record<keyof typeof en, string> = {
   'header.soundOn': 'Ativar som de notificação',
   'header.soundOff': 'Desativar som de notificação',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Envie uma mensagem para começar',
   'chat.suggestions': 'Tente perguntar…',
   'chat.suggestion1': 'Resuma meus e-mails recentes',
@@ -1252,7 +1252,7 @@ const pt: Record<keyof typeof en, string> = {
 };
 
 const zh: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': '连接到您的 OpenClaw 网关',
   'login.gatewayUrl': '网关地址',
   'login.token': '令牌',
@@ -1271,7 +1271,7 @@ const zh: Record<keyof typeof en, string> = {
   'login.clientId': '客户端 ID',
   'login.clientIdHint': '在 WebSocket 连接帧中发送。默认值：webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': '已连接',
   'header.disconnected': '未连接',
   'header.logout': '退出',
@@ -1280,7 +1280,7 @@ const zh: Record<keyof typeof en, string> = {
   'header.soundOn': '开启通知音',
   'header.soundOff': '关闭通知音',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': '发送消息开始对话',
   'chat.suggestions': '试试问…',
   'chat.suggestion1': '总结我最近的邮件',
@@ -1456,7 +1456,7 @@ const zh: Record<keyof typeof en, string> = {
 };
 
 const it: Record<keyof typeof en, string> = {
-  'login.title': 'PinchChat',
+  'login.title': 'Chat',
   'login.subtitle': 'Connettiti al tuo gateway OpenClaw',
   'login.gatewayUrl': 'URL del Gateway',
   'login.token': 'Token',
@@ -1475,7 +1475,7 @@ const it: Record<keyof typeof en, string> = {
   'login.clientId': 'ID client',
   'login.clientIdHint': 'Inviato nel frame di connessione WebSocket. Predefinito: webchat',
 
-  'header.title': 'PinchChat',
+  'header.title': 'Chat',
   'header.connected': 'Connesso',
   'header.disconnected': 'Disconnesso',
   'header.logout': 'Esci',
@@ -1484,7 +1484,7 @@ const it: Record<keyof typeof en, string> = {
   'header.soundOn': 'Attiva suono notifiche',
   'header.soundOff': 'Disattiva suono notifiche',
 
-  'chat.welcome': 'PinchChat',
+  'chat.welcome': 'Chat',
   'chat.welcomeSub': 'Invia un messaggio per iniziare',
   'chat.suggestions': 'Prova a chiedere…',
   'chat.suggestion1': 'Riassumi le mie ultime email',

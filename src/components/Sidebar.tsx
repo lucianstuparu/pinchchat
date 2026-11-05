@@ -1,11 +1,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Search, Pin, Trash2, Columns2, Clock, Bot, MessageSquare, Globe, Zap, ArrowUpCircle, Download, Pencil, Link, Plus, ChevronDown } from 'lucide-react';
+import { X, Search, Pin, Trash2, Columns2, Clock, Bot, MessageSquare, Zap, Download, Pencil, Link, Plus, ChevronDown } from 'lucide-react';
 import type { Session } from '../types';
 import { useT } from '../hooks/useLocale';
 import { SessionIcon } from './SessionIcon';
 import { sessionDisplayName, extractAgentIdFromKey } from '../lib/sessionName';
 import { relativeTime } from '../lib/relativeTime';
-import { useUpdateCheck } from '../hooks/useUpdateCheck';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import {
   FILTER_KEY, AGENT_FILTER_KEY,
@@ -18,27 +17,7 @@ import {
 import { copyToClipboard } from '../lib/clipboard';
 
 function VersionBadge() {
-  const update = useUpdateCheck(__APP_VERSION__);
-  if (update.available) {
-    return (
-      <span className="ml-1 inline-flex items-center gap-1.5 text-[9px]">
-        <span className="text-pc-text-faint select-all">v{__APP_VERSION__}</span>
-        <a
-          href={update.releaseUrl || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/25 transition-colors"
-          title={`Update available: v${update.latestVersion}`}
-        >
-          <ArrowUpCircle size={10} />
-          <span>{update.latestVersion} available</span>
-        </a>
-      </span>
-    );
-  }
-  return (
-    <span className="ml-1 text-[9px] text-pc-text-faint select-all" title={`PinchChat v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
-  );
+  return <span className="ml-1 text-[9px] text-pc-text-faint select-all">v{__APP_VERSION__}</span>;
 }
 
 function SidebarFooter() {
@@ -56,16 +35,6 @@ function SidebarFooter() {
           <span>Install</span>
         </button>
       )}
-      <a
-        href="https://github.com/MarlBurroW/pinchchat"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-pc-text-faint hover:text-pc-text-secondary transition-colors"
-        title="GitHub"
-        aria-label="GitHub repository"
-      >
-        <Globe size={11} />
-      </a>
       <VersionBadge />
     </div>
   );
@@ -374,7 +343,7 @@ export function Sidebar({ sessions, agents = [], activeSession, onSwitch, onDele
             <div className="relative shrink-0">
               <div className="absolute -inset-1.5 rounded-xl bg-gradient-to-r from-cyan-400/15 to-violet-500/15 blur-lg" />
               <div className="relative flex h-8 w-8 items-center justify-center rounded-xl overflow-hidden">
-                <img src="/logo.png" alt="PinchChat" className="h-8 w-8 object-contain" />
+                <img src="/logo.png" alt="Chat" className="h-8 w-8 object-contain" />
               </div>
             </div>
             <span className="font-semibold text-sm text-pc-text tracking-wide truncate">{t('sidebar.title')}</span>

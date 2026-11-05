@@ -63,7 +63,7 @@ export function Header({ status, sessionKey, onToggleSidebar, activeSessionData,
         <Menu size={20} />
       </button>
       <div className="flex items-center gap-3 flex-1 min-w-0 relative" ref={sessionInfoRef}>
-        <img src={agentAvatarUrl || '/logo.png'} alt="PinchChat" className="h-9 w-9 rounded-2xl object-cover" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src !== window.location.origin + '/logo.png') { img.src = '/logo.png'; } else { img.style.display = 'none'; } }} />
+        <img src={agentAvatarUrl || '/logo.png'} alt="Chat" className="h-9 w-9 rounded-2xl object-cover" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src !== window.location.origin + '/logo.png') { img.src = '/logo.png'; } else { img.style.display = 'none'; } }} />
         <button className="min-w-0 text-left group" onClick={() => setShowSessionInfo(v => !v)} title={t('header.sessionInfo')} aria-label={t('header.sessionInfo')}>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-pc-text text-sm tracking-wide">{headerAgentName}</span>

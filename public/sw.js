@@ -1,4 +1,4 @@
-// PinchChat Service Worker — cache static assets for offline/instant load
+// Service worker — cache static assets for offline/instant load
 // App files: one cache per build. scripts/stamp-sw.mjs replaces the
 // placeholder after `vite build` with a hash of the built index.html, so each
 // deploy gets a fresh cache and old ones are deleted on activate.
@@ -58,7 +58,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Files whose names never change (the manifest, the app's icons): network first, the cache only
-  // offline. Served stale they kept the old name and icon after a change (the PinchChat lobster on
+  // offline. Served stale they kept the old name and icon after a change (the old icon on
   // chat.stuparu.eu, 2026-10-24); hashed build files below can stay cache-first.
   if (/^\/(manifest\.json|logo[^/]*\.png|favicon[^/]*\.png|apple-touch-icon\.png|shortcuts\/.+\.png)$/.test(url.pathname)) {
     event.respondWith(

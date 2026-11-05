@@ -353,7 +353,7 @@ export function SettingsModal({ open, onClose, soundEnabled, onToggleSound }: Pr
                   {t('settings.previewText')}
                 </div>
                 <div className="rounded-xl border border-dashed border-pc-border p-2 bg-[var(--pc-bg-code)] text-[13px]" style={{ fontFamily: 'var(--pc-font-mono)', fontSize: 'var(--pc-font-size-mono)' }}>
-                  const hello = 'PinchChat'; // typography preview
+                  const hello = 'Chat'; // typography preview
                 </div>
                 <div className="text-[11px] text-pc-text-faint mt-2 text-center">{t('settings.fontNote')}</div>
               </div>

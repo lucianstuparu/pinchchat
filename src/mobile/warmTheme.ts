@@ -2,7 +2,7 @@
  * The messenger's own palette: warm light (parchment, warm browns, terracotta accent).
  *
  * Applied as CSS custom properties on the messenger's root element, so it overrides the shared
- * PinchChat theme for the messenger only; the full UI ("Advanced") keeps the user's theme.
+ * Chat theme for the messenger only; the full UI ("Advanced") keeps the user's theme.
  */
 import { useEffect, type CSSProperties } from 'react';
 

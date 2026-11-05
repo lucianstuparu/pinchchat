@@ -152,7 +152,7 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
           </button>
           <button type="button" onClick={() => onView('full')} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
             <Icon bg="#8e8e93"><Monitor size={16} /></Icon>
-            <span className="flex-1 text-[16px]">Full PinchChat (advanced)</span>
+            <span className="flex-1 text-[16px]">Full view (advanced)</span>
             <ChevronRight size={17} className="text-pc-text-faint" />
           </button>
         </Group>}

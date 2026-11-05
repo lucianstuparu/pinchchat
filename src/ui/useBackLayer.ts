@@ -52,7 +52,7 @@ export function useBackLayer(open: boolean, onClose: () => void) {
 
 /**
  * oc and Shopping size everything in rem (Tailwind): pin the root to 16 px so the my.design sizes are
- * exact (40 / 48 / 56). The classic PinchChat views set it to their own font-size setting (15 px).
+ * exact (40 / 48 / 56). The classic Chat views set it to their own font-size setting (15 px).
  */
 export function useExactSizes() {
   useEffect(() => {

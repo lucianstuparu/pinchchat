@@ -217,7 +217,7 @@ export function useGateway() {
       const identity = await getOrCreateDeviceIdentity();
       client.setDeviceIdentity(identity);
     } catch (err) {
-      console.warn('[PinchChat] Failed to load device identity, connecting without it:', err);
+      console.warn('[Chat] Failed to load device identity, connecting without it:', err);
     }
 
     client.onConnectError((gatewayMsg) => {

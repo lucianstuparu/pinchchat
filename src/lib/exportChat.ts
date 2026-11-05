@@ -11,7 +11,7 @@ export function messagesToMarkdown(messages: ChatMessage[], sessionLabel?: strin
   }
 
   const exportDate = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
-  lines.push(`> Exported from PinchChat on ${exportDate}`, '');
+  lines.push(`> Exported from Chat on ${exportDate}`, '');
 
   for (const msg of messages) {
     const time = new Date(msg.timestamp).toLocaleString('en-US', {

@@ -22,7 +22,7 @@ describe('messagesToMarkdown', () => {
 
   it('includes export timestamp', () => {
     const md = messagesToMarkdown([]);
-    expect(md).toContain('Exported from PinchChat on');
+    expect(md).toContain('Exported from Chat on');
   });
 
   it('labels user messages with 👤 User', () => {

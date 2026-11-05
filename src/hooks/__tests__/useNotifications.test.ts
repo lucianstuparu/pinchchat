@@ -128,16 +128,16 @@ describe('useNotifications', () => {
 describe('setBaseTitle', () => {
   it('sets document title with session label', () => {
     setBaseTitle('My Chat');
-    expect(document.title).toBe('My Chat — PinchChat');
+    expect(document.title).toBe('My Chat — Chat');
   });
 
   it('sets document title to app name when no label', () => {
     setBaseTitle();
-    expect(document.title).toBe('PinchChat');
+    expect(document.title).toBe('Chat');
   });
 
   it('sets document title to app name with undefined', () => {
     setBaseTitle(undefined);
-    expect(document.title).toBe('PinchChat');
+    expect(document.title).toBe('Chat');
   });
 });

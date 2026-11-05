@@ -1,11 +1,11 @@
 /** The two faces of the chat: ME (the person) and the agent's mark. Inline SVG, theme colours. */
 import { getUiMode } from '../mobile/uiMode';
 
-/** oc v2's coach: a disc with a dot; while it thinks the dot breathes (index.css), and stops with the first token. */
-export function CoachMark({ thinking }: { thinking?: boolean }) {
+/** The coach, and oc's icon (tools/oc-icons.py): a disc with a dot; while it thinks the dot breathes (index.css), and stops with the first token. */
+export function CoachMark({ thinking, className = 'h-6 w-6' }: { thinking?: boolean; className?: string }) {
   return (
-    <span role="img" aria-label={thinking ? 'The coach is thinking' : 'Coach'} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f72585]">
-      <span className={`block h-[9px] w-[9px] rounded-full bg-white ${thinking ? 'coach-breathe' : ''}`} />
+    <span role="img" aria-label={thinking ? 'The coach is thinking' : 'Coach'} className={`inline-flex ${className} shrink-0 items-center justify-center rounded-full bg-[#f72585]`}>
+      <span className={`block aspect-square w-[37.5%] rounded-full bg-white ${thinking ? 'coach-breathe' : ''}`} />
     </span>
   );
 }
@@ -28,9 +28,8 @@ export function MeAvatar({ className = 'h-7 w-7', name }: { className?: string; 
 }
 
 export function AgentAvatar({ className = 'h-7 w-7', thinking }: { className?: string; thinking?: boolean }) {
-  if (getUiMode() === 'v2') return <CoachMark thinking={thinking} />;
-  // Casa Artlia's assistant: the icon's house on the accent's pair (pink), never the chat app's orange face
-  // (Lucian 2026-10-25: it read like his own coral "ME").
+  // Casa Artlia's assistant: the icon's house on the accent's pair (pink), never the chat app's mark
+  // (Lucian 2026-10-25: it read like his own "ME").
   if (import.meta.env.VITE_APP === 'artlia') return (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Asistent" role="img">
       <circle cx="16" cy="16" r="16" fill="var(--pc-pair)" />
@@ -46,16 +45,8 @@ export function AgentAvatar({ className = 'h-7 w-7', thinking }: { className?: s
       <path d="M5.8 24.5c.6-4.2 3-6.6 5.7-6.6s5.1 2.4 5.7 6.6zM15.4 24.5c.5-3.4 2.6-5.4 5.1-5.4s4.6 2 5.1 5.4z" fill="#fff" />
     </svg>
   );
-  // The assistant's face, as in the app icon (a smiling bubble on a sunrise gradient, Lucian 2026-10-24).
-  return (
-    <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Assistant" role="img">
-      <defs><linearGradient id="agent-sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ec7040" /><stop offset="1" stopColor="#cc4a32" /></linearGradient></defs>
-      <circle cx="16" cy="16" r="16" fill="url(#agent-sun)" />
-      <circle cx="11.5" cy="13" r="2" fill="#fff" />
-      <circle cx="20.5" cy="13" r="2" fill="#fff" />
-      <path d="M10.5 18.5 Q16 24 21.5 18.5" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-    </svg>
-  );
+  // Lucian 2026-11-05: "Replace the smiley everywhere". v2's 24 px; v1's rows keep their own width.
+  return <CoachMark thinking={thinking} className={getUiMode() === 'v2' ? 'h-6 w-6' : className} />;
 }
 
 /** Another person in a shared chat (Casa Artlia): their initial on a neutral disc. */

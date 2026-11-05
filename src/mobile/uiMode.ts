@@ -1,6 +1,6 @@
 /**
  * Chooses between the desk (src/app, the default since 2026-10-21), the older
- * messenger-style mobile UI (src/mobile) and the full upstream PinchChat UI.
+ * messenger-style mobile UI (src/mobile) and the full upstream Chat UI.
  *
  * Precedence: ?view=app|mobile|full in the URL (persisted) > stored choice >
  * VITE_DEFAULT_UI build setting > 'full' (upstream behaviour).

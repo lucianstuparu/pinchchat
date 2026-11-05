@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[PinchChat] Render error caught by ErrorBoundary:', error, info.componentStack);
+    console.error('[Chat] Render error caught by ErrorBoundary:', error, info.componentStack);
   }
 
   handleRetry = () => {

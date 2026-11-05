@@ -151,7 +151,7 @@ export default function App() {
       const last = messages[messages.length - 1];
       if (last && last.role === 'assistant' && !last.isStreaming) {
         const preview = last.content?.slice(0, 100) || 'New message';
-        notify('PinchChat', preview);
+        notify('Chat', preview);
       }
     }
   }, [messages, notify]);
@@ -209,7 +209,7 @@ export default function App() {
 
   return (
     <ToolCollapseProvider>
-    <div className="h-dvh flex overflow-x-hidden bg-[var(--pc-bg-base)] text-pc-text" style={{ backgroundImage: 'var(--pc-bg-gradient)' }} role="application" aria-label="PinchChat">
+    <div className="h-dvh flex overflow-x-hidden bg-[var(--pc-bg-base)] text-pc-text" style={{ backgroundImage: 'var(--pc-bg-gradient)' }} role="application" aria-label="Chat">
       <a href="#chat-input" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-pc-accent focus:text-white focus:text-sm focus:font-medium">{t('app.skipToChat')}</a>
       <Sidebar
         sessions={sessions}
