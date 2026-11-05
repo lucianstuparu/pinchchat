@@ -4,8 +4,8 @@
  */
 export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 
-/** What a thing looks like (src/kit2/ObjectFace): an object and/or a logo; initials on a colour until then. */
-export interface Face { logo?: string; object?: string; letters: string; color: string; name?: string }
+/** What a thing looks like (src/kit2/ObjectFace): a logo, a drawing, or a drawing with the logo on it. */
+export interface Face { logo?: string; object?: string; drawing?: string; name?: string }
 
 export interface NowItem {
   id: string;

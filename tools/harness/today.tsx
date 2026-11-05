@@ -15,7 +15,7 @@ const mode = q.get('theme') === 'dark' ? 'dark' : 'light';
 const state = q.get('state') ?? 'full';
 const today = new Date().toISOString().slice(0, 10);
 const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
-const face = (letters: string, color: string, name: string, object?: string): Face => ({ letters, color, name, ...(object ? { object } : {}) });
+const face = (_letters: string, _color: string, name: string, object?: string): Face => ({ name, object: object ?? 'doc' });
 let id = 0;
 const item = (o: Partial<NowItem>): NowItem => ({ id: `tsk-2026-11-05-${String(++id).padStart(6, '0')}`, title: '', kind: 'task', store: 'tasks', scope: 'shared', status: 'todo', priority: 'P3', weight: 1, section: 'later', ...o });
 const full: TodayData = {
