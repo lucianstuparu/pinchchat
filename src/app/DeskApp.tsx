@@ -408,6 +408,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const WINDOW = 60;
   const [windowSize, setWindowSize] = useState(WINDOW * 2);
   const [loadingAll, setLoadingAll] = useState(false);
+  const dupesRef = useRef<Map<string, Set<string>>>(new Map());
   const visible = shown.length > windowSize ? shown.slice(-windowSize) : shown;
   // oc v2: one change, one card (todayRules), and a coach's line that only repeated it goes altogether.
   const repeated = useMemo(() => {
@@ -513,7 +514,6 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     setConvOpen(false); setLit(id);
     window.setTimeout(() => setLit(l => (l === id ? null : l)), 2000);
   }, []);
-  const dupesRef = useRef<Map<string, Set<string>>>(new Map());
   const nowRef = useRef(now.items); nowRef.current = now.items;
   const renderNote = useCallback((note: ClaudeNote, itemId?: string) => (
     <NoteCard note={note} itemId={itemId} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} />
