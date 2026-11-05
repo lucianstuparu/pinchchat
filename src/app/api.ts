@@ -4,6 +4,9 @@
  */
 export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 
+/** What a thing looks like (src/kit2/ObjectFace): an object and/or a logo; initials on a colour until then. */
+export interface Face { logo?: string; object?: string; letters: string; color: string; name?: string }
+
 export interface NowItem {
   id: string;
   /** The short number, household-wide ("22 done"). */
@@ -19,6 +22,11 @@ export interface NowItem {
   focus?: string;
   rank?: number;
   title: string;
+  /** oc v2: four words at most; the title stays the full one. */
+  glance_title?: string;
+  face?: Face;
+  /** oc v2: in Passing by because its payee is marked automatic. */
+  automatic?: boolean;
   kind: string;
   store: 'admin' | 'tasks' | 'loops' | 'shopping' | 'pantry';
   scope: 'private' | 'shared';
@@ -67,7 +75,7 @@ export interface Sheet {
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
 }
 
-export type ItemAction = 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order' | 'went-wrong';
+export type ItemAction = 'crucial' | 'tile-move' | 'day-undo' | 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order' | 'went-wrong';
 
 export class SessionExpired extends Error {}
 
@@ -88,6 +96,16 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
 export const transcribeAudio = (audio: { content: string; mimeType: string }) =>
   post<{ text: string; lang: string | null }>('/reg/transcribe', { audio: audio.content, mimeType: audio.mimeType }).then(r => r.text);
 export const fetchNow = () => post<{ today: string; items: NowItem[]; watch?: Watching; done?: NowItem[] }>('/reg/now', {});
+/** oc v2: what Today shows (register-api /reg/today). */
+export interface TodayData {
+  today: string; last_open: string | null;
+  day: { date: string; crucial: string[]; picked?: string[]; closed_at?: string; in_the_way?: string };
+  crucial: NowItem[]; todo: NowItem[]; passing_by: NowItem[]; later_count: number;
+}
+export const fetchToday = () => post<TodayData>('/reg/today', {});
+export interface Payee { key: string; name: string; count: number; amount?: number; currency?: string; auto: boolean }
+export const fetchPayees = () => post<{ payees: Payee[] }>('/reg/payees', {}).then(r => r.payees);
+export const setPayee = (payee: string, auto: boolean) => post<{ ok: boolean; was: boolean }>('/reg/payees/act', { payee, auto });
 export const fetchLoops = () => post<{ today: string; loops: Loop[] }>('/reg/loops', {});
 export const fetchSheet = (item: string) => post<Sheet>('/reg/item', { item });
 export const fetchStates = (items: string[]) => post<{ items: Record<string, Partial<NowItem>>; today: string }>('/reg/status', { items });

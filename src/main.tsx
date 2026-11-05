@@ -65,7 +65,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Suspense fallback={null}><WaApp /></Suspense>
       ) : (
         <ThemeProvider>
-          {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' ? <DeskApp /> : <App />}
+          {getUiMode() === 'mobile' ? <MobileApp /> : getUiMode() === 'app' || getUiMode() === 'v2' ? <DeskApp /> : <App />}
         </ThemeProvider>
       )}
     </ErrorBoundary>

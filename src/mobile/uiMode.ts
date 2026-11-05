@@ -9,13 +9,13 @@
  * /?ui=mobile and the old choice was stored under pinchchat:ui, which kept phones on
  * the older messenger after the desk became the default. Both are now ignored.
  */
-export type UiMode = 'mobile' | 'app' | 'full';
+export type UiMode = 'mobile' | 'app' | 'full' | 'v2';
 
 const STORAGE_KEY = 'pinchchat:view';
 const PARAM = 'view';
 
 function isUiMode(v: unknown): v is UiMode {
-  return v === 'mobile' || v === 'app' || v === 'full';
+  return v === 'mobile' || v === 'app' || v === 'full' || v === 'v2';
 }
 
 export function getUiMode(): UiMode {

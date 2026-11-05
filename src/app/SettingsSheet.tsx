@@ -16,7 +16,11 @@ interface Props {
   push?: PushState | 'busy';
   onTogglePush?: () => void;
   /** Omit to hide "Other views" (an app without them). */
-  onView?: (v: 'mobile' | 'full') => void;
+  onView?: (v: 'mobile' | 'full' | 'app' | 'v2') => void;
+  /** oc: "Bills that pay themselves". */
+  onPayees?: () => void;
+  /** oc v2 is on: the switch back to the current version. */
+  v2?: boolean;
   /** Hide the colour choice (an app with a fixed colour, e.g. Shopping in Keep yellow). */
   fixedAccent?: boolean;
   /** Omit to hide "Mail rules" (an app without them). */
@@ -43,7 +47,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   return <SharedSegmented size="s" choice label={label} value={value} onChange={onChange} options={options.map(([v, labelText, icon]) => ({ value: v, label: labelText, icon }))} />;
 }
 
-export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onRules, onHistory, onView, onLogout, onClose, children, fixedAccent }: Props) {
+export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, onRules, onHistory, onView, onPayees, v2, onLogout, onClose, children, fixedAccent }: Props) {
   const [speech, setSpeech] = useState<SpeechMode>(getSpeechMode);
   const [lang, setLang] = useState(getDictationLang);
   const name = person ? person[0].toUpperCase() + person.slice(1) : 'You';
@@ -132,7 +136,15 @@ export function SettingsSheet({ person, mode, look, onLook, push, onTogglePush, 
 
         {children}
 
+        {onPayees && <Group title="Bills">
+          <button type="button" onClick={onPayees} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+            <span className="min-w-0 flex-1 text-[16px]">Bills that pay themselves</span>
+          </button>
+        </Group>}
         {onView && <Group title="Other views">
+          <button type="button" onClick={() => onView(v2 ? 'app' : 'v2')} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+            <span className="min-w-0 flex-1 text-[16px]">{v2 ? 'Back to the current version' : 'Try the new Today'}</span>
+          </button>
           <button type="button" onClick={() => onView('mobile')} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
             <Icon bg="#8e8e93"><MessageCircle size={16} /></Icon>
             <span className="flex-1 text-[16px]">Classic messenger</span>

@@ -13,7 +13,7 @@
 import { dropRepeatedFailures, failedTurn } from '../mobile/notice';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, Bell, CalendarClock, History, ShoppingCart, ChevronRight, Copy, Languages, ListChecks, Lightbulb, MessageSquare, Search, StickyNote, X, type LucideIcon } from 'lucide-react';
-import { getLook, lookVars, setLook, useMode, useThemeChrome, type Look } from './themes';
+import { getLook, getLookV2, lookVars, setLook, setLookV2, useMode, useThemeChrome, type Look } from './themes';
 import { useGateway } from '../hooks/useGateway';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
 import { LoginScreen } from '../components/LoginScreen';
@@ -24,7 +24,7 @@ import { collapseCliTurns, isShownInMessenger, visibleText, withoutLeadingQuote 
 import { Composer, type ComposerPrefill, type Intent } from '../mobile/Composer';
 import { QuestionCard } from '../mobile/QuestionCard';
 import { useQuestions } from '../mobile/useQuestions';
-import { switchUiMode } from '../mobile/uiMode';
+import { getUiMode, switchUiMode } from '../mobile/uiMode';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { KeepNote } from '../notes/KeepNote';
@@ -34,7 +34,7 @@ import { useDeepSearch } from '../ui/useDeepSearch';
 import { AskRow, Marked, SearchGroup, SearchRow, SearchingLine } from '../ui/SearchParts';
 import { loadedMatch, markedParts, plainOf, wordParts } from '../ui/searchText';
 import { useDelayedFlag } from '../ui/progress';
-import { act, fetchLoops, fetchNow, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem, type Watching } from './api';
+import { act, fetchLoops, fetchNow, fetchToday, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem, type TodayData, type Watching } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { opsFor, type Move } from '../ui/dragRules';
@@ -43,6 +43,8 @@ import { ItemChips } from './ItemChips';
 import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
 import { RulesSheet } from './RulesSheet';
+import { PayeesSheet } from './PayeesSheet';
+import { TileMenu, TodayV2 } from './TodayV2';
 import { NotificationsSheet } from './NotificationsSheet';
 import { UndoBar, type UndoInfo } from './UndoBar';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
@@ -83,14 +85,15 @@ const QUICK: Array<{ key: string; label: string; icon: LucideIcon; prefix: strin
 const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { background: `${t.rail}33`, color: t.inkDark } : { background: t.bg, color: t.ink });
 
 export default function DeskApp() {
-  const [look, setLookState] = useState<Look>(getLook);
+  const v2 = getUiMode() === 'v2';
+  const [look, setLookState] = useState<Look>(v2 ? getLookV2 : getLook);
   useExactSizes();
   const mode = useMode(look.appearance);
   useThemeChrome(mode);
   const gw = useGateway();
   const savedLogin = getStoredCredentials() !== null;
   const networkOnly = !gw.connectError || gw.connectError.startsWith('Connection failed');
-  const chooseLook = (l: Look) => { setLook(l); setLookState(l); };
+  const chooseLook = (l: Look) => { (v2 ? setLookV2 : setLook)(l); setLookState(l); };
   return (
     <div style={lookVars(mode, look.accent)} className="h-dvh bg-pc-base text-pc-text antialiased">
       {!gw.authenticated && !(savedLogin && networkOnly)
@@ -167,15 +170,21 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [hint, setHint] = useState<string | null>(() => (pendingShareId() === 'failed' ? 'Could not read the shared content.' : null));
   const [refreshing, setRefreshing] = useState(false);
+  const v2 = getUiMode() === 'v2';
+  const [today, setToday] = useState<TodayData | null>(null);
+  const [convOpen, setConvOpen] = useState(false);
+  const [menuFor, setMenuFor] = useState<NowItem | null>(null);
+  const [payeesOpen, setPayeesOpen] = useState(false);
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [n, l] = await Promise.all([fetchNow(), fetchLoops()]);
+      const [n, l, d] = await Promise.all([fetchNow(), fetchLoops(), v2 ? fetchToday() : Promise.resolve(null)]);
       setNow(n); setLoops(l.loops); setExpired(false); setLoaded(true);
+      if (d) setToday(d);
     } catch (e) {
       if (e instanceof SessionExpired) setExpired(true);
     } finally { setRefreshing(false); }
-  }, []);
+  }, [v2]);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
@@ -208,6 +217,33 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const priority = item.priority === 'P1' ? 'P3' : 'P1';
     setNow(n => ({ ...n, items: n.items.map(i => (i.id === item.id ? { ...i, priority } : i)) }));
     try { await act(item.id, 'priority', { priority }); offerUndo(item.id, `${priority === 'P1' ? 'Priority' : 'No longer a priority'}: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
+  };
+
+  // ---- oc v2: Today's actions. Optimistic like To do; the server's answer then replaces it.
+  const withoutTile = (id: string) => setToday(d => (d ? { ...d, crucial: d.crucial.filter(i => i.id !== id), todo: d.todo.filter(i => i.id !== id) } : d));
+  const tileDone = async (item: NowItem) => {
+    withoutTile(item.id);
+    try { await act(item.id, 'done'); offerUndo(item.id, `Done: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
+  };
+  const dropTile = async (item: NowItem) => {
+    withoutTile(item.id);
+    try { await act(item.id, 'drop'); offerUndo(item.id, `Not needed: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
+  };
+  const dayUndo = (id: string, label: string) => setUndo({ key: Date.now(), label, undo: () => { void act(id, 'day-undo').catch(e => setHint(e instanceof Error ? e.message : 'Could not undo')).finally(() => void refresh()); } });
+  const setCrucial = async (item: NowItem, on: boolean, replace?: string) => {
+    await act(item.id, 'crucial', { on, ...(replace ? { replace } : {}) });
+    dayUndo(item.id, `${on ? 'Crucial' : 'Not crucial'}: ${short(item)}`);
+    void refresh();
+  };
+  const moveTile = async (item: NowItem, to: number) => {
+    setToday(d => { if (!d) return d; const rest = d.todo.filter(i => i.id !== item.id); rest.splice(to, 0, item); return { ...d, todo: rest }; });
+    try { await act(item.id, 'tile-move', { to }); dayUndo(item.id, `Moved: ${short(item)}`); }
     catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
@@ -495,6 +531,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   // The phone's Back (the edge swipes, which the system owns) closes To do, as any top layer
   // (ui/useBackLayer.ts); on the chat Back leaves the app.
   useBackLayer(todoOpen, () => setTodoOpen(false));
+  useBackLayer(v2 && convOpen && !wide, () => setConvOpen(false));
+  useEffect(() => { if (v2 && convOpen) scrollToBottom(); }, [v2, convOpen]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const panel = (onClose?: () => void) => (
     <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} watch={now.watch} done={now.done} loops={loops} today={now.today}
@@ -662,6 +700,96 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   );
 
 
+  const noticeCard = notice ? (
+            <div className="mx-3 mt-2 flex items-start gap-3 rounded-[12px] border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
+              <Bell size={18} className="mt-0.5 shrink-0 text-pc-accent" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold leading-snug">{notice.title}</p>
+                {notice.body && <p className="mt-0.5 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-secondary">{notice.body}</p>}
+                <p className="mt-1 text-[12px] text-pc-text-muted">
+                  Notification · {new Date(notice.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  {notice.item && <> · <button type="button" onClick={() => { setSheet(notice.item!); dismissNotice(); }} className="font-medium text-pc-accent">Open it</button></>}
+                </p>
+              </div>
+              <button type="button" onClick={dismissNotice} className="-m-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Dismiss"><X size={16} /></button>
+            </div>
+  ) : null;
+
+  const layers = (
+    <>
+      {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
+        onActed={(id, action, title, later) => {
+          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: later ?? 'Put off', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
+          if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
+        }} />}
+      {settings && (
+        <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
+          onRules={() => { setSettings(false); setRulesOpen(true); }}
+          onHistory={() => { setSettings(false); setHistoryOpen(true); }}
+          onView={v => switchUiMode(v)} v2={v2} onPayees={() => { setSettings(false); setPayeesOpen(true); }} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />
+      )}
+      {rulesOpen && <RulesSheet mode={mode} onClose={() => setRulesOpen(false)} />}
+      {keeping && <KeepNote base="/reg" shared={keeping} onKept={kept} onChat={toChat} onClose={() => setKeeping(null)} />}
+      {historyOpen && <NotificationsSheet mode={mode} highlight={notice?.title}
+        onOpenItem={id => { setHistoryOpen(false); dismissNotice(); setSheet(id); }}
+        onOpenTodo={() => { setHistoryOpen(false); dismissNotice(); setTab('todo'); setTodoOpen(true); }}
+        onClose={() => { setHistoryOpen(false); dismissNotice(); }} />}
+      {payeesOpen && <PayeesSheet onClose={() => setPayeesOpen(false)} onChanged={() => void refresh()} />}
+      {menuFor && today && (
+        <TileMenu item={menuFor} isCrucial={today.day.crucial.includes(menuFor.id)} crucial={today.crucial}
+          position={today.todo.findIndex(i => i.id === menuFor.id)} count={today.todo.length} onClose={() => setMenuFor(null)}
+          onCrucial={(on, replace) => setCrucial(menuFor, on, replace)} onMove={to => void moveTile(menuFor, to)}
+          onLater={() => setSheet(menuFor.id)} onOpen={() => setSheet(menuFor.id)} onDrop={() => void dropTile(menuFor)} />
+      )}
+    </>
+  );
+
+  // ---- oc v2: Today, with the conversation growing above the one composer (my.design v2/oc-v2-brief.md §6).
+  if (v2) {
+    const open = wide || convOpen;
+    const todayScreen = (
+      <TodayV2 data={today} mode={mode} expired={expired && !today} initial={name ? name[0] : undefined} notice={noticeCard && <div className="pb-1">{noticeCard}</div>}
+        onEverything={() => { setTab('todo'); setTodoOpen(true); }} onSettings={() => setSettings(true)}
+        onDone={i => void tileDone(i)} onOpen={i => setSheet(i.id)} onMenu={setMenuFor} />
+    );
+    return (
+      <div className="relative flex h-dvh flex-col overflow-hidden">
+        {statusLine && <div className="flex h-6 shrink-0 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
+        <div className="relative flex min-h-0 flex-1">
+          <div className={wide ? 'w-[520px] shrink-0 border-r border-pc-border' : 'min-w-0 flex-1'}>{todayScreen}</div>
+          <section aria-label="Conversation" inert={!open}
+            className={wide ? 'relative flex min-w-0 flex-1 flex-col bg-pc-base' : 'absolute inset-x-0 bottom-0 top-16 z-20 flex flex-col rounded-t-[20px] bg-pc-base shadow-[0_-8px_24px_rgba(0,0,0,0.18)] transition-transform duration-300'}
+            style={wide ? undefined : { transform: open ? 'none' : 'translateY(calc(100% + 24px))' }}>
+            {search !== null
+              ? <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Search to-dos and messages" />
+              : (
+                <div className="flex h-12 shrink-0 items-center pl-4 pr-1">
+                  <h2 className="min-w-0 flex-1 text-[15px] font-semibold">Conversation</h2>
+                  <IconButton label="Search" onClick={() => setSearch('')}><Search size={20} /></IconButton>
+                  {!wide && <IconButton label="Back to Today" onClick={() => setConvOpen(false)}><X size={22} /></IconButton>}
+                </div>
+              )}
+            <main ref={scrollRef} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              {search !== null ? searchResults : <div className="space-y-1 pt-1 md:px-2">{chat}</div>}
+            </main>
+          </section>
+        </div>
+        {search === null && (
+          <div className="relative z-30 shrink-0 border-t border-pc-border bg-pc-base"
+            onFocusCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}>
+            {!sheet && !todoOpen && undoBar}
+            <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={(text, files) => { setConvOpen(true); send(text, files); }} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Say or type it" />
+          </div>
+        )}
+        <div className="fixed inset-0 z-40 shadow-2xl" role="dialog" aria-modal="true" aria-label="Everything" inert={!todoOpen}
+          style={{ transform: todoOpen ? 'none' : 'translateX(calc(-100% - 24px))', transition: 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+          {panel(() => setTodoOpen(false))}
+        </div>
+        {layers}
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border bg-[color-mix(in_srgb,var(--pc-bg-base)_88%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl">
@@ -684,20 +812,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       <div className="flex min-h-0 flex-1 md:flex-row">
         {wide && <aside className="flex w-[420px] shrink-0 flex-col border-r border-pc-border">{panel()}</aside>}
         <div className="relative flex min-w-0 flex-1 flex-col">
-          {search === null && notice && (
-            <div className="mx-3 mt-2 flex items-start gap-3 rounded-[12px] border border-[rgba(var(--pc-accent-rgb),0.35)] bg-[rgba(var(--pc-accent-rgb),0.08)] px-3.5 py-3" role="status" aria-label="Notification">
-              <Bell size={18} className="mt-0.5 shrink-0 text-pc-accent" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold leading-snug">{notice.title}</p>
-                {notice.body && <p className="mt-0.5 whitespace-pre-wrap text-[15px] leading-snug text-pc-text-secondary">{notice.body}</p>}
-                <p className="mt-1 text-[12px] text-pc-text-muted">
-                  Notification · {new Date(notice.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                  {notice.item && <> · <button type="button" onClick={() => { setSheet(notice.item!); dismissNotice(); }} className="font-medium text-pc-accent">Open it</button></>}
-                </p>
-              </div>
-              <button type="button" onClick={dismissNotice} className="-m-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-pc-text-muted active:bg-[var(--pc-hover-strong)]" aria-label="Dismiss"><X size={16} /></button>
-            </div>
-          )}
+          {search === null && notice && noticeCard}
           {search === null && pinnedBar}
           <main ref={scrollRef} onScroll={onScroll} onTouchStart={swipeStart('chat')} onTouchMove={swipeMove} onTouchEnd={swipeEnd} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2" role="log" aria-live="polite">
             {search !== null ? searchResults : <div className="space-y-1 pt-1 md:px-2">{chat}</div>}
@@ -735,23 +850,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         </div>
       )}
 
-      {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
-        onActed={(id, action, title, later) => {
-          const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: later ?? 'Put off', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
-          if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
-        }} />}
-      {settings && (
-        <SettingsSheet person={person} mode={mode} look={look} onLook={onLook} push={pushState} onTogglePush={() => void togglePush()}
-          onRules={() => { setSettings(false); setRulesOpen(true); }}
-          onHistory={() => { setSettings(false); setHistoryOpen(true); }}
-          onView={v => switchUiMode(v)} onLogout={() => { setSettings(false); logout(); }} onClose={() => setSettings(false)} />
-      )}
-      {rulesOpen && <RulesSheet mode={mode} onClose={() => setRulesOpen(false)} />}
-      {keeping && <KeepNote base="/reg" shared={keeping} onKept={kept} onChat={toChat} onClose={() => setKeeping(null)} />}
-      {historyOpen && <NotificationsSheet mode={mode} highlight={notice?.title}
-        onOpenItem={id => { setHistoryOpen(false); dismissNotice(); setSheet(id); }}
-        onOpenTodo={() => { setHistoryOpen(false); dismissNotice(); setTab('todo'); setTodoOpen(true); }}
-        onClose={() => { setHistoryOpen(false); dismissNotice(); }} />}
+      {layers}
     </div>
   );
 }

@@ -9,11 +9,13 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 
 export type Appearance = 'auto' | 'light' | 'dark';
-export type Accent = 'terracotta' | 'teal' | 'azure' | 'green' | 'blue' | 'graphite' | 'keep' | 'signal';
+export type Accent = 'pink' | 'terracotta' | 'teal' | 'azure' | 'green' | 'blue' | 'graphite' | 'keep' | 'signal';
 export interface Look { appearance: Appearance; accent: Accent }
 
 /** Accent per mode (dark needs lighter tones), and the agent's colour that goes with it. */
-export const ACCENTS: Record<Accent, { name: string; light: string; dark: string; pairLight: string; pairDark: string; ink?: [string, string]; on?: string }> = {
+export const ACCENTS: Record<Accent, { name: string; light: string; dark: string; pairLight: string; pairDark: string; ink?: [string, string]; on?: string; tint?: [string, string] }> = {
+  // oc v2's accent (my.design v2/oc-v2-brief.md §8.1). White text on it is only 3.78:1, so text buttons use the deep ink as their fill.
+  pink:       { name: 'Pink',       light: '#f72585', dark: '#ff4d9d', pairLight: '#5f6368', pairDark: '#9aa0a6', ink: ['#b5179e', '#ff8cc4'], tint: ['#ffe3ef', 'rgba(255,77,157,0.18)'] },
   terracotta: { name: 'Terracotta', light: '#c2593a', dark: '#e07a58', pairLight: '#2f6b55', pairDark: '#5aa889' },
   // The life-manager artifact's colour (Lucian, 2026-10-24: offered beside terracotta, not the default).
   teal:       { name: 'Teal',       light: '#0e9488', dark: '#2bb3a6', pairLight: '#c2593a', pairDark: '#e07a58', ink: ['#0b7268', '#5fd3c6'] },
@@ -53,8 +55,10 @@ function vars(mode: 'light' | 'dark', accent: Accent): Record<string, string> {
     '--pc-scrollbar-thumb': n.faint, '--pc-scrollbar-track': n.base, '--pc-scrollbar-thumb-hover': n.muted,
     '--pc-hover': `rgba(${n.hoverRgb},0.05)`, '--pc-hover-strong': `rgba(${n.hoverRgb},0.09)`, '--pc-separator': n.border, '--pc-bg-gradient': 'none',
     '--pc-accent': acc, '--pc-accent-light': acc, '--pc-accent-dim': `rgba(${accRgb},0.3)`,
-    '--pc-accent-glow': `rgba(${accRgb},0.1)`, '--pc-accent-rgb': accRgb,
+    '--pc-accent-glow': `rgba(${accRgb},${accent === 'pink' ? 0.18 : 0.1})`, '--pc-accent-rgb': accRgb,
     '--pc-pair': pair, '--pc-pair-rgb': hexRgb(pair),
+    '--pc-today': mode === 'dark' ? '#fbbf24' : '#b45309',
+    '--pc-accent-tint': a.tint ? (mode === 'dark' ? a.tint[1] : a.tint[0]) : `rgba(${accRgb},0.12)`,
     '--pc-accent-ink': a.ink ? (mode === 'dark' ? a.ink[1] : a.ink[0]) : acc,   // text in the accent colour
     '--pc-on-accent': a.on ?? '#ffffff',                                          // text on an accent fill
     '--pc-mine': `rgba(${accRgb},${mode === 'dark' ? 0.32 : 0.14})`,   // the person's own bubbles
@@ -82,6 +86,17 @@ export function getLook(): Look {
   return { appearance: 'auto', accent: 'terracotta' };
 }
 export function setLook(l: Look) { try { localStorage.setItem(KEY, JSON.stringify(l)); } catch { /* not kept */ } }
+
+// oc v2 keeps its own look: a stored v1 look would hide the new accent, and going back to v1 finds v1's look untouched.
+const KEY_V2 = 'openclaw-pwa:look-v2';
+export function getLookV2(): Look {
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY_V2) || 'null') as Partial<Look> | null;
+    if (v && v.appearance && v.accent && v.accent in ACCENTS) return v as Look;
+  } catch { /* defaults */ }
+  return { appearance: getLook().appearance, accent: 'pink' };
+}
+export function setLookV2(l: Look) { try { localStorage.setItem(KEY_V2, JSON.stringify(l)); } catch { /* not kept */ } }
 
 /** The mode actually shown: 'auto' follows the phone's dark mode, live. */
 export function useMode(appearance: Appearance): 'light' | 'dark' {
