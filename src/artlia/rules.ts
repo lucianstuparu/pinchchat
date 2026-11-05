@@ -148,11 +148,19 @@ export const plainText = (text: string) => text.replace(/\[\[([^\]]+)\]\]/g, '$1
 export { senderOf } from '../mobile/messageView';
 export const withSender = (name: string, text: string) => (name ? `[${name}] ${text}` : text);
 
+/** What a list row says: the short title, its name in bold ("**Ușa** · deschide extern"), or the whole title until there is one. */
+export function rowTitle(i: ArtItem): string {
+  const g = i.glance_title;
+  if (!g) return i.title;
+  const at = g.indexOf(' · ');
+  return at > 0 ? `**${g.slice(0, at)}**${g.slice(at)}` : g;
+}
+
 export function matchesArt(i: ArtItem, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
   if (/^\d+$/.test(s)) return i.n === Number(s);
   const fold = (x?: string) => (x ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const hay = fold([i.title, i.what, i.todo, i.notes, i.src].join(' '));
+  const hay = fold([i.title, i.glance_title, i.what, i.todo, i.notes, i.src].join(' '));
   return fold(s).split(/\s+/).every(w => hay.includes(w));
 }

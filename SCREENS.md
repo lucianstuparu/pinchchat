@@ -31,6 +31,7 @@ Screenshots in `docs/screens/` are from the browser at phone width with test dat
 
 | Screen | Status | Latest screenshot | Notes |
 |---|---|---|---|
+| Casa Artlia rows | rough | [light](docs/screens/artlia-rows-375-light.jpg), [dark](docs/screens/artlia-rows-375-dark.jpg) | Sample data with real labels (`tools/harness/artlia.html`), measured at 320, 375 and 1440. Not deployed; logos and job drawings not seen in the rows yet. |
 | Today | rough | [light](docs/screens/oc-v2-today-375-light.png), [dark](docs/screens/oc-v2-today-375-dark.png), [1440 light](docs/screens/oc-v2-today-1440-light.png), [1440 dark](docs/screens/oc-v2-today-1440-dark.png) | Screenshots use sample data (`tools/harness/today.html`). Crucial, tiles, Passing by. Real data checked in the laptop's Chrome and a 390×844 frame; not yet on a phone. Composer still v1's size. |
 | Tile menu | rough | [375](docs/screens/oc-v2-today-menu-375.png) | Move, Make crucial (asks which when two), Later, Open, Not needed. Long press or the dots; no drag yet. |
 | Conversation over Today | rough | none yet | Opens and closes correctly on the live app, scrolled to the latest; the slide itself not seen. No message sent in the test. |

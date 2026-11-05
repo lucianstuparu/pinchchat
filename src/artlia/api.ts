@@ -3,7 +3,7 @@
  * through register-api's /artlia/* routes (ai.manager casa-artlia-app.md). The last list is kept on
  * the phone, so the app opens with it at once and still shows it offline.
  */
-import { SessionExpired, post } from '../app/api';
+import { SessionExpired, post, type Face } from '../app/api';
 
 export type Kind = 'task' | 'check' | 'decision' | 'milestone';
 export type Status = 'todo' | 'check' | 'waiting' | 'done' | 'cancelled';
@@ -22,6 +22,10 @@ export interface ArtItem {
   focus?: string;
   /** Its place within its group on Acum, set by dragging (lower first). */
   rank?: number;
+  /** The coach's short title for lists (none until it has looked, or after the title changed); the whole title stays in the sheet. */
+  glance_title?: string;
+  /** What it looks like: a real logo or a drawing (kit2/ObjectFace). */
+  face?: Face;
 }
 export interface Category { id: string; label: string; desc?: string; order?: number }
 export interface ArtList { today: string; categories: Category[]; items: ArtItem[]; glossary: Record<string, string> }

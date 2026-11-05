@@ -1,11 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { byPhase, catStats, sectionsOf, groupNow, matchesArt, plan, senderOf, termRuns, topOf, withSender } from '../rules';
+import { byPhase, catStats, sectionsOf, groupNow, matchesArt, plan, rowTitle, senderOf, termRuns, topOf, withSender } from '../rules';
 import type { ArtItem, Category } from '../api';
 
 const T = '2026-10-24';
 let seq = 0;
 const it_ = (over: Partial<ArtItem>): ArtItem => ({ id: `art-${++seq}`, n: seq, title: `item ${seq}`, cat: 'erp', status: 'todo', ...over });
 const cats: Category[] = [{ id: 'erp', label: 'ERP', order: 1 }, { id: 'banca', label: 'Bancă', order: 2 }];
+
+describe('the row title', () => {
+  const base = { id: 'a', title: 'Ușa spre scara **exterioară**', cat: 'erp', status: 'todo' } as ArtItem;
+  it('is the whole title until there is a short one', () => { expect(rowTitle(base)).toBe(base.title); });
+  it('bolds the name before the dot', () => { expect(rowTitle({ ...base, glance_title: 'Ușa · deschide extern' })).toBe('**Ușa** · deschide extern'); });
+  it('stays plain with no dot', () => { expect(rowTitle({ ...base, glance_title: 'Adresa: 1 sau 1B?' })).toBe('Adresa: 1 sau 1B?'); });
+  it('search still finds words only the whole title has', () => {
+    expect(matchesArt({ ...base, glance_title: 'Ușa · deschide' }, 'exterioara')).toBe(true);
+    expect(matchesArt({ ...base, glance_title: 'Ușa · deschide' }, 'deschide')).toBe(true);
+  });
+});
 
 describe('Acum', () => {
   it('puts each open item in one group, by due date, then de verificat, then priority', () => {

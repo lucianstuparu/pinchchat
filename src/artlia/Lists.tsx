@@ -2,17 +2,19 @@
  * The Casa Artlia lists (ai.manager casa-artlia-app.md): Acum (what needs attention, each item
  * once), Plan (the road to opening, one section per milestone) and Categorii (counts and progress;
  * a category opens its items by phase). Rows are oc's task row (my.design patterns/task-row.md):
- * tick, number in the category's colour, title with the key name bold, due chip and category pill.
+ * tick, number in the category's colour, its picture (a logo or a drawing), the short title with the key name bold (the whole
+ * title is in the sheet and found by search), due chip and category pill.
  */
 import { useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, Flag, HelpCircle, Pin, Search, Star, X } from 'lucide-react';
 import { DueChip, Title } from '../app/Todo';
+import { ObjectFace } from '../kit2/ObjectFace';
 import { dueChip } from '../app/todoRules';
 import type { ArtItem, Category } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
 import { BOX, BOX_GLOW, BOX_INK, byRank, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
-import { catStats, groupNow, isOpen, matchesArt, plan, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
+import { catStats, groupNow, isOpen, matchesArt, plan, rowTitle, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
 
 type Mode = 'light' | 'dark';
 
@@ -82,8 +84,10 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
           style={{ color: done ? undefined : tone.rail }} aria-label={item.n ? `numărul ${item.n}` : undefined}>
           {item.n ?? ''}
         </span>
-        <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 py-[9px] text-left">
-          <Title text={item.title} className={`block text-[16px] leading-[22px] ${done ? 'text-pc-text-muted line-through' : milestone ? 'font-semibold text-pc-text-primary' : 'text-pc-text-primary'}`} />
+        {item.face && <span className={`mr-1 flex h-10 w-10 shrink-0 items-center justify-center ${done ? 'opacity-50' : ''}`}><ObjectFace face={item.face} size={28} /></span>}
+        <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 py-[9px] text-left"
+          title={item.glance_title ? item.title.replace(/\*\*/g, '') : undefined}>
+          <Title text={rowTitle(item)} className={`block text-[16px] leading-[22px] ${done ? 'text-pc-text-muted line-through' : milestone ? 'font-semibold text-pc-text-primary' : 'text-pc-text-primary'}`} />
           {(dueChip(item, today) || showCat || extra || item.priority === 'P1' || item.focus) && (
             <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {item.focus && isOpen(item) && <Pin size={14} className="text-[#d48a12]" fill="currentColor" aria-label="Pus în Acum" />}
@@ -159,7 +163,7 @@ export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: Li
       {drag && (
         <DragGhost x={drag.x} y={drag.y}>
           <span className="mr-1.5 font-bold tabular-nums" style={{ color: toneOf(drag.item.cat, cats).rail }}>{drag.item.n}</span>
-          <Title text={drag.item.title} className="text-pc-text-primary" />
+          <Title text={rowTitle(drag.item)} className="text-pc-text-primary" />
         </DragGhost>
       )}
     </div>
@@ -199,7 +203,7 @@ export function PlanView({ items, today, mode, cats, onDone, onOpen }: ListProps
                 {shown.map(i => <ArtRow key={i.id} item={i} today={today} mode={mode} cats={cats} onDone={onDone} onOpen={onOpen} />)}
                 {(!expanded || (many && !open[`${key}:all`])) && (
                   <button type="button" onClick={() => setOpen(o => ({ ...o, [key]: true, [`${key}:all`]: expanded ? true : o[`${key}:all`] }))}
-                    className="press ml-[84px] flex min-h-10 items-center gap-1 text-[15px] font-semibold text-pc-accent">
+                    className="press ml-[128px] flex min-h-10 items-center gap-1 text-[15px] font-semibold text-pc-accent">
                     <ChevronDown size={16} /> {expanded ? `Încă ${s.items.length - 5}` : `Arată ${s.items.length}`}
                   </button>
                 )}
