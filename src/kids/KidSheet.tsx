@@ -11,8 +11,8 @@ import { useBusy } from '../ui/draft';
 import { useDelayedFlag } from '../ui/progress';
 import { DueChip, Title } from '../app/Todo';
 import { roError, type Child, type KidAction, type KidItem, type KidList, type Slot } from './api';
-import { ChildDots, KidRow } from './Lists';
-import { DAY_NAME, KIND_LABEL, RSVP_LABEL, TYPE_LABEL, WHO_LABEL, childName, isOpen, plans, shortDate, slotText, timeText } from './rules';
+import { ChildNames, KidRow } from './Lists';
+import { DAY_NAME, KIND_LABEL, RSVP_LABEL, TYPE_LABEL, WHO_LABEL, isOpen, plans, shortDate, slotText, timeText } from './rules';
 
 type Mode = 'light' | 'dark';
 
@@ -117,9 +117,8 @@ export function KidSheet({ item, list, mode, footer, onClose, onAct, onAsk, onOp
       <div className="flex justify-end"><CloseButton onClick={onClose} label="Închide" /></div>
       <div className="-mt-2 mb-3">
         <p className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-pc-text-muted">
-          <ChildDots item={item} kids={kids} size={20} />
+          <ChildNames item={item} kids={kids} mode={mode} />
           <span>{kind === 'event' && item.type ? TYPE_LABEL[item.type] : KIND_LABEL[kind]}</span>
-          {item.child && <span>· {childName(item.child, kids)}</span>}
           {planOf && <button type="button" onClick={() => onOpen(planOf)} className="text-[var(--pc-accent-ink)] underline underline-offset-2">· {planOf.title.replace(/\*\*/g, '')}</button>}
         </p>
         {!edit && (
@@ -239,7 +238,7 @@ export function KidSheet({ item, list, mode, footer, onClose, onAct, onAsk, onOp
 
       {kind === 'plan' && !edit && (
         <section className="mb-4">
-          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-[0.06em] text-pc-text-secondary">Pași</h3>
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-[0.06em] text-pc-text-secondary">Pași{steps.length > 0 ? ` · ${steps.filter(x => !isOpen(x)).length} din ${steps.length}` : ''}</h3>
           {steps.length === 0 && <p className="text-[15px] text-pc-text-muted">Niciun pas încă · spune-i asistentului ce e de făcut pentru el.</p>}
           {steps.map(s => <KidRow key={s.id} item={s} kids={kids} mode={mode} today={list.today} onOpen={onOpen} onDone={x => void onAct(x, 'done').catch(() => undefined)} showDue />)}
         </section>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activitiesByChild, childrenOf, dayTitle, ideaTags, ideas, plans, slotText, topOf, week, weekEnd, weekday } from '../rules';
+import { activitiesByChild, childrenOf, dayTitle, ideaTags, ideas, objectFor, planLine, plans, slotText, topOf, week, weekEnd, weekday } from '../rules';
 import type { Child, KidItem } from '../api';
 
 const T = '2026-11-03';   // a Tuesday
@@ -102,5 +102,49 @@ describe('Activități, Idei, Planuri', () => {
     expect(childrenOf({ child: 'both' }, kids).map(c => c.name)).toEqual(['Carla', 'Lia']);
     expect(childrenOf({ child: 'lia' }, kids).map(c => c.name)).toEqual(['Lia']);
     expect(childrenOf({}, kids)).toEqual([]);
+  });
+});
+
+describe('the drawings', () => {
+  const of = (title: string, over: Partial<KidItem> = {}) => objectFor(k({ title, ...over }));
+  it('come from the words, with or without diacritics, in Romanian and French', () => {
+    expect(of('Înot')).toBe('goggles');
+    expect(of('**Natation**')).toBe('goggles');
+    expect(of('judo')).toBe('gi');
+    expect(of('Pian')).toBe('note');
+    expect(of('Curs de dans')).toBe('slipper');
+    expect(of('**Dans**')).toBe('slipper');
+    expect(of('Ziua lui Tom')).toBe('cake');
+    expect(of('Invitație la ziua lui Tom')).toBe('envelope');
+    expect(of('Mască de hârtie')).toBe('scissors');
+    expect(of('Plante în borcan')).toBe('plant');
+  });
+  it('take paper before sport, and do not match inside other words', () => {
+    expect(of('Semnează fișa pentru înot')).toBe('form');
+    expect(of('Sortie dans le parc')).toBe('backpack');    // French "dans" is not dancing
+    expect(of('Corp și minte')).toBe('list');              // "cor" is a whole word
+    expect(of('Cartier nou')).toBe('list');                // nor is "carte" inside it
+  });
+  it('fall back on the tags, then on what kind of thing it is', () => {
+    expect(of('Ceva', { kind: 'idea', tags: ['bricolaj'] })).toBe('scissors');
+    expect(of('Ceva', { kind: 'event', type: 'dayoff' })).toBe('sun');
+    expect(of('Ceva', { kind: 'event' })).toBe('calendar');
+    expect(of('Ceva', { kind: 'idea' })).toBe('bulb');
+    expect(of('Ceva', { kind: 'plan' })).toBe('flag');
+    expect(of('Ceva', { kind: 'activity' })).toBe('star');
+    expect(of('Ceva')).toBe('list');
+  });
+});
+
+describe('a plan says where it stands', () => {
+  const plan = k({ kind: 'plan', title: 'Plan' });
+  const a = k({ title: 'A', status: 'done' }), b = k({ title: 'B' }), c = k({ title: 'C' });
+  it('with its next open step, in order', () => {
+    expect(planLine({ plan, steps: [a, b, c], done: 1 })).toEqual({ next: b, line: 'Urmează' });
+  });
+  it('or in words when there is none', () => {
+    expect(planLine({ plan, steps: [], done: 0 })).toEqual({ next: null, line: 'Fără pași încă' });
+    expect(planLine({ plan, steps: [a], done: 1 })).toEqual({ next: null, line: 'Toți pașii sunt gata' });
+    expect(planLine({ plan: { ...plan, status: 'done' }, steps: [a], done: 1 })).toEqual({ next: null, line: 'Gata' });
   });
 });

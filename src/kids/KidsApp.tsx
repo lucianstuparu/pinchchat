@@ -24,16 +24,15 @@ import { useQuestions } from '../mobile/useQuestions';
 import type { OutgoingAttachment } from '../mobile/attachments';
 import { useNotifications, setBaseTitle } from '../hooks/useNotifications';
 import { SessionExpired, transcribeAudio, whoami } from '../app/api';
-import { Title } from '../app/Todo';
 import { UndoBar, type UndoInfo } from '../app/UndoBar';
 import { Sheet, CloseButton } from '../ui/Sheet';
 import { AppHeader, IconButton, Segmented } from '../ui/Controls';
 import { useBackLayer, useExactSizes } from '../ui/useBackLayer';
 import { useDelayedFlag } from '../ui/progress';
 import { actOn, cachedList, fetchList, roError, type KidAction, type KidItem, type KidList } from './api';
-import { ActivitiesView, ChildDots, IdeasView, PlansView, WeekView } from './Lists';
+import { ActivitiesView, ChildNames, IdeasView, NextBand, PlansView, WeekView } from './Lists';
 import { KidSheet } from './KidSheet';
-import { dayTitle, isOpen, topOf, withSender } from './rules';
+import { isOpen, topOf, withSender } from './rules';
 
 const SESSION = 'agent:kids:main';
 const OUTBOX_KEY = 'kids:outbox';
@@ -272,7 +271,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const today = list?.today ?? new Date().toISOString().slice(0, 10);
   const items = useMemo(() => list?.items ?? [], [list]);
   const kids = useMemo(() => list?.children ?? [], [list]);
-  const { top, day: topDay, overdue, more } = topOf(items, today);
+  const { top } = topOf(items, today);
   const renderChips = useCallback((its: Array<{ id: string; label: string }>) => (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {its.map(c => {
@@ -280,37 +279,26 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         return (
           <button key={c.id} type="button" onClick={() => openSheet(c.id)}
             className={`inline-flex max-w-full items-center gap-1.5 rounded-full border border-pc-border bg-pc-elevated px-2.5 py-1 text-[13px] ${it && !isOpen(it) ? 'text-pc-text-muted line-through' : ''}`}>
-            {it && <ChildDots item={it} kids={kids} size={16} />}
+            {it && <ChildNames item={it} kids={kids} mode={mode} />}
             <span className="truncate">{it ? short(it) : c.label}</span>
           </button>
         );
       })}
     </div>
-  ), [items, kids, openSheet]);
+  ), [items, kids, mode, openSheet]);
   useEffect(() => { if (!hint) return; const t = window.setTimeout(() => setHint(null), 6000); return () => window.clearTimeout(t); }, [hint]);
 
-  // ---- the pinned card: what comes first, on a band with a shadow edge
+  // ---- above the chat: what comes first, small, on its tint; a tap opens the list
   const pinned = (
-    <div className="relative z-10 bg-pc-base px-3 pb-2 pt-2 shadow-[0_10px_12px_-12px_rgba(0,0,0,0.35)] md:hidden">
-      <button type="button" onClick={() => setPanelOpen(true)} aria-label="Deschide lista"
-        className="flex w-full items-center gap-3 rounded-[12px] bg-pc-elevated px-4 py-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.08),0_4px_14px_rgba(0,0,0,0.10)] ring-1 ring-[var(--pc-separator)] active:scale-[0.99]">
-        <span className="min-w-0 flex-1">
-          {!list ? <span className="block text-[16px] text-pc-text-muted">{spinning ? 'Se încarcă…' : 'Săptămâna copiilor'}</span>
-            : top ? (
-              <>
-                <span className="flex items-center gap-1.5 text-[16px] leading-tight">
-                  <Title text={top.item.title} className="min-w-0 truncate" />
-                  <ChildDots item={top.item} kids={kids} size={18} />
-                </span>
-                <span className="mt-1.5 block truncate text-[13px] leading-tight text-pc-text-muted">
-                  {overdue > 0 ? `Întârziat${overdue > 1 ? ` · încă ${overdue - 1}` : ''}` : [topDay ? dayTitle(topDay, today).split(' · ')[0] : '', top.time ?? ''].filter(Boolean).join(', ')}
-                  {more > 0 ? ` · încă ${more} săptămâna asta` : ''}
-                </span>
-              </>
-            ) : <span className="block text-[16px] font-medium">Săptămână liberă · vezi lista</span>}
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-pc-text-faint" />
-      </button>
+    <div className="relative z-10 bg-pc-base px-3 pb-2 pt-2 md:hidden">
+      {list && top ? <NextBand small items={items} kids={kids} today={today} mode={mode} onOpen={() => setPanelOpen(true)} />
+        : (
+          <button type="button" onClick={() => setPanelOpen(true)} aria-label="Deschide lista"
+            className="flex h-14 w-full items-center gap-3 rounded-[20px] bg-pc-surface px-4 text-left text-[16px] font-medium">
+            <span className="min-w-0 flex-1 truncate">{!list ? (spinning ? 'Se încarcă…' : 'Săptămâna copiilor') : 'Săptămână liberă · vezi lista'}</span>
+            <ChevronRight size={18} className="shrink-0 text-pc-text-muted" />
+          </button>
+        )}
     </div>
   );
 
@@ -336,7 +324,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           </p>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6 pt-1">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3" style={{ background: mode === 'dark' ? 'var(--pc-bg-base)' : 'var(--pc-bg-surface)' }}>
         {!list ? <p className="py-16 text-center text-[15px] text-pc-text-muted">{spinning ? 'Se încarcă…' : ''}</p>
           : tab === 'week' ? <WeekView {...listProps} />
           : tab === 'acts' ? <ActivitiesView {...listProps} />

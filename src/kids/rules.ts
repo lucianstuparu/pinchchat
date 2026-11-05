@@ -135,6 +135,59 @@ export function plans(items: KidItem[]): PlanView[] {
     .sort((a, b) => Number(!isOpen(a.plan)) - Number(!isOpen(b.plan)) || (a.plan.due_date ?? '9999').localeCompare(b.plan.due_date ?? '9999'));
 }
 
+/** The one line that says where a plan stands: its next open step, never a count. */
+export function planLine({ plan, steps }: PlanView): { next: KidItem | null; line: string } {
+  if (!isOpen(plan)) return { next: null, line: 'Gata' };
+  if (!steps.length) return { next: null, line: 'Fără pași încă' };
+  const next = steps.find(isOpen) ?? null;
+  return { next, line: next ? 'Urmează' : 'Toți pașii sunt gata' };
+}
+
+// ---- the drawings: a fixed library, chosen from the words (KidObject.tsx draws them)
+export type KidObjectName = 'goggles' | 'gi' | 'ball' | 'note' | 'slipper' | 'racket' | 'snow' | 'bike' | 'cake' | 'envelope' | 'form' | 'school'
+  | 'backpack' | 'sun' | 'book' | 'plaster' | 'gift' | 'scissors' | 'brush' | 'plant' | 'pot' | 'bag' | 'ticket' | 'calendar' | 'bulb' | 'list' | 'star' | 'flag';
+
+/** Romanian and French, without diacritics. Paper before sport: "Semnează fișa pentru înot" is a form. */
+const WORDS: Array<[KidObjectName, RegExp]> = [
+  ['form', /\b(semn|fisa|fise|formular|autorisation|autorizati|inscri|dosar|acte\b|assurance|asigurare|certificat|attestation|adeverint)/],
+  ['envelope', /\b(invitati|invitation|scrisoare|carte postala|mesaj)/],
+  ['cake', /\b(ziua (lui|lu|ei)\b|zi de nastere|zilei de nastere|aniversar|anniversaire|petrecer|fete de)/],
+  ['gift', /\b(cadou|cadouri|cadeau)/],
+  ['goggles', /\b(inot|piscin|natati|natation|bazin)/],
+  ['gi', /\b(judo|karate|taekwondo|aikido|arte martiale|kimono)/],
+  ['ball', /\b(fotbal|foot|baschet|basket|handbal|hand\b|rugby|volei|minge)/],
+  ['racket', /\b(tenis|tennis|badminton|ping)/],
+  ['slipper', /^dans\b|\b(de dans\b|dansuri|danse\b|balet|gimnastic|gym\b)/],
+  ['note', /\b(pian|muzic|musique|solfegi|solfege|vioar|violon|chitar|guitare|cor\b|chorale|flaut|flute)/],
+  ['snow', /\b(schi|ski\b|patinaj|patin|luge|zapada|neige)/],
+  ['bike', /\b(biciclet|velo|trotinet|role\b)/],
+  ['plaster', /\b(doctor|medic|pediatr|vaccin|dentist|orthodont|ortodont|spital|analize)/],
+  ['ticket', /\b(muzeu|musee|teatru|theatre|cinema|film|spectacol|concert|circ\b|zoo\b)/],
+  ['book', /\b(carte\b|carti\b|cartea\b|citit|citim|lectur|bibliotec|teme\b|devoir|poveste|povesti)/],
+  ['scissors', /\b(bricolaj|colaj|decupa|masca|masti|carton|hartie|origami|lipit)/],
+  ['brush', /\b(pictur|desen|peinture|dessin|acuarel|vopsea)/],
+  ['plant', /\b(plant|gradin|seminte|jardin|flori\b|floare)/],
+  ['pot', /\b(gatit|gatim|reteta|retete|cuisine|prajitur|biscuit|clatit)/],
+  ['backpack', /\b(ghiozdan|rechizit|cartable|iesire|excursi|sortie|drumetie|tabara)/],
+  ['sun', /\b(zi libera|vacant|vacances|ferie)/],
+  ['school', /\b(scoal|scolar|sedint|reunion|reuniune|parinti|profesor|invatator|maitresse|ecole)/],
+  ['bag', /\b(cumpar|magazin|de luat)/],
+];
+const BY_TYPE: Record<string, KidObjectName> = { birthday: 'cake', invitation: 'envelope', outing: 'backpack', meeting: 'school', dayoff: 'sun', other: 'calendar' };
+const BY_KIND: Record<string, KidObjectName> = { task: 'list', activity: 'star', event: 'calendar', idea: 'bulb', plan: 'flag' };
+
+const plainWords = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/\*\*/g, '').toLowerCase();
+
+/** The title first, then the tags, then what kind of thing it is. */
+export function objectFor(i: Pick<KidItem, 'kind' | 'title' | 'type' | 'tags'>): KidObjectName {
+  for (const text of [i.title, (i.tags ?? []).join(' ')]) {
+    const t = plainWords(text);
+    const hit = WORDS.find(([, re]) => re.test(t));
+    if (hit) return hit[0];
+  }
+  return (i.kind === 'event' && i.type && BY_TYPE[i.type]) || BY_KIND[i.kind] || 'list';
+}
+
 // ---- the shared chat: "[Ludmila] text" says who wrote it
 export { senderOf } from '../mobile/messageView';
 export { withSender } from '../artlia/rules';
