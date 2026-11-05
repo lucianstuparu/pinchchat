@@ -118,7 +118,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, [ready, frontSession, activeSession, switchSession]);
 
   // ---- To do and In progress
-  const [now, setNow] = useState<{ today: string; items: NowItem[]; watch?: Watching }>({ today: '', items: [] });
+  const [now, setNow] = useState<{ today: string; items: NowItem[]; watch?: Watching; done?: NowItem[] }>({ today: '', items: [] });
   const [loops, setLoops] = useState<Loop[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
@@ -497,7 +497,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   useBackLayer(todoOpen, () => setTodoOpen(false));
 
   const panel = (onClose?: () => void) => (
-    <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} watch={now.watch} loops={loops} today={now.today}
+    <TodoPanel mode={mode} tab={tab} onTab={setTab} items={now.items} watch={now.watch} done={now.done} loops={loops} today={now.today}
       loaded={loaded} expired={expired} refreshing={refreshing} onRefresh={() => void refresh()}
       onDone={i => void doAct(i, 'done')} onStar={i => void star(i)} onOpen={setSheet} onMove={m => void move(m)}
       onContinue={l => putInComposer(`Continue: ${l.title} ⟨${l.id}⟩`, true)}

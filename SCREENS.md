@@ -18,6 +18,7 @@ Screenshots in `docs/screens/` are from the browser at phone width with test dat
 | Chat | built | [oc-chat-375](docs/screens/oc-chat-375.jpg), [320×480](docs/screens/oc-chat-320x480.jpg) | Pinned To do bar, quick starts, input bar (Mic / Send / Stop). Swipe right opens To do. |
 | To do (phone, full screen) | built | [light](docs/screens/oc-todo-375-light.jpg), [dark](docs/screens/oc-todo-375-dark.jpg) (before kit) | Numbers, bold names, due chips, topics, glow boxes, areas; repeat shown; put off folded away. |
 | To do: Passing by (watch-outs) | built | none yet (measured at 320×480 and 390×844 in `tools/harness/todo.html`, 2026-11-02) | Under Now: muted lines, no tick box, never counted; Passed folded; chip Watching. Sheet: Edit, Went wrong…, Not needed. |
+| To do: Done | built | none yet (seen at 390x844 in `tools/harness/todo.html`, 2026-11-05) | Folded at the bottom: last 30 days by day, newest first, muted, a check at the end; a row opens the sheet (Reopen). Search looks through the year. |
 | To do (laptop column) | built | none yet | Same panel beside the chat. |
 | In progress | rough | none yet | Second tab of To do; rows still the older style (no numbers). |
 | Item details | built | none yet | Edit title, due, topics, repeat; Remind in 3 days; Not needed; Undo at its foot. |

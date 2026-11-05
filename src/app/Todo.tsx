@@ -187,6 +187,40 @@ function PassingBy({ watch, today, mode, onOpen, open }: { watch: Watching; toda
   );
 }
 
+/**
+ * What was finished: folded at the bottom of To do, last 30 days by day, newest first; a row opens the
+ * item (Reopen is there). Searching looks through the whole year, unfolded.
+ */
+function DoneList({ items, today, searching, onOpen }: { items: NowItem[]; today: string; searching: boolean; onOpen: (i: NowItem) => void }) {
+  const [show, setShow] = useState(false);
+  const recent = searching ? items : items.filter(i => today && i.done_on && daysBetween(i.done_on, today) <= 30);
+  if (!recent.length) return null;
+  const open = searching || show;
+  const days = [...new Set(recent.map(i => i.done_on!))];
+  const dayLabel = (d: string) => { const ago = today ? daysBetween(d, today) : null; return ago === 0 ? 'Today' : ago === 1 ? 'Yesterday' : formatDay(d); };
+  return (
+    <section aria-label="Done" className="px-1.5">
+      <button type="button" onClick={() => setShow(v => !v)} aria-expanded={open} disabled={searching}
+        className="press flex h-[44px] w-full items-center gap-1.5 px-2 text-left text-[13px] text-pc-text-muted">
+        {!searching && <ChevronDown size={15} className={open ? '' : '-rotate-90'} aria-hidden />} Done · {recent.length}
+      </button>
+      {open && days.map(d => (
+        <div key={d}>
+          <h4 className="px-3 pb-0.5 pt-2 text-[12px] font-semibold text-pc-text-muted">{dayLabel(d)}</h4>
+          {recent.filter(i => i.done_on === d).map(i => (
+            <button key={i.id} type="button" onClick={() => onOpen(i)} data-row={i.id}
+              className="press flex min-h-[44px] w-full items-center gap-2 rounded-[12px] py-1.5 pl-3 pr-2 text-left active:bg-[var(--pc-hover-strong)]">
+              <span className="w-[30px] shrink-0 text-right text-[15px] font-bold tabular-nums text-pc-text-muted">{i.n ?? ''}</span>
+              <Title text={i.title} className="min-w-0 flex-1 truncate text-[15px] leading-[20px] text-pc-text-secondary" />
+              <Check size={15} strokeWidth={2.5} className="shrink-0 text-pc-text-muted" aria-hidden />
+            </button>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function GroupHead({ dot, mark, label, count, color }: { dot?: string; mark?: ReactNode; label: string; count: number; color?: string }) {
   return (
     <h3 className="flex items-center gap-2 px-2 pb-0.5 pt-1 text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: color ?? 'var(--pc-text-secondary)' }}>
@@ -315,6 +349,8 @@ export interface TodoPanelProps {
   items: NowItem[]; loops: Loop[]; today: string;
   /** Watch-outs ("Passing by"): never counted, never in the lists of things to do. */
   watch?: Watching;
+  /** What was finished in the last year, newest first. */
+  done?: NowItem[];
   loaded: boolean; expired: boolean; refreshing: boolean; onRefresh: () => void;
   onDone: (i: NowItem) => void; onStar: (i: NowItem) => void; onOpen: (id: string) => void;
   /** A drag: into or out of the box, or a new order. */
@@ -342,6 +378,7 @@ export function TodoPanel(p: TodoPanelProps) {
   // A search finds watch-outs too; "Watching" shows only them, the passed ones unfolded.
   const watch: Watching | undefined = p.watch && (q.trim()
     ? { upcoming: p.watch.upcoming.filter(i => matches(i, q)), passed: p.watch.passed.filter(i => matches(i, q)) } : p.watch);
+  const done = (p.done ?? []).filter(i => !q.trim() || matches(i, q));
   const hasWatch = !!p.watch && (p.watch.upcoming.length > 0 || p.watch.passed.length > 0);
   const chip = (on: boolean) => `relative inline-flex h-8 items-center rounded-full border px-3 before:absolute before:inset-x-0 before:-inset-y-[7px] before:content-['']  text-[13px] font-medium ${on ? 'border-pc-text bg-pc-text text-pc-base' : 'border-pc-border-strong text-pc-text-secondary'}`;
   return (
@@ -405,7 +442,8 @@ export function TodoPanel(p: TodoPanelProps) {
                   <p className="text-[16px] font-semibold">All clear</p>
                   <p className="mt-1 text-[15px] text-pc-text-muted">Nothing needs you right now.</p>
                 </div>
-              ) : items.length === 0 && q.trim() && !(watch && (watch.upcoming.length || watch.passed.length)) ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
+              ) : items.length === 0 && q.trim() && done.length === 0 && !(watch && (watch.upcoming.length || watch.passed.length)) ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">Nothing matches “{q.trim()}”</p>
+              : items.length === 0 && q.trim() && !(watch && (watch.upcoming.length || watch.passed.length)) ? null
               : items.length === 0 && !hasWatch ? <p className="px-2 py-8 text-center text-[15px] text-pc-text-muted">All clear for now: everything left is put off until later.</p>
               : <TodoList items={items} watch={watch} today={p.today} mode={p.mode} filter={filter === 'watching' ? null : filter} onDone={p.onDone} onStar={p.onStar} onOpen={i => p.onOpen(i.id)} onMove={p.onMove} />}
             {putOff.length > 0 && !q.trim() && (
@@ -413,6 +451,7 @@ export function TodoPanel(p: TodoPanelProps) {
                 <Clock size={16} aria-hidden /> {putOff.length} put off until later · <span className="font-medium text-[var(--pc-accent-ink)]">{showPutOff ? 'Hide' : 'Show'}</span>
               </button>
             )}
+            {p.loaded && !filter && <DoneList items={done} today={p.today} searching={!!q.trim()} onOpen={i => p.onOpen(i.id)} />}
             {p.items.length > 0 && <p className="px-2 text-[12px] text-pc-text-faint">Swipe a task right to finish it. Hold one and drag it: into the box to put it in Now, out to take it out, up or down to reorder. Say “22 done” in the chat to finish one by number.</p>}
           </div>
         )}

@@ -50,3 +50,36 @@ describe('watch-outs in To do', () => {
     expect(screen.queryByText('EDF')).toBeNull();
   });
 });
+
+describe('Done in To do', () => {
+  const paid = item({ id: 'adm-1', n: 40, title: 'Paid **EDF**', kind: 'bill', status: 'paid', done_on: '2026-11-01' });
+  const sfr = item({ id: 'tsk-3', n: 41, title: 'Wrote to **Orange**', status: 'done', done_on: '2026-10-31' });
+  const old2 = item({ id: 'tsk-4', n: 42, title: 'Renewed **passport**', status: 'done', done_on: '2026-03-01' });
+  const withDone = (over: Partial<TodoPanelProps> = {}) => props({ done: [paid, sfr, old2], ...over });
+
+  it('is folded, counts the last 30 days, and opens by day', () => {
+    const opened: string[] = [];
+    render(<TodoPanel {...withDone({ onOpen: id => opened.push(id) })} />);
+    const section = screen.getByRole('region', { name: 'Done' });
+    expect(within(section).queryByText('Orange')).toBeNull();
+    fireEvent.click(within(section).getByRole('button', { name: /Done · 2/ }));
+    expect(within(section).getByText('Today')).toBeTruthy();
+    expect(within(section).getByText('Yesterday')).toBeTruthy();
+    expect(within(section).queryByText('passport')).toBeNull();
+    fireEvent.click(within(section).getByText('Orange'));
+    expect(opened).toEqual(['tsk-3']);
+  });
+
+  it('a search looks through the whole year, even with nothing open matching', () => {
+    render(<TodoPanel {...withDone()} />);
+    fireEvent.change(screen.getByPlaceholderText(/Search tasks/), { target: { value: 'passport' } });
+    expect(within(screen.getByRole('region', { name: 'Done' })).getByText('passport')).toBeTruthy();
+    expect(screen.queryByText(/Nothing matches/)).toBeNull();
+  });
+
+  it('shows with an empty To do, under All clear', () => {
+    render(<TodoPanel {...withDone({ items: [], watch: undefined })} />);
+    expect(screen.getByText('All clear')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Done' })).toBeTruthy();
+  });
+});

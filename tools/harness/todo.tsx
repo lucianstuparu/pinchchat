@@ -25,7 +25,13 @@ const watch = {
   ],
   passed: [item({ id: 'tsk-2026-11-01-00000d', n: 30, kind: 'watch', status: 'passed', title: '**Free** takes 30 €', due_date: day(-3), amount: 29.99, currency: 'EUR' })],
 };
-const all = [...items, ...watch.upcoming, ...watch.passed];
+const done = [
+  item({ id: 'adm-2026-11-01-00000e', n: 40, kind: 'bill', status: 'paid', title: 'Pay **EDF** invoice', done_on: day(0) }),
+  item({ id: 'tsk-2026-11-01-00000f', n: 41, status: 'done', title: 'Write to **SFR** about the old contract and ask for the final invoice to be sent again', done_on: day(-1) }),
+  item({ id: 'tsk-2026-11-01-000010', n: 42, status: 'done', title: 'Book the **dentist**', done_on: day(-1) }),
+  item({ id: 'tsk-2026-11-01-000011', n: 43, status: 'done', title: 'Renew the **passport**', done_on: day(-6) }),
+];
+const all = [...items, ...watch.upcoming, ...watch.passed, ...done];
 
 // The desk API, answered here.
 const realFetch = window.fetch.bind(window);
@@ -47,7 +53,7 @@ function Harness() {
   document.documentElement.classList.toggle('dark', dark);
   return (
     <div className="h-[100dvh] bg-pc-base text-pc-text">
-      <TodoPanel mode={dark ? 'dark' : 'light'} tab={tab} onTab={setTab} items={items} watch={watch} loops={[]} today={today}
+      <TodoPanel mode={dark ? 'dark' : 'light'} tab={tab} onTab={setTab} items={items} watch={watch} done={done} loops={[]} today={today}
         loaded expired={false} refreshing={false} onRefresh={() => undefined} onDone={() => undefined} onStar={() => undefined}
         onOpen={setSheet} onContinue={() => undefined} onAdd={() => undefined} transcribe={async () => ''} reply={null}
         onDismissReply={() => undefined} onClose={() => undefined} />
