@@ -1,11 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { byPhase, catStats, sectionsOf, groupNow, matchesArt, plan, rowTitle, senderOf, termRuns, topOf, withSender } from '../rules';
+import { byPhase, catStats, sectionsOf, groupNow, lateDays, matchesArt, plan, rowTitle, senderOf, termRuns, topOf, withSender } from '../rules';
 import type { ArtItem, Category } from '../api';
 
 const T = '2026-10-24';
 let seq = 0;
 const it_ = (over: Partial<ArtItem>): ArtItem => ({ id: `art-${++seq}`, n: seq, title: `item ${seq}`, cat: 'erp', status: 'todo', ...over });
 const cats: Category[] = [{ id: 'erp', label: 'ERP', order: 1 }, { id: 'banca', label: 'Bancă', order: 2 }];
+
+describe('waiting for someone', () => {
+  const wait = (over: Partial<ArtItem>) => it_({ waits_for: 'Crédit Mutuel', status: 'waiting', ...over });
+  it('is quiet before its date, asks once late, and goes quiet when put off', () => {
+    const before = wait({ due_date: '2026-10-30' });
+    expect(groupNow([before], T).waits).toEqual([]);
+    expect(groupNow([before], T).now).toEqual([]);
+    const lateOne = wait({ due_date: '2026-10-18' });
+    expect(groupNow([lateOne], T).waits).toEqual([lateOne]);
+    expect(groupNow([lateOne], T).overdue).toEqual([]);
+    expect(lateDays(lateOne, T)).toBe(6);
+    const off = wait({ due_date: '2026-10-18', snoozed_until: '2026-10-27' });
+    expect(groupNow([off], T).waits).toEqual([]);
+    expect(groupNow([off], T).putOff).toBe(1);
+  });
+  it('a sleeping next step stays out of Acum', () => {
+    const asleep = it_({ asleep: true, due_date: T, priority: 'P1' });
+    const g = groupNow([asleep], T);
+    expect([...g.now, ...g.overdue, ...g.priority]).toEqual([]);
+  });
+});
 
 describe('the row title', () => {
   const base = { id: 'a', title: 'Ușa spre scara **exterioară**', cat: 'erp', status: 'todo' } as ArtItem;

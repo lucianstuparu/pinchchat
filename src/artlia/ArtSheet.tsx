@@ -5,7 +5,7 @@
  * Every change offers Undo (the bar in the footer).
  */
 import { useState } from 'react';
-import { Ban, Check, Clock, FileText, MessageSquare, Paperclip, Pencil, Pin, PinOff, Undo2 } from 'lucide-react';
+import { Ban, Check, Clock, FileText, Hourglass, MessageSquare, Paperclip, Pencil, Pin, PinOff, Send, Undo2 } from 'lucide-react';
 import { CloseButton, Sheet } from '../ui/Sheet';
 import { Segmented } from '../ui/Controls';
 import { useBusy } from '../ui/draft';
@@ -13,7 +13,7 @@ import { useDelayedFlag } from '../ui/progress';
 import { DueChip, Title } from '../app/Todo';
 import { fileUrl, roError, type ArtAction, type ArtItem, type ArtList, type Phase, type Status } from './api';
 import { CatPill } from './Lists';
-import { KIND_LABEL, NEED_LABEL, PHASE_LABEL, isOpen, termRuns } from './rules';
+import { KIND_LABEL, NEED_LABEL, PHASE_LABEL, isOpen, lateDays, lateLabel, rowTitle, termRuns } from './rules';
 
 type Mode = 'light' | 'dark';
 
@@ -38,12 +38,13 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
   item: ArtItem; list: ArtList; mode: Mode; footer?: React.ReactNode;
   onClose: () => void;
   onAct: (item: ArtItem, action: ArtAction, extra?: Record<string, unknown>) => Promise<void>;
-  onAsk: (item: ArtItem) => void;
+  /** Opens the chat about this item; `text` goes in the box, unsent. */
+  onAsk: (item: ArtItem, text?: string) => void;
   onUpload: (item: ArtItem, file: File) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
-  const [edit, setEdit] = useState<{ title: string; due: string; cat: string; phase: string } | null>(null);
+  const [edit, setEdit] = useState<{ title: string; due: string; cat: string; phase: string; waits: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useBusy('art-item', busy || !!note.trim() || !!edit);
   const saving = useDelayedFlag(busy);
@@ -64,6 +65,7 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
     if (edit.due !== (item.due_date ?? '')) changes.due_date = edit.due || null;
     if (edit.cat !== item.cat) changes.cat = edit.cat;
     if (edit.phase !== (item.phase ?? '')) changes.phase = edit.phase || null;
+    if (edit.waits.trim() !== (item.waits_for ?? '')) changes.waits_for = edit.waits.trim();
     if (Object.keys(changes).length === 0 || await run('edit', changes)) setEdit(null);
   };
   const addNote = async () => { const t = note.trim(); if (!t) return; if (await run('note', { text: t })) setNote(''); };
@@ -77,6 +79,10 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
   const secondary = 'press flex flex-col items-center justify-center gap-1 rounded-[12px] bg-pc-surface py-3 text-[13px] text-pc-text active:bg-[var(--pc-hover-strong)] disabled:opacity-50';
   const field = 'w-full rounded-[12px] border border-pc-border-strong bg-pc-surface px-3 py-2 text-[16px] outline-none focus:border-pc-accent';
   const kind = item.kind ?? 'task';
+  const waiting = !!item.waits_for && open;
+  const nextStep = waiting ? list.items.find(i => i.after === item.id && isOpen(i)) : undefined;
+  const late = waiting ? lateDays(item, list.today) : 0;
+  const editBtn = !edit && <button type="button" onClick={() => setEdit({ title: item.title, due: item.due_date ?? '', cat: item.cat, phase: item.phase ?? '', waits: item.waits_for ?? '' })} className={secondary}><Pencil size={19} className="text-[var(--pc-accent-ink)]" /> Editează</button>;
 
   return (
     <Sheet label={item.title.replace(/\*\*/g, '')} onClose={onClose} className="max-h-[88dvh] overflow-y-auto px-4 pt-2 md:max-w-lg">
@@ -111,6 +117,10 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
                 {(Object.keys(PHASE_LABEL) as Phase[]).map(p => <option key={p} value={p}>{PHASE_LABEL[p]}</option>)}
               </select>
             </label>
+            <label className="flex items-center justify-between gap-3 rounded-[12px] bg-pc-surface px-3 py-1 text-[15px]">
+              <span className="shrink-0 text-pc-text-muted">Așteptăm de la</span>
+              <input value={edit.waits} onChange={e => setEdit({ ...edit, waits: e.target.value })} placeholder="nimeni" maxLength={60} className="h-10 min-w-0 flex-1 bg-transparent text-right outline-none" />
+            </label>
             <div className="flex gap-2">
               <button type="button" onClick={() => setEdit(null)} className="press h-12 flex-1 rounded-[12px] bg-pc-surface text-[16px]">Renunță</button>
               <button type="button" disabled={busy || !edit.title.trim()} onClick={() => void save()} className="press h-12 flex-1 rounded-[12px] bg-pc-accent text-[16px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-50">
@@ -121,7 +131,12 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
         ) : (
           <>
             <Title text={`${item.n != null ? `${item.n} · ` : ''}${item.title}`} className={`block text-[20px] font-semibold leading-snug ${open ? '' : 'text-pc-text-muted line-through'}`} />
-            {item.due_date && <span className="mt-2 inline-flex"><DueChip item={item} today={list.today} mode={mode} /></span>}
+            {waiting ? (
+              <p className="mt-2 flex items-center gap-1.5 text-[15px] font-medium text-pc-text-secondary">
+                <Hourglass size={16} className="shrink-0 text-[#d48a12]" aria-hidden />
+                <span>Așteptăm de la {item.waits_for}{late > 0 ? ` · ${lateLabel(late)}` : ''}</span>
+              </p>
+            ) : item.due_date && <span className="mt-2 inline-flex"><DueChip item={item} today={list.today} mode={mode} /></span>}
           </>
         )}
       </div>
@@ -136,7 +151,7 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
         ) : null;
       })}
 
-      {open && (
+      {open && !waiting && (
         <div className="mb-4 mt-2">
           <Segmented<Status> label="Stare" size="s" choice value={item.status === 'todo' || item.status === 'check' || item.status === 'waiting' ? item.status : 'todo'}
             onChange={s => void run('status', { status: s })}
@@ -146,7 +161,23 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
 
       {error && <p className="mb-2 text-[15px] text-red-500" role="alert">{error}</p>}
 
-      {open ? (
+      {waiting ? (
+        <>
+          {nextStep && <p className="mb-2 text-[15px] text-pc-text-secondary">Apoi pornește: <Title text={`${nextStep.n ?? ''} · ${rowTitle(nextStep)}`} className="text-pc-text-primary" /></p>}
+          <button type="button" disabled={busy} onClick={() => void run('done')}
+            className="press flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-60">
+            <Check size={19} strokeWidth={2.5} /> A sosit
+          </button>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <button type="button" onClick={() => onAsk(item, `Scrie-mi un mesaj de reamintire către ${item.waits_for}.`)} className={secondary}><Send size={19} className="text-pc-accent" /> Scrie-le</button>
+            <button type="button" disabled={busy} onClick={() => void run('snooze', { days: 3 })} className={secondary}><Clock size={19} className="text-pc-accent" /> Încă 3 zile</button>
+            <button type="button" disabled={busy} onClick={() => void run('snooze', { days: 7 })} className={secondary}><Clock size={19} className="text-pc-accent" /> Încă 7 zile</button>
+            <button type="button" onClick={() => onAsk(item)} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Întreabă</button>
+            {editBtn}
+            <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Nu mai e nevoie</button>
+          </div>
+        </>
+      ) : open ? (
         <>
           <button type="button" disabled={busy} onClick={() => void run('done')}
             className="press flex h-14 w-full items-center justify-center gap-2 rounded-[12px] bg-pc-accent text-[17px] font-semibold text-[var(--pc-on-accent)] disabled:opacity-60">
@@ -160,7 +191,7 @@ export function ArtSheet({ item, list, mode, footer, onClose, onAct, onAsk, onUp
           <div className="mt-2 grid grid-cols-4 gap-2">
             <button type="button" onClick={() => onAsk(item)} className={secondary}><MessageSquare size={19} className="text-pc-accent" /> Întreabă</button>
             <button type="button" disabled={busy} onClick={() => void run('snooze', { days: 3 })} className={secondary}><Clock size={19} className="text-pc-accent" /> Amână 3 zile</button>
-            {!edit && <button type="button" onClick={() => setEdit({ title: item.title, due: item.due_date ?? '', cat: item.cat, phase: item.phase ?? '' })} className={secondary}><Pencil size={19} className="text-[var(--pc-accent-ink)]" /> Editează</button>}
+            {editBtn}
             <button type="button" disabled={busy} onClick={() => void run('drop')} className={secondary}><Ban size={19} className="text-pc-text-muted" /> Nu mai e nevoie</button>
           </div>
         </>

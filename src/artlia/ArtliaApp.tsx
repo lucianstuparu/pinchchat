@@ -203,7 +203,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     try {
       const r = await actOn(item.id, action, extra);
       if (r.item) swap(item.id, r.item);
-      const said = action === 'focus' ? (extra?.on === false ? 'Scos din Acum' : 'Pus în Acum') : SAID[action];
+      const said = action === 'focus' ? (extra?.on === false ? 'Scos din Acum' : 'Pus în Acum')
+        : action === 'done' && item.waits_for ? 'A sosit'
+        : action === 'snooze' ? `Amânat ${extra?.days ?? 3} zile` : SAID[action];
       if (said) offerUndo(item, said);
     } catch (e) {
       swap(item.id, item);
@@ -283,11 +285,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const s = msg.role === 'user' ? senderOf(visibleText(msg)) : { name: null, text: visibleText(msg) };
     setReplyTo({ text: extractItems(withoutLeadingQuote(s.text)).text || 'Fotografie', mine: msg.role === 'user' && (!s.name || s.name === name) });
   }, [name]);
-  const putIntent = (intent: Intent) => { closePanel(); setSheetId(null); setPrefill({ nonce: Date.now(), text: '', attachments: [], intent }); };
-  const askAbout = (item: ArtItem) => {
+  const putIntent = (intent: Intent, text = '') => { closePanel(); setSheetId(null); setPrefill({ nonce: Date.now(), text, attachments: [], intent }); };
+  const askAbout = (item: ArtItem, text = '') => {
     const label = short(item);
     putIntent({ label: `Despre ${label.length > 28 ? `${label.slice(0, 27)}…` : label}`, prefix: `Despre ⟨${item.id}⟩: `, icon: MessageSquare,
-      style: list ? toneStyle(toneOf(item.cat, list.categories), mode) : {}, placeholder: 'Întrebarea ta' });
+      style: list ? toneStyle(toneOf(item.cat, list.categories), mode) : {}, placeholder: 'Întrebarea ta' }, text);
   };
   const addIn = (c: Category) => putIntent({ label: `De făcut · ${c.label}`, prefix: `De făcut în ${c.label}: `, icon: Plus,
     style: list ? toneStyle(toneOf(c.id, list.categories), mode) : {}, placeholder: 'Ce trebuie făcut, și până când?' });

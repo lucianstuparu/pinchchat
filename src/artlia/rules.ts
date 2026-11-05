@@ -45,15 +45,20 @@ export const toneStyle = (t: Tone, mode: string) => (mode === 'dark' ? { backgro
 import { byRank } from '../ui/dragRules';
 
 export const NOW_DAYS = 2;
-export interface NowGroups { overdue: ArtItem[]; now: ArtItem[]; week: ArtItem[]; soon: ArtItem[]; check: ArtItem[]; priority: ArtItem[]; putOff: number }
+export interface NowGroups { waits: ArtItem[]; overdue: ArtItem[]; now: ArtItem[]; week: ArtItem[]; soon: ArtItem[]; check: ArtItem[]; priority: ArtItem[]; putOff: number }
 
 const byDue = (a: ArtItem, b: ArtItem) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || (a.n ?? 0) - (b.n ?? 0);
 
 export function groupNow(items: ArtItem[], today: string): NowGroups {
-  const g: NowGroups = { overdue: [], now: [], week: [], soon: [], check: [], priority: [], putOff: 0 };
+  const g: NowGroups = { waits: [], overdue: [], now: [], week: [], soon: [], check: [], priority: [], putOff: 0 };
   for (const i of items) {
-    if (!isOpen(i)) continue;
+    if (!isOpen(i) || i.asleep) continue;
     const d = i.due_date ? daysBetween(today, i.due_date) : null;
+    if (i.waits_for) {   // quiet until late; then it asks, unless put off
+      if (i.snoozed_until && i.snoozed_until > today) g.putOff++;
+      else if (d !== null && d < 0) g.waits.push(i);
+      continue;
+    }
     if (d !== null && d < 0) g.overdue.push(i);
     else if (i.focus || (d !== null && d <= NOW_DAYS)) g.now.push(i);   // put in the box by hand: there, whatever its date
     else if (isPutOff(i, today)) g.putOff++;
@@ -63,14 +68,14 @@ export function groupNow(items: ArtItem[], today: string): NowGroups {
     else if (i.priority === 'P1' && i.kind !== 'milestone') g.priority.push(i);
   }
   // Each group by date, then the order set by dragging on top of it (byRank is a stable sort).
-  for (const k of ['overdue', 'now', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue).sort(byRank);
+  for (const k of ['waits', 'overdue', 'now', 'week', 'soon', 'check', 'priority'] as const) g[k].sort(byDue).sort(byRank);
   return g;
 }
 
 /** The pinned card: the most pressing thing, and how much else waits. */
 export function topOf(items: ArtItem[], today: string): { top: ArtItem | null; overdue: number; week: number } {
   const g = groupNow(items, today);
-  const top = g.overdue[0] ?? g.now[0] ?? g.week[0] ?? g.priority[0] ?? g.soon[0] ?? g.check[0] ?? null;
+  const top = g.overdue[0] ?? g.now[0] ?? g.waits[0] ?? g.week[0] ?? g.priority[0] ?? g.soon[0] ?? g.check[0] ?? null;
   return { top, overdue: g.overdue.length, week: g.now.length + g.week.length };
 }
 
@@ -147,6 +152,10 @@ export const plainText = (text: string) => text.replace(/\[\[([^\]]+)\]\]/g, '$1
 // ---- the shared chat: "[Ludmila] text" says who wrote it
 export { senderOf } from '../mobile/messageView';
 export const withSender = (name: string, text: string) => (name ? `[${name}] ${text}` : text);
+
+/** How many days past the date it was expected. */
+export const lateDays = (i: ArtItem, today: string) => (i.due_date ? Math.max(0, -daysBetween(today, i.due_date)) : 0);
+export const lateLabel = (days: number) => (days === 1 ? 'o zi întârziere' : `${days} zile întârziere`);
 
 /** What a list row says: the short title, its name in bold ("**Ușa** · deschide extern"), or the whole title until there is one. */
 export function rowTitle(i: ArtItem): string {

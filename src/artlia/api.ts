@@ -24,6 +24,10 @@ export interface ArtItem {
   rank?: number;
   /** The coach's short title for lists (none until it has looked, or after the title changed); the whole title stays in the sheet. */
   glance_title?: string;
+  /** Waiting for someone: who owes it; due_date is when it was expected. Nothing to tick. */
+  waits_for?: string;
+  /** A next step: the item it follows, that item's number, and asleep while that one is open. */
+  after?: string; after_n?: number; asleep?: boolean;
   /** What it looks like: a real logo or a drawing (kit2/ObjectFace). */
   face?: Face;
 }

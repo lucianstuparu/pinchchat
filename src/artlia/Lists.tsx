@@ -6,7 +6,7 @@
  * title is in the sheet and found by search), due chip and category pill.
  */
 import { useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight, Flag, HelpCircle, Pin, Search, Star, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Flag, HelpCircle, Hourglass, Pin, Search, Star, X } from 'lucide-react';
 import { DueChip, Title } from '../app/Todo';
 import { ObjectFace } from '../kit2/ObjectFace';
 import { dueChip } from '../app/todoRules';
@@ -14,7 +14,7 @@ import type { ArtItem, Category } from './api';
 import { useDragDrop, useLift } from '../ui/dragOrder';
 import { DragGhost, DropLine } from '../ui/DragParts';
 import { BOX, BOX_GLOW, BOX_INK, byRank, DROP_OUTLINE, moveFor, type Move } from '../ui/dragRules';
-import { catStats, groupNow, isOpen, matchesArt, plan, rowTitle, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
+import { catStats, groupNow, isOpen, lateDays, lateLabel, matchesArt, plan, rowTitle, sectionsOf, toneOf, toneStyle, type Tone } from './rules';
 
 type Mode = 'light' | 'dark';
 
@@ -38,18 +38,20 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
   const done = !isOpen(item) || ticked;
   const tone = toneOf(item.cat, cats);
   const milestone = item.kind === 'milestone';
+  const waiting = !!item.waits_for && isOpen(item);
+  const late = waiting ? lateDays(item, today) : 0;
   const tick = () => {
-    if (done) return;
+    if (done || waiting) return;
     setTicked(true); navigator.vibrate?.(10);
     window.setTimeout(() => onDone(item), 380);   // the check shows before the row goes
   };
-  const extra = item.kind === 'check' || item.status === 'check' ? 'De verificat' : item.kind === 'decision' ? 'De decis' : item.status === 'waiting' ? 'În așteptare' : null;
+  const extra = waiting ? null : item.kind === 'check' || item.status === 'check' ? 'De verificat' : item.kind === 'decision' ? 'De decis' : item.status === 'waiting' ? 'În așteptare' : null;
   return (
     <div data-row={item.id} className={`relative select-none overflow-hidden rounded-[12px] ${lifted ? 'opacity-30' : ''}`} {...hold.mouse}
       onTouchStart={e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null }; hold.touchStart(e.touches[0].clientX, e.touches[0].clientY); }}
       onTouchMove={e => {
         hold.touchMove(e.touches[0].clientX, e.touches[0].clientY);
-        const t = touch.current; if (!t || done || hold.lifted()) return;
+        const t = touch.current; if (!t || done || waiting || hold.lifted()) return;
         const mx = e.touches[0].clientX - t.x, my = e.touches[0].clientY - t.y;
         if (t.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) t.horizontal = Math.abs(mx) > Math.abs(my) && mx > 0;
         if (t.horizontal) { e.stopPropagation(); setDx(Math.max(0, Math.min(120, mx))); }
@@ -66,7 +68,7 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
       )}
       <div className={`flex items-start gap-1 py-1.5 pr-2 ${dx ? '' : 'transition-transform'} ${ticked ? 'opacity-50' : ''}`}
         style={dx ? { transform: `translateX(${dx}px)` } : undefined}>
-        <button type="button" onClick={tick} disabled={!isOpen(item)} className="press flex h-10 w-10 shrink-0 items-center justify-center"
+        {waiting ? <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#d48a12]"><Hourglass size={20} aria-label="Așteptăm" /></span> : <button type="button" onClick={tick} disabled={!isOpen(item)} className="press flex h-10 w-10 shrink-0 items-center justify-center"
           aria-label={`Făcut: ${item.title.replace(/\*\*/g, '')}`}>
           {milestone ? (
             <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 ${done ? 'border-[#1d9e75] bg-[#1d9e75] text-white' : ''}`}
@@ -79,7 +81,7 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
               {done && <Check size={14} strokeWidth={3.5} />}
             </span>
           )}
-        </button>
+        </button>}
         <span className="w-[30px] shrink-0 pr-1 pt-[9px] text-right text-[17px] font-bold leading-[22px] tracking-tight tabular-nums"
           style={{ color: done ? undefined : tone.rail }} aria-label={item.n ? `numărul ${item.n}` : undefined}>
           {item.n ?? ''}
@@ -88,10 +90,12 @@ export function ArtRow({ item, today, mode, cats, showCat = true, onDone, onOpen
         <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 py-[9px] text-left"
           title={item.glance_title ? item.title.replace(/\*\*/g, '') : undefined}>
           <Title text={rowTitle(item)} className={`block text-[16px] leading-[22px] ${done ? 'text-pc-text-muted line-through' : milestone ? 'font-semibold text-pc-text-primary' : 'text-pc-text-primary'}`} />
-          {(dueChip(item, today) || showCat || extra || item.priority === 'P1' || item.focus) && (
+          {(dueChip(item, today) || showCat || extra || item.priority === 'P1' || item.focus || waiting || item.asleep) && (
             <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {item.focus && isOpen(item) && <Pin size={14} className="text-[#d48a12]" fill="currentColor" aria-label="Pus în Acum" />}
-              <DueChip item={item} today={today} mode={mode} />
+              {waiting && <span className="inline-flex h-[22px] items-center text-[12px] font-semibold text-pc-text-secondary">{item.waits_for}</span>}
+              {late > 0 ? <span className="inline-flex h-[22px] items-center rounded-[8px] px-2 text-[12px] font-semibold text-[#a5241f]" style={{ background: mode === 'dark' ? 'rgba(220,76,76,0.2)' : '#f9d3d3' }}>{lateLabel(late)}</span> : <DueChip item={item} today={today} mode={mode} />}
+              {item.asleep && <span className="inline-flex h-[22px] items-center text-[12px] font-semibold text-pc-text-muted">După {item.after_n}</span>}
               {item.priority === 'P1' && <Star size={14} className="text-[#f5a623]" fill="currentColor" aria-label="Prioritar" />}
               {extra && <span className="inline-flex h-[22px] items-center gap-1 text-[12px] font-semibold text-pc-text-muted"><HelpCircle size={12} aria-hidden />{extra}</span>}
               {showCat && <CatPill cat={item.cat} cats={cats} mode={mode} />}
@@ -141,7 +145,7 @@ export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: Li
     <section data-zone={zone} className="rounded-[16px] pb-1" style={drag && drag.from === zone && drag.over?.zone === zone ? DROP_OUTLINE : undefined}>{head}{rows(zone, list)}</section>
   );
   const hot = box.length > 0;
-  const empty = !hot && !g.week.length && !g.soon.length && !g.check.length && !g.priority.length;
+  const empty = !hot && !g.waits.length && !g.week.length && !g.soon.length && !g.check.length && !g.priority.length;
   return (
     <div className="space-y-6">
       {(hot || drag) && (
@@ -151,6 +155,12 @@ export function NowView({ items, today, mode, cats, onDone, onOpen, onMove }: Li
           {g.overdue.length === 0 && <GroupHead label="Acum" count={box.length} color={BOX_INK} sub="azi – poimâine și ce pui tu aici" />}
           {rows(BOX, box)}
           {!hot && <p className="px-3 py-6 text-center text-[15px] font-medium" style={{ color: BOX_INK }}>Lasă aici ce faci acum</p>}
+        </section>
+      )}
+      {g.waits.length > 0 && (
+        <section>
+          <GroupHead mark={<Hourglass size={13} strokeWidth={2.5} aria-hidden />} label="Așteptăm" count={g.waits.length} color="#b26f0a" sub="a trecut data" />
+          {g.waits.map(i => <ArtRow key={i.id} item={i} today={today} mode={mode} cats={cats} onDone={onDone} onOpen={onOpen} />)}
         </section>
       )}
       {plain('week', <GroupHead label="Săptămâna asta" count={g.week.length} />, g.week)}
