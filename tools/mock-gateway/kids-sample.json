@@ -1,17 +1,173 @@
 {
-  "children": [{ "id": "carla", "name": "Carla", "class": "CP" }, { "id": "lia", "name": "Lia", "class": "PS" }],
-  "items": [
-    { "id": "kid-2026-11-03-000001", "n": 201, "kind": "activity", "title": "**Înot**", "status": "todo", "child": "lia", "schedule": [{ "day": 3, "start": "14:00", "end": "15:00" }], "place": "Piscina", "bring": "sac de înot, cască", "who": "ludmila", "season_to": "2027-06-23", "calendar": [{ "id": "x1", "start": "2026-11-04T14:00" }] },
-    { "id": "kid-2026-11-03-000002", "n": 202, "kind": "activity", "title": "**Dans**", "status": "todo", "child": "carla", "schedule": [{ "day": 4, "start": "17:00", "end": "18:00" }, { "day": 6, "start": "10:00" }], "place": "Sala de sport", "cost": "180 € / an" },
-    { "id": "kid-2026-11-03-000003", "n": 203, "kind": "task", "title": "Semnează **autorisation** pentru sortie", "status": "todo", "child": "carla", "due_date": "2026-11-06" },
-    { "id": "kid-2026-11-03-000004", "n": 204, "kind": "task", "title": "Plătește **cantina** pe noiembrie", "status": "todo", "child": "both", "due_date": "2026-11-01" },
-    { "id": "kid-2026-11-03-000005", "n": 205, "kind": "event", "title": "Ziua lui **Tom**", "status": "todo", "child": "lia", "type": "invitation", "due_date": "2026-11-08", "time": "15:00", "end_time": "17:30", "place": "Sala de sport", "rsvp": "yes" },
-    { "id": "kid-2026-11-03-000006", "n": 206, "kind": "event", "title": "**Réunion parents-profs**", "status": "todo", "child": "carla", "type": "meeting", "due_date": "2026-11-12", "time": "18:00", "who": "both" },
-    { "id": "kid-2026-11-03-000007", "n": 207, "kind": "idea", "title": "Felinare din **borcane**", "status": "todo", "tags": ["ploaie", "bricolaj"], "materials": "borcane, hârtie colorată, lumânări LED", "loved": true, "created": "2026-11-01T10:00:00Z" },
-    { "id": "kid-2026-11-03-000008", "n": 208, "kind": "idea", "title": "Plimbare cu **ghinde** și frunze", "status": "todo", "tags": ["afară", "sub 30 min"], "created": "2026-11-02T10:00:00Z" },
-    { "id": "kid-2026-11-03-000009", "n": 209, "kind": "plan", "title": "Petrecerea **Carlei**", "status": "todo", "child": "carla", "due_date": "2027-03-20" },
-    { "id": "kid-2026-11-03-000010", "n": 210, "kind": "task", "title": "Rezervă **sala**", "status": "done", "plan": "kid-2026-11-03-000009", "child": "carla" },
-    { "id": "kid-2026-11-03-000011", "n": 211, "kind": "task", "title": "**Invitații**", "status": "todo", "plan": "kid-2026-11-03-000009", "child": "carla", "due_date": "2027-02-20" },
-    { "id": "kid-2026-11-03-000012", "n": 212, "kind": "task", "title": "Cumpără **cizme de cauciuc**", "status": "todo", "child": "lia" }
-  ]
+ "children": [
+  {
+   "id": "carla",
+   "name": "Carla",
+   "class": "CP"
+  },
+  {
+   "id": "lia",
+   "name": "Lia",
+   "class": "PS"
+  }
+ ],
+ "items": [
+  {
+   "id": "kid-2026-11-03-000001",
+   "n": 201,
+   "kind": "activity",
+   "title": "**Înot**",
+   "status": "todo",
+   "child": "lia",
+   "schedule": [
+    {
+     "day": 3,
+     "start": "14:00",
+     "end": "15:00"
+    }
+   ],
+   "place": "Piscina",
+   "bring": "sac de înot, cască",
+   "who": "ludmila",
+   "season_to": "2027-06-23",
+   "calendar": [
+    {
+     "id": "x1",
+     "start": "2026-11-04T14:00"
+    }
+   ]
+  },
+  {
+   "id": "kid-2026-11-03-000002",
+   "n": 202,
+   "kind": "activity",
+   "title": "**Dans**",
+   "status": "todo",
+   "child": "carla",
+   "schedule": [
+    {
+     "day": 4,
+     "start": "17:00",
+     "end": "18:00"
+    },
+    {
+     "day": 6,
+     "start": "10:00"
+    }
+   ],
+   "place": "Sala de sport",
+   "cost": "180 € / an"
+  },
+  {
+   "id": "kid-2026-11-03-000003",
+   "n": 203,
+   "kind": "task",
+   "title": "Semnează **autorisation** pentru sortie",
+   "status": "todo",
+   "child": "carla",
+   "due_date": "2026-11-06",
+   "glance_title": "Autorisation sortie · semnează"
+  },
+  {
+   "id": "kid-2026-11-03-000004",
+   "n": 204,
+   "kind": "task",
+   "title": "Plătește **cantina** pe noiembrie",
+   "status": "todo",
+   "child": "both",
+   "due_date": "2026-11-01"
+  },
+  {
+   "id": "kid-2026-11-03-000005",
+   "n": 205,
+   "kind": "event",
+   "title": "Ziua lui **Tom**",
+   "status": "todo",
+   "child": "lia",
+   "type": "invitation",
+   "due_date": "2026-11-08",
+   "time": "15:00",
+   "end_time": "17:30",
+   "place": "Sala de sport",
+   "rsvp": "yes"
+  },
+  {
+   "id": "kid-2026-11-03-000006",
+   "n": 206,
+   "kind": "event",
+   "title": "**Réunion parents-profs**",
+   "status": "todo",
+   "child": "carla",
+   "type": "meeting",
+   "due_date": "2026-11-12",
+   "time": "18:00",
+   "who": "both"
+  },
+  {
+   "id": "kid-2026-11-03-000007",
+   "n": 207,
+   "kind": "idea",
+   "title": "Felinare din **borcane**",
+   "status": "todo",
+   "tags": [
+    "ploaie",
+    "bricolaj"
+   ],
+   "materials": "borcane, hârtie colorată, lumânări LED",
+   "loved": true,
+   "created": "2026-11-01T10:00:00Z"
+  },
+  {
+   "id": "kid-2026-11-03-000008",
+   "n": 208,
+   "kind": "idea",
+   "title": "Plimbare cu **ghinde** și frunze",
+   "status": "todo",
+   "tags": [
+    "afară",
+    "sub 30 min"
+   ],
+   "created": "2026-11-02T10:00:00Z",
+   "glance_title": "Plimbare cu ghinde",
+   "face": {
+    "drawing": "sample-acorn.svg"
+   }
+  },
+  {
+   "id": "kid-2026-11-03-000009",
+   "n": 209,
+   "kind": "plan",
+   "title": "Petrecerea **Carlei**",
+   "status": "todo",
+   "child": "carla",
+   "due_date": "2027-03-20"
+  },
+  {
+   "id": "kid-2026-11-03-000010",
+   "n": 210,
+   "kind": "task",
+   "title": "Rezervă **sala**",
+   "status": "done",
+   "plan": "kid-2026-11-03-000009",
+   "child": "carla"
+  },
+  {
+   "id": "kid-2026-11-03-000011",
+   "n": 211,
+   "kind": "task",
+   "title": "**Invitații**",
+   "status": "todo",
+   "plan": "kid-2026-11-03-000009",
+   "child": "carla",
+   "due_date": "2027-02-20"
+  },
+  {
+   "id": "kid-2026-11-03-000012",
+   "n": 212,
+   "kind": "task",
+   "title": "Cumpără **cizme de cauciuc**",
+   "status": "todo",
+   "child": "lia"
+  }
+ ]
 }

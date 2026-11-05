@@ -9,7 +9,7 @@ cpSync('dist/logo-512.png', 'dist/logo.png');   // the login screen's picture
 for (const d of ['kids', 'artlia', 'shop', 'shortcuts']) rmSync(`dist/${d}`, { recursive: true, force: true });
 const html = readFileSync('dist/index.html', 'utf8')
   .replace(/<html lang="[^"]*"/, '<html lang="ro"')
-  .replace(/<title>[^<]*<\/title>/, '<title>Copiii</title>')
+  .replace(/<title>[^<]*<\/title>/, '<title>Kids</title>')
   .replace(/<meta name="theme-color" content="[^"]*"/, '<meta name="theme-color" content="#ffffff"');
 writeFileSync('dist/index.html', html);
 console.log('dist/ is the kids app');

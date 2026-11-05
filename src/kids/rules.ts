@@ -174,13 +174,19 @@ const WORDS: Array<[KidObjectName, RegExp]> = [
   ['school', /\b(scoal|scolar|sedint|reunion|reuniune|parinti|profesor|invatator|maitresse|ecole)/],
   ['bag', /\b(cumpar|magazin|de luat)/],
 ];
+const DRAWN = new Set<KidObjectName>(['goggles', 'gi', 'ball', 'note', 'slipper', 'racket', 'snow', 'bike', 'cake', 'envelope', 'form', 'school', 'backpack', 'sun',
+  'book', 'plaster', 'gift', 'scissors', 'brush', 'plant', 'pot', 'bag', 'ticket', 'calendar', 'bulb', 'list', 'star', 'flag']);   // faces.mjs KIDS_OBJECTS: keep in step
 const BY_TYPE: Record<string, KidObjectName> = { birthday: 'cake', invitation: 'envelope', outing: 'backpack', meeting: 'school', dayoff: 'sun', other: 'calendar' };
 const BY_KIND: Record<string, KidObjectName> = { task: 'list', activity: 'star', event: 'calendar', idea: 'bulb', plan: 'flag' };
 
 const plainWords = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/\*\*/g, '').toLowerCase();
 
-/** The title first, then the tags, then what kind of thing it is. */
-export function objectFor(i: Pick<KidItem, 'kind' | 'title' | 'type' | 'tags'>): KidObjectName {
+/** The short title the background job wrote, for tiles; the full one stays in the sheet. */
+export const shortTitle = (i: Pick<KidItem, 'title' | 'glance_title'>) => i.glance_title ?? i.title;
+
+/** The job's word first (coach-worker.mjs), then the title, then the tags, then what kind of thing it is. */
+export function objectFor(i: Pick<KidItem, 'kind' | 'title' | 'type' | 'tags' | 'face'>): KidObjectName {
+  if (i.face?.object && DRAWN.has(i.face.object as KidObjectName)) return i.face.object as KidObjectName;
   for (const text of [i.title, (i.tags ?? []).join(' ')]) {
     const t = plainWords(text);
     const hit = WORDS.find(([, re]) => re.test(t));

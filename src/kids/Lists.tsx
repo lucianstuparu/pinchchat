@@ -10,7 +10,7 @@ import { DueChip, Title } from '../app/Todo';
 import type { Child, KidItem } from './api';
 import { KidObject } from './KidObject';
 import {
-  RSVP_LABEL, TYPE_LABEL, WHO_LABEL, activitiesByChild, childTone, childrenOf, dayTitle, ideaTags, ideas, isOpen, planLine, plans, shortDate,
+  RSVP_LABEL, TYPE_LABEL, WHO_LABEL, activitiesByChild, childTone, childrenOf, dayTitle, ideaTags, ideas, isOpen, planLine, plans, shortDate, shortTitle,
   slotText, topOf, week, type WeekLine,
 } from './rules';
 
@@ -125,7 +125,7 @@ function WideTile({ item, kids, mode, today, onOpen, onDone, title, meta, showDu
         <button type="button" onClick={() => onOpen(item)} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-2 text-left">
           <KidObject item={item} size={44} />
           <span className="min-w-0 flex-1">
-            <Title text={title ?? item.title} className={`block text-[16px] font-medium leading-[21px] ${isOpen(item) ? '' : 'line-through'}`} />
+            <Title text={title ?? shortTitle(item)} className={`block text-[16px] font-medium leading-[21px] ${isOpen(item) ? '' : 'line-through'}`} />
             {meta && <span className="mt-0.5 block text-[13px] leading-[18px] text-pc-text-muted">{meta}</span>}
             <span className="mt-1 flex flex-wrap items-center gap-1 empty:hidden">
               {showDue && <DueChip item={item} today={today} mode={mode} />}
@@ -149,14 +149,14 @@ function SmallTile({ item, onOpen, meta, names }: { item: KidItem; onOpen: (i: K
         <KidObject item={item} size={48} />
         {!!item.calendar?.length && <CalendarCheck size={14} className="text-[var(--pc-accent-ink)]" aria-label="În calendar" />}
       </span>
-      <Title text={item.title} className="mt-2 block w-full text-[15px] font-medium leading-[20px] [overflow-wrap:anywhere]" />
+      <Title text={shortTitle(item)} className="mt-2 block w-full text-[15px] font-medium leading-[20px] [overflow-wrap:anywhere]" />
       <span className="mt-0.5 block w-full text-[13px] leading-[18px] text-pc-text-muted [overflow-wrap:anywhere]">{meta}</span>
       {names && <span className="mt-1.5">{names}</span>}
     </button>
   );
 }
 
-const withTime = (i: KidItem, time?: string, end?: string) => (time ? `${i.title}, ${time}${end ? `–${end}` : ''}` : i.title);
+const withTime = (i: KidItem, time?: string, end?: string) => (time ? `${shortTitle(i)}, ${time}${end ? `–${end}` : ''}` : shortTitle(i));
 
 /**
  * What comes first, on the accent tint with its drawing: in the list (tap for the sheet, tick if it can
@@ -169,7 +169,7 @@ export function NextBand({ items, kids, today, mode, onOpen, onDone, small }: { 
   const line = small
     ? [when, more > 0 ? `încă ${more}` : ''].filter(Boolean).join(' · ')
     : [when, metaWithNumber(top.item, details(top.item))].filter(Boolean).join(' · ');
-  // A fresh tint of Copiii's green: the accent at low alpha turns grey on the grey ground.
+  // A fresh tint of Kids' green: the accent at low alpha turns grey on the grey ground.
   const tint = { background: mode === 'dark' ? 'rgba(var(--pc-accent-rgb),0.28)' : '#d6f0e1' };
   return (
     <div className={`flex items-center rounded-[20px] ${small ? '' : 'mb-4'}`} style={tint}>
@@ -305,7 +305,7 @@ export function PlansView({ items, kids, today, mode, onOpen, onDone, onAdd }: L
               <div className="flex items-center border-t border-pc-border">
                 <button type="button" onClick={() => onOpen(next)} className="min-w-0 flex-1 py-2 pl-3 pr-2 text-left">
                   <span className="block text-[12px] font-semibold text-[var(--pc-accent-ink)]">{line}</span>
-                  <Title text={next.title} className="block text-[15px] leading-[20px]" />
+                  <Title text={shortTitle(next)} className="block text-[15px] leading-[20px]" />
                   {next.due_date && <span className="mt-1 flex"><DueChip item={next} today={today} mode={mode} /></span>}
                 </button>
                 <span className="pr-1"><Tick key={next.id} item={next} onDone={onDone} /></span>

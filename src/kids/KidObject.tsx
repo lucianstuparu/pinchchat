@@ -1,8 +1,9 @@
 /**
  * What a kids item looks like (my.design decisions 2026-11-05): a drawing of the real thing, in the
- * house stroke of the v2 boards (2 px ink, paper fill, at most one spot of colour). rules.ts objectFor
- * picks it from the words, so nothing here needs a model or a server. Decorative: the title beside it
- * always says what it is.
+ * house stroke of the v2 boards (2 px ink, paper fill, at most one spot of colour). oc v2's background
+ * job (coach-worker.mjs) names the thing; a thing not in this library comes from the job's shared
+ * drawings as an image; until the job has looked, rules.ts objectFor picks from the words. Decorative:
+ * the title beside it always says what it is.
  */
 import type { ReactNode } from 'react';
 import { objectFor, type KidObjectName } from './rules';
@@ -137,14 +138,16 @@ const DRAW: Record<KidObjectName, ReactNode> = {
 };
 
 /** `glow` marks the one highlighted thing on a screen. */
-export function KidObject({ item, size, glow }: { item: Pick<KidItem, 'kind' | 'title' | 'type' | 'tags'>; size: number; glow?: boolean }) {
+export function KidObject({ item, size, glow }: { item: Pick<KidItem, 'kind' | 'title' | 'type' | 'tags' | 'face'>; size: number; glow?: boolean }) {
   return (
     <span aria-hidden className="relative block shrink-0" style={{ width: size, height: size }}>
       {glow && <span className="absolute left-[12%] h-2 w-[76%] rounded-[50%] bg-[rgba(var(--pc-accent-rgb),0.35)]" style={{ bottom: -3 }} />}
-      <svg viewBox="0 0 64 64" width={size} height={size} className="relative block [&_*]:[vector-effect:non-scaling-stroke]"
-        fill="var(--pc-bg-elevated)" stroke="var(--pc-text-primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        {DRAW[objectFor(item)]}
-      </svg>
+      {item.face?.drawing ? <img src={`/kids/faces/${encodeURIComponent(item.face.drawing)}`} alt="" draggable={false} loading="lazy" width={size} height={size} className="relative block h-full w-full" /> : (
+        <svg viewBox="0 0 64 64" width={size} height={size} className="relative block [&_*]:[vector-effect:non-scaling-stroke]"
+          fill="var(--pc-bg-elevated)" stroke="var(--pc-text-primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          {DRAW[objectFor(item)]}
+        </svg>
+      )}
     </span>
   );
 }

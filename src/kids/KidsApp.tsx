@@ -1,5 +1,5 @@
 /**
- * Copiii, the kids app (kids.stuparu.eu; ai.manager kids-app.md): one chat shared by Lucian and
+ * Kids, the kids app (kids.stuparu.eu; ai.manager kids-app.md): one chat shared by Lucian and
  * Ludmila with the kids assistant (agent `kids`, session agent:kids:main), the children's list beside
  * it (Săptămâna · Activități · Idei · Planuri) and the item sheet. Romanian, French school terms kept.
  * Built like Casa Artlia from oc's parts: the input bar, the bubbles, the sheet, the undo bar.
@@ -229,7 +229,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const last = messages[messages.length - 1];
     if (onKids && last?.role === 'assistant' && !last.isStreaming && isShownInMessenger(last)) {
       const t = extractItems(visibleText(last)).text;
-      notify('Copiii', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'Mesaj nou'));
+      notify('Kids', failedTurn(t)?.summary ?? (t.slice(0, 120) || 'Mesaj nou'));
       void refresh();
     }
   }, [messages, notify, refresh, onKids]);
@@ -266,7 +266,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   };
 
   const [settings, setSettings] = useState(false);
-  const statusLine = status === 'connected' ? (allowed && gw.agents.length > 0 && !gw.agents.includes('kids') ? 'Asistentul Copiii nu e pornit încă' : null)
+  const statusLine = status === 'connected' ? (allowed && gw.agents.length > 0 && !gw.agents.includes('kids') ? 'Asistentul Kids nu e pornit încă' : null)
     : status === 'connecting' ? 'Se conectează…' : outbox.length > 0 ? `Fără conexiune · ${outbox.length} de trimis` : 'Fără conexiune';
   const today = list?.today ?? new Date().toISOString().slice(0, 10);
   const items = useMemo(() => list?.items ?? [], [list]);
@@ -309,7 +309,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       <div className="shrink-0 pt-[env(safe-area-inset-top)]">
         <div className="flex h-[52px] items-center gap-1 px-2">
           {onClose && <IconButton label="Înapoi la chat" onClick={onClose}><ArrowLeft size={22} /></IconButton>}
-          <h2 className="min-w-0 flex-1 truncate px-1 text-[17px] font-semibold">Copiii · listă</h2>
+          <h2 className="min-w-0 flex-1 truncate px-1 text-[17px] font-semibold">Kids · listă</h2>
           <IconButton label="Adaugă" onClick={addFor[tab]}><Plus size={22} /></IconButton>
           <IconButton label="Reîncarcă" onClick={() => void refresh()}><RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} /></IconButton>
         </div>
@@ -366,7 +366,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pc-border bg-[color-mix(in_srgb,var(--pc-bg-base)_88%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <AppHeader title="Copiii" subtitle={kids.length ? kids.map(c => `${c.name}${c.class ? ` ${c.class}` : ''}`).join(' · ') : 'Carla și Lia'}
+        <AppHeader title="Kids" subtitle={kids.length ? kids.map(c => `${c.name}${c.class ? ` ${c.class}` : ''}`).join(' · ') : 'Carla și Lia'}
           initial={name ? name[0] : '…'} onSettings={() => setSettings(true)} />
         {statusLine && <div className="flex h-6 items-center justify-center bg-amber-500/15 text-[12px] text-amber-700" role="status">{statusLine}</div>}
         {person === '' && !isLocal() && <div className="flex h-6 items-center justify-center bg-red-500/15 text-[12px] text-red-600" role="status">Neautentificat · <a href="/" className="ml-1 underline">intră</a></div>}
@@ -417,7 +417,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {settings && (
         <Sheet label="Setări" onClose={() => setSettings(false)} className="px-4 pt-2">
           <div className="flex justify-end"><CloseButton onClick={() => setSettings(false)} label="Închide" /></div>
-          <p className="-mt-2 mb-4 text-[17px] font-semibold">{name || 'Copiii'}</p>
+          <p className="-mt-2 mb-4 text-[17px] font-semibold">{name || 'Kids'}</p>
           <p className="mb-1.5 px-1 text-[13px] text-pc-text-muted">Aspect</p>
           <Segmented choice label="Aspect" value={look.appearance} onChange={a => onLook({ ...look, appearance: a })}
             options={[{ value: 'auto', label: 'Automat' }, { value: 'light', label: 'Luminos' }, { value: 'dark', label: 'Întunecat' }]} />

@@ -1,38 +1,60 @@
-# kids-icons.py: draw the kids app's icons into public/kids/ (green field, two white children of
-# different heights, a small terracotta heart between them, as Casa Artlia's house with its heart).
+# kids-icons.py: draw the Kids app's icons into public/kids/: a kite on the app's green, four panels
+# (gold, white, white, rose) with a waving tail and two bows. Chosen 2026-11-05 over two faces and a
+# paper boat: it stays clear at favicon size, and it is nobody's portrait.
 # Run from the fork root: python tools/kids-icons.py
 from PIL import Image, ImageDraw
 
-GREEN, WHITE, HEART = (46, 125, 91), (255, 255, 255), (194, 89, 58)
+GREEN, WHITE, GOLD, ROSE, INK = (46, 125, 91), (255, 255, 255), (255, 209, 102), (242, 138, 178), (29, 59, 47)
+TOP, RIGHT, BOTTOM, LEFT = (0.585, 0.09), (0.835, 0.385), (0.475, 0.68), (0.235, 0.325)
 
 
-def heart(d, cx, cy, r, fill):
-    d.ellipse([cx - r, cy - r * 0.9, cx, cy + r * 0.1], fill=fill)
-    d.ellipse([cx, cy - r * 0.9, cx + r, cy + r * 0.1], fill=fill)
-    d.polygon([(cx - r * 0.97, cy - 0.25 * r), (cx + r * 0.97, cy - 0.25 * r), (cx, cy + r * 1.05)], fill=fill)
+def cross():
+    """Where the spine (top-bottom) meets the spar (left-right)."""
+    (x1, y1), (x2, y2), (x3, y3), (x4, y4) = TOP, BOTTOM, LEFT, RIGHT
+    d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d
+    return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+
+
+def bezier(p0, p1, p2, p3, n=48):
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        yield (u**3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t**3 * p3[0],
+               u**3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t**3 * p3[1])
 
 
 def draw(size, safe=1.0):
     """safe < 1 shrinks the drawing into the maskable safe zone."""
-    s = size * 4
+    s = size * 4 if size > 64 else 512   # small icons are drawn big and scaled down
     img = Image.new("RGB", (s, s), GREEN)
     d = ImageDraw.Draw(img)
     k = s * safe
     o = (s - k) / 2
-    P = lambda x, y: (o + x * k, o + y * k)   # noqa: E731
+    P = lambda p: (o + p[0] * k, o + p[1] * k)   # noqa: E731
 
-    def child(cx, head_y, head_r, body_w, body_top, body_bottom):
-        x0, y0 = P(cx - head_r, head_y - head_r); x1, y1 = P(cx + head_r, head_y + head_r)
-        d.ellipse([x0, y0, x1, y1], fill=WHITE)
-        bx0, by0 = P(cx - body_w / 2, body_top); bx1, by1 = P(cx + body_w / 2, body_bottom)
-        rad = (bx1 - bx0) / 2
-        d.rounded_rectangle([bx0, by0, bx1, by1 + rad], radius=rad, fill=WHITE)
+    def line(points, w, fill):
+        pts = [P(p) for p in points]
+        d.line(pts, fill=fill, width=round(w * k), joint="curve")
+        r = w * k / 2
+        for x, y in (pts[0], pts[-1]):
+            d.ellipse([x - r, y - r, x + r, y + r], fill=fill)
 
-    child(0.34, 0.36, 0.105, 0.30, 0.50, 0.80)   # the older one
-    child(0.68, 0.47, 0.085, 0.24, 0.585, 0.80)  # the younger one
-    d.rectangle([0, P(0, 0.80)[1], s, s], fill=GREEN)   # cut the bodies flat at the bottom
-    hx, hy = P(0.515, 0.30)
-    heart(d, hx, hy, 0.055 * k, HEART)
+    # The tail first, under the kite; thicker on the small icons so it survives.
+    tail_w = 0.022 if size > 64 else 0.04
+    a = list(bezier(BOTTOM, (0.40, 0.76), (0.56, 0.78), (0.44, 0.84)))
+    b = list(bezier((0.44, 0.84), (0.37, 0.88), (0.31, 0.87), (0.25, 0.92)))
+    line(a + b, tail_w, WHITE)
+    for (x, y), turn in (((0.46, 0.765), 1), ((0.36, 0.875), -1)):
+        d.polygon([P((x, y)), P((x - 0.075, y - 0.05 * turn)), P((x - 0.065, y + 0.05 * turn))], fill=ROSE)
+        d.polygon([P((x, y)), P((x + 0.075, y + 0.05 * turn)), P((x + 0.065, y - 0.05 * turn))], fill=GOLD)
+
+    c = cross()
+    for corners, fill in (((TOP, LEFT), GOLD), ((TOP, RIGHT), WHITE), ((BOTTOM, LEFT), WHITE), ((BOTTOM, RIGHT), ROSE)):
+        d.polygon([P(corners[0]), P(corners[1]), P(c)], fill=fill)
+    if size > 64:   # the sticks would only smudge at favicon size
+        line([TOP, BOTTOM], 0.012, INK)
+        line([LEFT, RIGHT], 0.012, INK)
     return img.resize((size, size), Image.LANCZOS)
 
 

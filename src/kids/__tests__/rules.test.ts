@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activitiesByChild, childrenOf, dayTitle, ideaTags, ideas, objectFor, planLine, plans, slotText, topOf, week, weekEnd, weekday } from '../rules';
+import { activitiesByChild, childrenOf, dayTitle, ideaTags, ideas, objectFor, planLine, plans, shortTitle, slotText, topOf, week, weekEnd, weekday } from '../rules';
 import type { Child, KidItem } from '../api';
 
 const T = '2026-11-03';   // a Tuesday
@@ -147,5 +147,16 @@ describe('a plan says where it stands', () => {
     expect(planLine({ plan, steps: [], done: 0 })).toEqual({ next: null, line: 'Fără pași încă' });
     expect(planLine({ plan, steps: [a], done: 1 })).toEqual({ next: null, line: 'Toți pașii sunt gata' });
     expect(planLine({ plan: { ...plan, status: 'done' }, steps: [a], done: 1 })).toEqual({ next: null, line: 'Gata' });
+  });
+});
+
+describe('what the background job says', () => {
+  it('wins over the words, when the app has that drawing', () => {
+    expect(objectFor(k({ title: 'Pune gimnastica', face: { object: 'calendar' } }))).toBe('calendar');
+    expect(objectFor(k({ title: 'Înot', face: { object: 'unicorn' } }))).toBe('goggles');
+  });
+  it('gives tiles a short title, and the full one until then', () => {
+    expect(shortTitle(k({ title: 'Un titlu foarte lung', glance_title: 'Titlu' }))).toBe('Titlu');
+    expect(shortTitle(k({ title: 'Un titlu foarte lung' }))).toBe('Un titlu foarte lung');
   });
 });

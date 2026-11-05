@@ -1,8 +1,8 @@
 {
   "id": "/kids",
-  "name": "Copiii",
-  "short_name": "Copiii",
-  "description": "Copiii: săptămâna, activitățile, ideile și planurile lui Carla și Lia, și un asistent care traduce mesajele de la școală.",
+  "name": "Kids",
+  "short_name": "Kids",
+  "description": "Kids: săptămâna, activitățile, ideile și planurile lui Carla și Lia, și un asistent care traduce mesajele de la școală.",
   "lang": "ro",
   "start_url": "/",
   "scope": "/",

@@ -16,6 +16,8 @@ export interface Slot { day: number; start: string; end?: string }
 export interface CalEvent { id: string; link?: string; start: string; weekly_until?: string }
 export interface KidItem {
   id: string; n?: number; kind: Kind; title: string; status: Status; child?: string;
+  /** From the background job (coach-worker.mjs), while they fit the title: at most four words, and the picture. */
+  glance_title?: string; face?: { object?: string; drawing?: string };
   due_date?: string; end_date?: string; time?: string; end_time?: string; type?: EventType; rsvp?: 'yes' | 'no' | 'maybe';
   who?: Who; schedule?: Slot[]; season_from?: string; season_to?: string;
   place?: string; cost?: string; contact?: string; bring?: string;

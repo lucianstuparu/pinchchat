@@ -598,6 +598,11 @@ const server = http.createServer((req, res) => {
     return;
   }
   // The kids app's API (/kids/*; ai.manager kids-app.md). In-memory sample; calendar answers after a second.
+  if (url.pathname.startsWith('/kids/faces/')) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><ellipse cx="50" cy="60" rx="26" ry="32" fill="#ffffff" stroke="#1c1c1e" stroke-width="4"/><path d="M22 40c8-16 48-16 56 0z" fill="#c9a26b" stroke="#1c1c1e" stroke-width="4"/></svg>');
+    return;
+  }
   if (url.pathname.startsWith('/kids/')) {
     let body = '';
     req.on('data', (c) => { body += c; });
