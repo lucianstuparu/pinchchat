@@ -776,7 +776,8 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         </div>
         {search === null && (
           <div className="relative z-30 shrink-0 border-t border-pc-border bg-pc-base"
-            onFocusCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}>
+            onFocusCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}
+            onPointerDownCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}>
             {!sheet && !todoOpen && undoBar}
             <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={(text, files) => { setConvOpen(true); send(text, files); }} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Say or type it" />
           </div>

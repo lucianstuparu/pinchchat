@@ -27,14 +27,14 @@ Screenshots in `docs/screens/` are from the browser at phone width with test dat
 | Settings | built | none yet | Appearance, accent (terracotta default, teal option), the mic, notifications. |
 | Login | rough | none | Upstream PinchChat screen, not restyled. |
 
-## oc v2 (behind `?view=v2`, not deployed)
+## oc v2 (behind `?view=v2`, on chat.stuparu.eu since 2026-11-05, v1 stays the default)
 
 | Screen | Status | Latest screenshot | Notes |
 |---|---|---|---|
-| Today | rough | [light](docs/screens/oc-v2-today-375-light.png), [dark](docs/screens/oc-v2-today-375-dark.png), [1440 light](docs/screens/oc-v2-today-1440-light.png), [1440 dark](docs/screens/oc-v2-today-1440-dark.png) | Sample data in `tools/harness/today.html`. Crucial, tiles, Passing by. Not seen on a phone or against the real server. Composer still v1's size. |
+| Today | rough | [light](docs/screens/oc-v2-today-375-light.png), [dark](docs/screens/oc-v2-today-375-dark.png), [1440 light](docs/screens/oc-v2-today-1440-light.png), [1440 dark](docs/screens/oc-v2-today-1440-dark.png) | Screenshots use sample data (`tools/harness/today.html`). Crucial, tiles, Passing by. Real data checked in the laptop's Chrome and a 390×844 frame; not yet on a phone. Composer still v1's size. |
 | Tile menu | rough | [375](docs/screens/oc-v2-today-menu-375.png) | Move, Make crucial (asks which when two), Later, Open, Not needed. Long press or the dots; no drag yet. |
-| Conversation over Today | rough | none yet | Built in the desk; compiled, not run with a gateway. |
-| Bills that pay themselves | rough | none yet | Settings; marks a payee as automatic. Not run against the server. |
+| Conversation over Today | rough | none yet | Opens and closes correctly on the live app, scrolled to the latest; the slide itself not seen. No message sent in the test. |
+| Bills that pay themselves | rough | none yet | Settings; lists the 9 real payees. Marking not exercised (it is Lucian's to do). |
 
 ## Shopping (shop.stuparu.eu)
 
