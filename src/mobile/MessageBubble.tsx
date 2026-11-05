@@ -3,6 +3,7 @@ import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mic, Reply, TextSelect, Volume2 } from 'lucide-react';
 import { markCopyables } from './copyables';
 import { AgentAvatar, MeAvatar, PersonAvatar } from '../app/avatars';
+import { getUiMode } from './uiMode';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
@@ -73,7 +74,7 @@ interface Props {
   /** First message of a run shows the sender's avatar; the rest keep its space. */
   showAvatar?: boolean;
   /** How to show the items a message names (default: cards with Done / Snooze). */
-  renderItems?: (items: Array<{ id: string; label: string }>) => ReactNode;
+  renderItems?: (items: Array<{ id: string; label: string }>, ctx?: { ts: number; onCards: () => void }) => ReactNode;
   /** Multi-select (copy several messages): enter it from the long-press menu, tap to toggle. */
   selecting?: boolean;
   selected?: boolean;
@@ -108,11 +109,12 @@ function FailedTurn({ summary, detail, time, showAvatar }: { summary: string; de
   );
 }
 
-function Avatar({ mine, visible, person }: { mine: boolean; visible: boolean; person?: string | null }) {
-  if (!visible) return <span className="w-7 shrink-0" aria-hidden />;
-  return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar /> : person ? <PersonAvatar name={person} /> : <AgentAvatar />}</span>;
+function Avatar({ mine, visible, person, me, thinking }: { mine: boolean; visible: boolean; person?: string | null; me?: string; thinking?: boolean }) {
+  if (!visible) return <span className={`${V2 ? 'w-6' : 'w-7'} shrink-0`} aria-hidden />;
+  return <span className="mt-0.5 shrink-0 self-start">{mine ? <MeAvatar name={me} /> : person ? <PersonAvatar name={person} /> : <AgentAvatar thinking={thinking} />}</span>;
 }
 
+const V2 = getUiMode() === 'v2';
 const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
@@ -131,6 +133,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   const typing = msg.isStreaming && !text;
   const canReply = !!onReply && !msg.isStreaming && (text.length > 0 || images.length > 0);
 
+  // oc v2: a reply that became change cards (app/ChangeCards) drops its prose.
+  const [cardsOnly, setCardsOnly] = useState(false);
   const [dx, setDx] = useState(0);
   const [menu, setMenu] = useState(false);
   const [unfolded, setUnfolded] = useState(false);
@@ -207,6 +211,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   };
 
   if (failed && !selecting) return <FailedTurn {...failed} time={formatTime(msg.timestamp)} showAvatar={showAvatar} />;
+  // oc v2: thinking is the coach's mark breathing, with no empty bubble under it.
+  if (V2 && typing) return <div className="flex gap-1.5 px-2 py-1"><Avatar mine={false} visible person={other} thinking /></div>;
 
   return (
     <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-[20px]' : ''}`}
@@ -242,7 +248,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           touchMenu ? '[@media(pointer:coarse)]:select-none [@media(pointer:coarse)]:[-webkit-touch-callout:none]' : ''
         } ${
           mine
-            ? 'rounded-tr-md bg-[var(--pc-mine,rgba(var(--pc-accent-rgb),0.18))] text-pc-text'
+            ? `rounded-tr-md ${V2 ? 'bg-[#ffe3ef] text-[#1c1c1e]' : 'bg-[var(--pc-mine,rgba(var(--pc-accent-rgb),0.18))] text-pc-text'}`
             : 'rounded-tl-md bg-pc-surface text-pc-text'
         }`}
       >
@@ -265,7 +271,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           </span>
         ) : voiceNote && !text ? (
           <p className="flex items-center gap-1.5 py-0.5 text-[16px] text-pc-text-muted"><Mic size={16} className="shrink-0 text-[var(--pc-accent-ink)]" aria-hidden /> {L('Voice message')}</p>
-        ) : text ? (
+        ) : text && !(cardsOnly && !long) ? (
           <>
             {/* Long messages start folded at about eight lines; the rest is a tap away. */}
             {voiceNote && <Mic size={15} className="float-left mr-1.5 mt-[3px] text-[var(--pc-accent-ink)]" aria-label={L('Voice message')} />}
@@ -280,7 +286,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             )}
           </>
         ) : null}
-        {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items) : <ItemActions items={items} />)}
+        {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items, { ts: msg.timestamp, onCards: () => setCardsOnly(true) }) : <ItemActions items={items} />)}
 
         <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[12px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>
@@ -324,7 +330,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           </div>
         )}
       </div>
-      {mine && <Avatar mine visible={showAvatar} />}
+      {mine && <Avatar mine visible={showAvatar} me={me} />}
       {menu && <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />}
     </div>
   );

@@ -1,5 +1,24 @@
 /** The two faces of the chat: ME (the person) and the agent's mark. Inline SVG, theme colours. */
-export function MeAvatar({ className = 'h-7 w-7' }: { className?: string }) {
+import { getUiMode } from '../mobile/uiMode';
+
+/** oc v2's coach: a disc with a dot; while it thinks the dot breathes (index.css), and stops with the first token. */
+export function CoachMark({ thinking }: { thinking?: boolean }) {
+  return (
+    <span role="img" aria-label={thinking ? 'The coach is thinking' : 'Coach'} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f72585]">
+      <span className={`block h-[9px] w-[9px] rounded-full bg-white ${thinking ? 'coach-breathe' : ''}`} />
+    </span>
+  );
+}
+
+/** oc v2's person: a neutral disc with the initial. */
+export function PersonMark({ name }: { name: string }) {
+  return (
+    <span role="img" aria-label={name} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#e9e9ee] text-[13px] font-bold leading-none text-[#b5179e]">{name[0]?.toUpperCase()}</span>
+  );
+}
+
+export function MeAvatar({ className = 'h-7 w-7', name }: { className?: string; name?: string }) {
+  if (name && getUiMode() === 'v2') return <PersonMark name={name} />;
   return (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label="Me" role="img">
       <circle cx="16" cy="16" r="16" fill="var(--pc-accent)" />
@@ -8,7 +27,8 @@ export function MeAvatar({ className = 'h-7 w-7' }: { className?: string }) {
   );
 }
 
-export function AgentAvatar({ className = 'h-7 w-7' }: { className?: string }) {
+export function AgentAvatar({ className = 'h-7 w-7', thinking }: { className?: string; thinking?: boolean }) {
+  if (getUiMode() === 'v2') return <CoachMark thinking={thinking} />;
   // Casa Artlia's assistant: the icon's house on the accent's pair (pink), never the chat app's orange face
   // (Lucian 2026-10-25: it read like his own coral "ME").
   if (import.meta.env.VITE_APP === 'artlia') return (
@@ -40,6 +60,7 @@ export function AgentAvatar({ className = 'h-7 w-7' }: { className?: string }) {
 
 /** Another person in a shared chat (Casa Artlia): their initial on a neutral disc. */
 export function PersonAvatar({ name, className = 'h-7 w-7' }: { name: string; className?: string }) {
+  if (getUiMode() === 'v2') return <PersonMark name={name} />;
   return (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0 rounded-full shadow-sm`} aria-label={name} role="img">
       <circle cx="16" cy="16" r="16" fill="#7c5cd6" />

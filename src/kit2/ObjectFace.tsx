@@ -16,7 +16,19 @@ const OBJECTS: Record<string, { w: number; h: number; draw: ReactNode; badge: { 
     <rect x="2" y="2" width="96" height="66" rx="6" fill={PAPER} {...s} />
     <path d="M2 8l48 32 48-32" fill="none" {...s} />
   </> },
-  phone: { w: 44, h: 72, badge: { x: 10, y: 24, size: 24 }, draw: <rect x="4" y="2" width="36" height="68" rx="7" fill={PAPER} {...s} /> },
+  phone: { w: 44, h: 72, badge: { x: 10, y: 22, size: 24 }, draw: <>
+    <rect x="4" y="2" width="36" height="68" rx="7" fill={PAPER} {...s} />
+    <rect x="9" y="9" width="26" height="46" rx="2" fill="#f2f2f7" />
+    <circle cx="22" cy="62" r="2.5" fill={INK} />
+  </> },
+  letter: { w: 58, h: 70, badge: { x: 7, y: 7, size: 16 }, draw: <>
+    <rect x="3" y="2" width="52" height="66" rx="3" fill={PAPER} {...s} />
+    <path d="M9 30h40M9 39h40M9 48h26" fill="none" stroke="#d1d1d6" strokeWidth="3" strokeLinecap="round" />
+  </> },
+  person: { w: 60, h: 70, badge: { x: 36, y: 44, size: 20 }, draw: <>
+    <circle cx="30" cy="20" r="16" fill={PAPER} {...s} />
+    <path d="M4 68c1-17 12-26 26-26s25 9 26 26z" fill={PAPER} {...s} />
+  </> },
   stack: { w: 80, h: 62, badge: { x: 9, y: 26, size: 22 }, draw: <>
     <rect x="16" y="2" width="60" height="42" rx="4" fill={PAPER} {...s} />
     <rect x="10" y="9" width="60" height="42" rx="4" fill={PAPER} {...s} />
@@ -54,6 +66,12 @@ function Logo({ name, size }: { name: string; size: number }) {
 
 /** `size` is the height the face may take. */
 export function ObjectFace({ face, size, glow }: { face: Face; size: number; /** The one glow on the screen, under the next thing. */ glow?: boolean }) {
+  if (face.mono && !face.logo && !face.drawing && !face.object) {
+    return (
+      <span aria-hidden className="relative flex shrink-0 items-center justify-center rounded-[22%] bg-[#e9e9ee] font-extrabold leading-none text-[#3a3a3c]"
+        style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>{face.mono}</span>
+    );
+  }
   const obj = OBJECTS[face.object ?? (face.logo || face.drawing ? '' : 'doc')];
   const under = glow ? <span className="absolute left-[10%] h-2 w-4/5 rounded-[50%]" style={{ bottom: -7, background: 'var(--pc-accent-glow)' }} /> : null;
   if (face.drawing) {

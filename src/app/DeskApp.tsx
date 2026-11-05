@@ -40,6 +40,7 @@ import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRule
 import { opsFor, type Move } from '../ui/dragRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
+import { ChangeCards } from './ChangeCards';
 import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
 import { RulesSheet } from './RulesSheet';
@@ -482,10 +483,22 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
   const statusLine = status === 'connected' ? null : status === 'connecting' ? 'Connecting…' : status === 'pairing' ? 'Waiting for pairing approval' : outbox.length > 0 ? `Offline · ${outbox.length} waiting to send` : 'Offline';
   // Items a message names become chips; a WhatsApp draft becomes its send card.
-  const renderChips = useCallback((items: Array<{ id: string; label: string }>) => {
-    const wa = items.filter(i => i.id.startsWith('wa-')), rest = items.filter(i => !i.id.startsWith('wa-'));
-    return <>{wa.length > 0 && <WaCards ids={wa.map(i => i.id)} />}{rest.length > 0 && <ItemChips items={rest} onOpen={setSheet} />}</>;
+  // "Show on Today": back to Today with the tile lit for 2 s; a thing in the pile opens its sheet instead.
+  const [lit, setLit] = useState<string | null>(null);
+  const todayRef = useRef(today); todayRef.current = today;
+  const refreshRef = useRef(refresh); refreshRef.current = refresh;
+  const showOnToday = useCallback((id: string) => {
+    const d = todayRef.current;
+    if (!d || ![...d.crucial, ...d.todo].some(i => i.id === id)) { setSheet(id); return; }
+    setConvOpen(false); setLit(id);
+    window.setTimeout(() => setLit(l => (l === id ? null : l)), 2000);
   }, []);
+  const renderChips = useCallback((items: Array<{ id: string; label: string }>, ctx?: { ts: number; onCards: () => void }) => {
+    const wa = items.filter(i => i.id.startsWith('wa-')), rest = items.filter(i => !i.id.startsWith('wa-'));
+    return <>{wa.length > 0 && <WaCards ids={wa.map(i => i.id)} />}{rest.length > 0 && (v2 && ctx
+      ? <ChangeCards items={rest} ts={ctx.ts} onOpen={setSheet} onShow={showOnToday} onCards={ctx.onCards} refresh={() => void refreshRef.current()} />
+      : <ItemChips items={rest} onOpen={setSheet} />)}</>;
+  }, [v2, showOnToday]);
   const name = person ? person[0].toUpperCase() + person.slice(1) : '';
   const dateTitle = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -686,13 +699,13 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         return (
           <div key={msg.id} id={`d-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-2' : ''} ${flash === msg.id ? 'rounded-[12px] bg-[rgba(var(--pc-accent-rgb),0.12)]' : ''}`}>
             {newDay && <div className="flex justify-center pb-2 pt-3"><span className="text-[12px] font-medium text-pc-text-muted">{dayLabel(msg.timestamp)}</span></div>}
-            <MessageBubble msg={msg} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips}
+            <MessageBubble msg={msg} me={name || undefined} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips}
               selecting={selected !== null} selected={!!selected?.has(msg.id)} onSelect={toggleSelect} />
           </div>
         );
       })}
       {outbox.map((item, i) => (
-        <MessageBubble key={item.id} showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
+        <MessageBubble key={item.id} me={name || undefined} showAvatar={i === 0 && shown[shown.length - 1]?.role !== 'user'}
           msg={{ id: item.id, role: 'user', content: item.text, timestamp: item.queuedAt, blocks: [{ type: 'text', text: item.text || `${item.attachments.length} attachment${item.attachments.length === 1 ? '' : 's'}` }], sendStatus: 'sending' }} />
       ))}
       {questions.map(qq => <QuestionCard key={qq.id} record={qq} onAnswer={answer} onSkip={skip} />)}
@@ -748,7 +761,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   if (v2) {
     const open = wide || convOpen;
     const todayScreen = (
-      <TodayV2 data={today} mode={mode} expired={expired && !today} initial={name ? name[0] : undefined} notice={noticeCard && <div className="pb-1">{noticeCard}</div>}
+      <TodayV2 data={today} mode={mode} lit={lit} expired={expired && !today} initial={name ? name[0] : undefined} notice={noticeCard && <div className="pb-1">{noticeCard}</div>}
         onEverything={() => { setTab('todo'); setTodoOpen(true); }} onSettings={() => setSettings(true)}
         onDone={i => void tileDone(i)} onOpen={i => setSheet(i.id)} onMenu={setMenuFor} />
     );

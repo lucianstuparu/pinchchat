@@ -5,8 +5,11 @@
 import ReactDOM from 'react-dom/client';
 import { useState } from 'react';
 import '../../src/index.css';
-import { TileMenu, TodayV2 } from '../../src/app/TodayV2';
+import { PileSheet, TileMenu, TodayV2 } from '../../src/app/TodayV2';
+import { ChangeCard } from '../../src/app/ChangeCards';
+import { CoachMark, PersonMark } from '../../src/app/avatars';
 import { lookVars } from '../../src/app/themes';
+import { ObjectFace } from '../../src/kit2/ObjectFace';
 import type { Face, NowItem, TodayData } from '../../src/app/api';
 
 document.documentElement.style.fontSize = '16px';   // as the app (useExactSizes)
@@ -39,7 +42,14 @@ const full: TodayData = {
     item({ n: 15, kind: 'bill', amount: 108.9, currency: 'EUR', due_date: day(12), automatic: true, face: face('AN', '#7c5cd6', 'Anthropic') }),
     item({ n: 29, kind: 'bill', amount: 59.99, currency: 'RON', due_date: day(18), automatic: true, face: face('GP', '#0e7c66', 'Google Play') }),
   ],
-  later_count: 23,
+  later_count: 5,
+  later: [
+    item({ n: 41, title: 'x', glance_title: 'Casa Artlia · verifică oferta', domain: 'casa-artlia', status: 'waiting', waits_for: 'Crédit Mutuel', due_date: day(-6), face: { name: 'Crédit Mutuel', object: 'letter' } }),
+    item({ n: 42, title: 'x', glance_title: 'Scara · măsoară treptele', domain: 'casa-artlia', face: { mono: 'CA' } }),
+    item({ n: 43, title: 'x', glance_title: 'Bérenger · confirmă creditul', status: 'waiting', waiting_since: day(-6), face: { name: 'Bérenger', object: 'person' } }),
+    item({ n: 44, title: 'x', glance_title: 'Primăria · sună pentru act', due_date: day(-11), face: { object: 'phone' } }),
+    item({ n: 45, title: 'x', glance_title: 'Chitara · caută profesor', face: { mono: 'CH' } }),
+  ],
 };
 const data = state === 'loading' ? null : state === 'empty' ? { ...full, crucial: [], todo: [], passing_by: [], later_count: 0 } : full;
 
@@ -51,6 +61,16 @@ function Harness() {
         <TodayV2 data={data} mode={mode} initial="L" onEverything={() => {}} onSettings={() => {}} onDone={() => {}} onOpen={() => {}} onMenu={setMenu} />
       </div>
       <div className="shrink-0 border-t border-pc-border bg-pc-base p-2"><textarea rows={1} placeholder="Say or type it" className="block w-full resize-none rounded-[12px] bg-pc-surface p-3 text-[16px]" /></div>
+      {q.get('pile') && <PileSheet items={full.later ?? []} today={today} onClose={() => {}} onOpen={() => {}} />}
+      {q.get('chat') && (
+        <div className="absolute inset-0 z-50 space-y-3 bg-pc-base p-3">
+          <div className="flex justify-end gap-1.5"><div className="rounded-[20px] rounded-tr-md bg-[#ffe3ef] px-3 py-1.5 text-[16px] text-[#1c1c1e]">sa sun la primaria maine</div><PersonMark name="Lucian" /></div>
+          <div className="flex gap-1.5"><CoachMark /><div className="min-w-0 flex-1"><ChangeCard n={204} title="Primăria · sună pentru act" face={{ object: 'phone' }} line="Added · tomorrow" onUndo={() => {}} onShow={() => {}} /></div></div>
+          <div className="flex gap-1.5"><PersonMark name="Ludmila" /><span className="text-[13px]">Ludmila's disc</span></div>
+          <div className="flex items-center gap-1.5"><CoachMark thinking /><span className="text-[13px]">thinking</span></div>
+          <div className="flex items-end gap-3">{(['envelope', 'letter', 'stack', 'folder', 'phone', 'person'] as const).map(o => <ObjectFace key={o} face={{ object: o }} size={44} />)}<ObjectFace face={{ mono: 'CA' }} size={44} /></div>
+        </div>
+      )}
       {menu && <TileMenu item={menu} position={0} count={6} isCrucial={false} crucial={full.crucial} onClose={() => setMenu(null)}
         onCrucial={() => Promise.reject(new Error('two already'))} onMove={() => {}} onLater={() => {}} onOpen={() => {}} onDrop={() => {}} />}
     </div>

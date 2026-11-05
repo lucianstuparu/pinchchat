@@ -5,7 +5,7 @@
 export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 
 /** What a thing looks like (src/kit2/ObjectFace): a logo, a drawing, or a drawing with the logo on it. */
-export interface Face { logo?: string; object?: string; drawing?: string; name?: string }
+export interface Face { logo?: string; object?: string; drawing?: string; /** The realm's two letters, when no object fits. */ mono?: string; name?: string }
 
 export interface NowItem {
   id: string;
@@ -24,6 +24,8 @@ export interface NowItem {
   title: string;
   /** oc v2: four words at most; the title stays the full one. */
   glance_title?: string;
+  /** Who owes it, and since when it has been waiting (or its last change). */
+  waits_for?: string; waiting_since?: string; updated_at?: string;
   face?: Face;
   /** oc v2: in Passing by because its payee is marked automatic. */
   automatic?: boolean;
@@ -100,7 +102,7 @@ export const fetchNow = () => post<{ today: string; items: NowItem[]; watch?: Wa
 export interface TodayData {
   today: string; last_open: string | null;
   day: { date: string; crucial: string[]; picked?: string[]; closed_at?: string; in_the_way?: string };
-  crucial: NowItem[]; todo: NowItem[]; passing_by: NowItem[]; later_count: number;
+  crucial: NowItem[]; todo: NowItem[]; passing_by: NowItem[]; later_count: number; /** The pile: open things not on show. */ later?: NowItem[];
 }
 export const fetchToday = () => post<TodayData>('/reg/today', {});
 export interface Payee { key: string; name: string; count: number; amount?: number; currency?: string; auto: boolean }

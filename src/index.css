@@ -328,6 +328,12 @@ button, a, [role="tab"], [role="radio"] { touch-action: manipulation; }
 .press:active:not(:disabled) { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) { .press:active:not(:disabled) { transform: none; } }
 
+/* oc v2's coach mark while it thinks; stops with the first token. Reduced motion: it only dims. */
+@keyframes coach-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.55); } }
+@keyframes coach-dim { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.coach-breathe { animation: coach-breathe 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .coach-breathe { animation: coach-dim 1.2s ease-in-out infinite; } }
+
 /* my.design patterns/progress-row.md: a moving segment while the length is unknown; still under reduced motion. */
 @keyframes progress-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 .progress-indeterminate { animation: progress-slide 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }

@@ -8,7 +8,8 @@ import { ArrowDown, ArrowUp, Ban, Check, Clock, Flag, LayoutGrid, MoreHorizontal
 import { Sheet } from '../ui/Sheet';
 import { ObjectFace } from '../kit2/ObjectFace';
 import { formatAmount, formatDay, type NowItem, type TodayData } from './api';
-import { columnsFor, whenOf } from './todayRules';
+import { columnsFor, pileOf, whenOf } from './todayRules';
+import { PersonMark } from './avatars';
 
 function Meta({ item, today }: { item: NowItem; today: string }) {
   const when = whenOf(item, today);
@@ -61,12 +62,12 @@ function MoreButton({ item, onMenu }: { item: NowItem; onMenu: (i: NowItem) => v
   );
 }
 
-export function Tile({ item, today, onDone, onOpen, onMenu }: { item: NowItem; today: string } & Handlers) {
+export function Tile({ item, today, lit, onDone, onOpen, onMenu }: { item: NowItem; today: string; lit?: boolean } & Handlers) {
   const title = item.glance_title ?? item.title;
   const hold = useHold(() => onMenu(item));
   return (
-    <div {...hold.bind} onClick={() => { if (!hold.held.current) onOpen(item); }} role="group" aria-label={title}
-      className="cursor-pointer select-none rounded-[16px] bg-pc-elevated px-3 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.05)]">
+    <div {...hold.bind} data-tile={item.id} onClick={() => { if (!hold.held.current) onOpen(item); }} role="group" aria-label={title}
+      className={`cursor-pointer select-none rounded-[16px] bg-pc-elevated px-3 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.05)] transition-shadow ${lit ? 'ring-2 ring-pc-accent' : ''}`}>
       <div className="flex items-start gap-2.5">
         <Tick title={title} onDone={() => onDone(item)} />
         <p className="min-w-0 flex-1 break-words text-[15px] font-bold leading-[1.25]">{title}</p>
@@ -80,18 +81,18 @@ export function Tile({ item, today, onDone, onOpen, onMenu }: { item: NowItem; t
   );
 }
 
-function CrucialTile({ item, today, large, short, onDone, onOpen, onMenu }: { item: NowItem; today: string; large: boolean; short: boolean } & Handlers) {
+function CrucialTile({ item, today, large, short, lit, onDone, onOpen, onMenu }: { item: NowItem; today: string; large: boolean; short: boolean; lit?: boolean } & Handlers) {
   const title = item.glance_title ?? item.title;
   const hold = useHold(() => onMenu(item));
   return (
-    <div {...hold.bind} onClick={() => { if (!hold.held.current) onOpen(item); }} role="group" aria-label={title}
-      className={`flex cursor-pointer select-none items-center gap-3 rounded-[16px] px-4 ${short ? 'py-1.5' : 'py-3'}`} style={{ background: 'var(--pc-accent-tint)' }}>
+    <div {...hold.bind} data-tile={item.id} onClick={() => { if (!hold.held.current) onOpen(item); }} role="group" aria-label={title}
+      className={`flex cursor-pointer select-none items-center gap-3 rounded-[16px] px-4 transition-shadow ${short ? 'py-1.5' : 'py-3'} ${lit ? 'ring-2 ring-pc-accent' : ''}`} style={{ background: 'var(--pc-accent-tint)' }}>
       <Tick title={title} onDone={() => onDone(item)} />
       <div className="min-w-0 flex-1">
         <p className={`font-extrabold leading-[1.2] ${large ? 'break-words text-[17px]' : short ? 'truncate text-[15px]' : 'break-words text-[15px]'}`}>{title}</p>
         <div className="mt-1 flex min-h-5 items-center"><Meta item={item} today={today} /></div>
       </div>
-      {item.face && <ObjectFace face={item.face} size={large ? 64 : short ? 32 : 44} glow={large} />}
+      {item.face && <ObjectFace face={item.face} size={large ? 56 : short ? 32 : 44} glow={large} />}
       <MoreButton item={item} onMenu={onMenu} />
     </div>
   );
@@ -116,19 +117,50 @@ function PassingPill({ item, today, onOpen }: { item: NowItem; today: string; on
 
 const PILLS = 4;
 
+/** "57 more": the pile, by matter (the full pile, with its states, comes later: brief §6.4). */
+export function PileSheet({ items, today, onClose, onOpen }: { items: NowItem[]; today: string; onClose: () => void; onOpen: (i: NowItem) => void }) {
+  return (
+    <Sheet label={`${items.length} more`} onClose={onClose} className="max-h-[88dvh] overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
+      <h2 className="px-1 pb-2 pt-1 text-[22px] font-bold">{items.length} more</h2>
+      <div className="space-y-4">
+        {pileOf(items).map(g => (
+          <section key={g.matter} aria-label={g.matter}>
+            <Heading>{g.matter} · {g.items.length}</Heading>
+            <div className="divide-y divide-[var(--pc-separator)] rounded-[12px] bg-pc-elevated">
+              {g.items.map(it => (
+                <button key={it.id} type="button" onClick={() => { onClose(); onOpen(it); }} className="press flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center">{it.face && <ObjectFace face={it.face} size={28} />}</span>
+                  <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight">{it.glance_title ?? it.title.replace(/\*\*/g, '')}</span>
+                  <Meta item={it} today={today} />
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
 export interface TodayProps extends Handlers {
   data: TodayData | null;
   mode: 'light' | 'dark';
   expired?: boolean;
-  /** The grid button, "+n" and "n more": the whole list (Everything, once it exists). */
+  /** The grid button and "+n": the whole list (Everything, once it exists). */
   onEverything: () => void;
+  /** The tile to light up for 2 s ("Show on Today"). */
+  lit?: string | null;
   onSettings: () => void;
   initial?: string;
   notice?: ReactNode;
 }
 
-export function TodayV2({ data, mode, expired, onEverything, onSettings, initial, notice, onDone, onOpen, onMenu }: TodayProps) {
+export function TodayV2({ data, mode, expired, onEverything, onSettings, initial, notice, lit, onDone, onOpen, onMenu }: TodayProps) {
   const handlers = { onDone, onOpen, onMenu };
+  const [pile, setPile] = useState(false);
+  useEffect(() => {
+    if (lit) box.current?.querySelector(`[data-tile="${lit}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [lit]);
   const box = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(2);
   // Short screens (320×480, a phone on its side): the band stays compact, so the list keeps some room (height budget, 03).
@@ -152,7 +184,7 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
         <h1 className="min-w-0 flex-1 truncate pl-1 text-[22px] font-bold">Today</h1>
         <span className="shrink-0 pr-1 text-[13px] text-pc-text-muted">{date}</span>
         <button type="button" onClick={onSettings} aria-label="Settings" className="press flex h-10 w-10 items-center justify-center rounded-full">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--pc-hover-strong)] text-[13px] font-semibold">{initial ?? <PanelTop size={15} aria-hidden />}</span>
+          {initial ? <PersonMark name={initial} /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e9e9ee]"><PanelTop size={15} aria-hidden /></span>}
         </button>
       </header>
       {notice}
@@ -166,8 +198,8 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
         ) : <>
           {data.crucial.length > 0 && (
             <section aria-label="Crucial">
-              <h2 className="flex items-center gap-1.5 px-1 pb-2 text-[13px] font-bold uppercase tracking-wide text-[var(--pc-accent-ink)]"><Flag size={13} strokeWidth={2.5} aria-hidden /> Crucial</h2>
-              <div className="space-y-2">{data.crucial.map((it, i) => <CrucialTile key={it.id} item={it} today={today} large={i === 0 && !short} short={short} {...handlers} />)}</div>
+              <h2 className="px-1 pb-2 text-[13px] font-bold uppercase tracking-wide text-[var(--pc-accent-ink)]">Crucial</h2>
+              <div className="space-y-2">{data.crucial.map((it, i) => <CrucialTile key={it.id} item={it} today={today} large={i === 0 && !short} short={short} lit={lit === it.id} {...handlers} />)}</div>
             </section>
           )}
           <section aria-label="To do">
@@ -175,11 +207,8 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
             {data.todo.length === 0
               ? <p className="px-1 py-4 text-[15px] text-pc-text-muted">{data.crucial.length ? 'Nothing else for today.' : 'Nothing needs you today.'}</p>
               : <div className="flex items-start gap-2">{columnsFor(data.todo, cols).map((col, c) => (
-                  <div key={c} className="min-w-0 flex-1 space-y-2">{col.map(it => <Tile key={it.id} item={it} today={today} {...handlers} />)}</div>
+                  <div key={c} className="min-w-0 flex-1 space-y-2">{col.map(it => <Tile key={it.id} item={it} today={today} lit={lit === it.id} {...handlers} />)}</div>
                 ))}</div>}
-            {data.later_count > 0 && (
-              <button type="button" onClick={onEverything} className="press mt-1 flex h-10 items-center px-1 text-[13px] font-medium text-pc-text-muted">{data.later_count} more in the list</button>
-            )}
           </section>
           {data.passing_by.length > 0 && (
             <section aria-label="Passing by">
@@ -193,8 +222,13 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
               </div>
             </section>
           )}
+          {data.later_count > 0 && (
+            <button type="button" onClick={() => (data.later?.length ? setPile(true) : onEverything())}
+              className="press flex h-12 w-full items-center justify-center rounded-[12px] bg-pc-elevated text-[16px] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)]">{data.later_count} more</button>
+          )}
         </>}
       </div>
+      {pile && data?.later && <PileSheet items={data.later} today={today} onClose={() => setPile(false)} onOpen={onOpen} />}
     </div>
   );
 }
