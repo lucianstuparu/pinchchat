@@ -151,6 +151,7 @@ export type KidObjectName = 'goggles' | 'gi' | 'ball' | 'note' | 'slipper' | 'ra
 const WORDS: Array<[KidObjectName, RegExp]> = [
   ['form', /\b(semn|fisa|fise|formular|autorisation|autorizati|inscri|dosar|acte\b|assurance|asigurare|certificat|attestation|adeverint)/],
   ['envelope', /\b(invitati|invitation|scrisoare|carte postala|mesaj)/],
+  ['calendar', /\bcalendar/],
   ['cake', /\b(ziua (lui|lu|ei)\b|zi de nastere|zilei de nastere|aniversar|anniversaire|petrecer|fete de)/],
   ['gift', /\b(cadou|cadouri|cadeau)/],
   ['goggles', /\b(inot|piscin|natati|natation|bazin)/],

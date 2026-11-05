@@ -121,6 +121,7 @@ describe('the drawings', () => {
   });
   it('take paper before sport, and do not match inside other words', () => {
     expect(of('Semnează fișa pentru înot')).toBe('form');
+    expect(of('Pune sâmbetele de gimnastică în calendar')).toBe('calendar');
     expect(of('Sortie dans le parc')).toBe('backpack');    // French "dans" is not dancing
     expect(of('Corp și minte')).toBe('list');              // "cor" is a whole word
     expect(of('Cartier nou')).toBe('list');                // nor is "carte" inside it
