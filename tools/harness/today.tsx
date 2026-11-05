@@ -58,17 +58,17 @@ function Harness() {
   return (
     <div style={{ ...lookVars(mode, 'pink'), ...(q.get('w') ? { width: Number(q.get('w')) } : {}) }} className="flex h-dvh flex-col bg-pc-base text-pc-text antialiased">
       <div className="min-h-0 flex-1">
-        <TodayV2 data={data} mode={mode} initial="L" onEverything={() => {}} onSettings={() => {}} onDone={() => {}} onOpen={() => {}} onMenu={setMenu} />
+        <TodayV2 data={data} mode={mode} initial="L" onSettings={() => {}} onDone={() => {}} onOpen={() => {}} onMenu={setMenu} />
       </div>
       <div className="shrink-0 border-t border-pc-border bg-pc-base p-2"><textarea rows={1} placeholder="Say or type it" className="block w-full resize-none rounded-[12px] bg-pc-surface p-3 text-[16px]" /></div>
       {q.get('pile') && <PileSheet items={full.later ?? []} today={today} onClose={() => {}} onOpen={() => {}} />}
       {q.get('chat') && (
         <div className="absolute inset-0 z-50 space-y-3 bg-pc-base p-3">
-          <div className="flex justify-end gap-1.5"><div className="rounded-[20px] rounded-tr-md bg-[#ffe3ef] px-3 py-1.5 text-[16px] text-[#1c1c1e]">sa sun la primaria maine</div><PersonMark name="Lucian" /></div>
+          <div className="flex justify-end gap-1.5"><div className="rounded-[20px] rounded-tr-md bg-[#f1f0f3] px-3 py-1.5 text-[16px] text-[#1c1c1e]">sa sun la primaria maine</div><PersonMark name="Lucian" /></div>
           <div className="flex gap-1.5"><CoachMark /><div className="min-w-0 flex-1"><ChangeCard n={204} title="Primăria · sună pentru act" face={{ object: 'phone' }} line="Added · tomorrow" onUndo={() => {}} onShow={() => {}} /></div></div>
           <div className="flex gap-1.5"><PersonMark name="Ludmila" /><span className="text-[13px]">Ludmila's disc</span></div>
           <div className="flex items-center gap-1.5"><CoachMark thinking /><span className="text-[13px]">thinking</span></div>
-          <div className="flex items-end gap-3">{(['envelope', 'letter', 'stack', 'folder', 'phone', 'person'] as const).map(o => <ObjectFace key={o} face={{ object: o }} size={44} />)}<ObjectFace face={{ mono: 'CA' }} size={44} /></div>
+          <div className="flex items-end gap-3">{(['envelope', 'letter', 'stack', 'folder', 'phone', 'person'] as const).map(o => <ObjectFace key={o} face={{ object: o }} size={44} />)}<ObjectFace face={{ mono: 'CA' }} size={44} /><ObjectFace face={{ mono: 'aws', mono_color: '#ff9900' }} size={44} /><ObjectFace face={{ object: 'envelope', mono: 'SFR', mono_color: '#e2001a' }} size={44} /></div>
         </div>
       )}
       {menu && <TileMenu item={menu} position={0} count={6} isCrucial={false} crucial={full.crucial} onClose={() => setMenu(null)}

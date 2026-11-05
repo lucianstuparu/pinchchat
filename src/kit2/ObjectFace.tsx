@@ -1,7 +1,7 @@
 /**
- * What a thing looks like (my.design v2/oc-v2-brief.md §8, oc-v2-review.md "Faces"): a real logo, a drawing, or a drawing with
- * the logo on it; never initials (Lucian 2026-11-05). Drawn in the house stroke from the boards; others come from the drawing
- * job as images. Decorative: the caption beside it always says what it is. Keep OBJECTS in step with faces.mjs KNOWN_OBJECTS.
+ * What a thing looks like (my.design v2/README.md, review 2): a drawn object, a brand's mono (a rounded square with its letters in
+ * its colour), or the object with the mono on it; never a raster logo. Drawn in the house stroke from the boards; others come from
+ * the drawing job as SVG. Decorative: the caption beside it always says what it is. Keep OBJECTS in step with faces.mjs KNOWN_OBJECTS.
  */
 import type { ReactNode } from 'react';
 import type { Face } from '../app/api';
@@ -59,39 +59,36 @@ const OBJECTS: Record<string, { w: number; h: number; draw: ReactNode; badge: { 
 
 const fileOf = (name: string) => `/reg/faces/${encodeURIComponent(name)}`;
 
-function Logo({ name, size }: { name: string; size: number }) {
-  return <img src={fileOf(name)} alt="" draggable={false} loading="lazy" width={size} height={size}
-    style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) }} className="block bg-white object-contain" />;
+function Mono({ letters, color, size }: { letters: string; color?: string; size: number }) {
+  return (
+    <span className="flex shrink-0 items-center justify-center font-extrabold leading-none"
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.22), background: color ?? '#e9e9ee', color: color ? '#fff' : '#3a3a3c', fontSize: Math.round(size * (letters.length > 2 ? 0.34 : 0.42)) }}>{letters}</span>
+  );
 }
 
 /** `size` is the height the face may take. */
 export function ObjectFace({ face, size, glow }: { face: Face; size: number; /** The one glow on the screen, under the next thing. */ glow?: boolean }) {
-  if (face.mono && !face.logo && !face.drawing && !face.object) {
-    return (
-      <span aria-hidden className="relative flex shrink-0 items-center justify-center rounded-[22%] bg-[#e9e9ee] font-extrabold leading-none text-[#3a3a3c]"
-        style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>{face.mono}</span>
-    );
-  }
-  const obj = OBJECTS[face.object ?? (face.logo || face.drawing ? '' : 'doc')];
+  const obj = OBJECTS[face.object ?? (face.drawing ? '' : 'doc')];
   const under = glow ? <span className="absolute left-[10%] h-2 w-4/5 rounded-[50%]" style={{ bottom: -7, background: 'var(--pc-accent-glow)' }} /> : null;
+  if (face.mono && !face.drawing && !face.object) return <span aria-hidden className="relative inline-block shrink-0"><Mono letters={face.mono} color={face.mono_color} size={size} />{under}</span>;
   if (face.drawing) {
     return (
       <span aria-hidden className="relative inline-block shrink-0" style={{ width: size, height: size }}>
         {under}
         <img src={fileOf(face.drawing)} alt="" draggable={false} loading="lazy" width={size} height={size} className="block h-full w-full" />
-        {face.logo && <span className="absolute bottom-0 left-0"><Logo name={face.logo} size={Math.round(size * 0.4)} /></span>}
+        {face.mono && <span className="absolute bottom-0 left-0"><Mono letters={face.mono} color={face.mono_color} size={Math.round(size * 0.4)} /></span>}
       </span>
     );
   }
-  if (!obj) return <span aria-hidden className="relative inline-block shrink-0">{face.logo && <Logo name={face.logo} size={size} />}{under}</span>;
+  if (!obj) return null;
   const scale = size / obj.h;
   return (
     <span aria-hidden className="relative inline-block shrink-0" style={{ width: obj.w * scale, height: size }}>
       {under}
       <svg viewBox={`0 0 ${obj.w} ${obj.h}`} width={obj.w * scale} height={size} className="block">{obj.draw}</svg>
-      {face.logo && (
+      {face.mono && (
         <span className="absolute" style={{ left: obj.badge.x * scale, top: obj.badge.y * scale }}>
-          <Logo name={face.logo} size={Math.round(obj.badge.size * scale)} />
+          <Mono letters={face.mono} color={face.mono_color} size={Math.round(obj.badge.size * scale)} />
         </span>
       )}
     </span>

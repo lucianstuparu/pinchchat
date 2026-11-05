@@ -40,7 +40,11 @@ import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRule
 import { opsFor, type Move } from '../ui/dragRules';
 import { ItemSheet } from './ItemSheet';
 import { ItemChips } from './ItemChips';
-import { ChangeCards } from './ChangeCards';
+import { ChangeCards, NoteCard } from './ChangeCards';
+import { extractItems } from '../mobile/messageItems';
+import { CoachMark, PersonMark } from './avatars';
+import { duplicateCards, previewOf, whenOf, type ClaudeNote } from './todayRules';
+import { ObjectFace } from '../kit2/ObjectFace';
 import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
 import { RulesSheet } from './RulesSheet';
@@ -127,6 +131,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [loaded, setLoaded] = useState(false);
   const [expired, setExpired] = useState(false);
   const [todoOpen, setTodoOpen] = useState(false);
+  const [everythingNonce, setEverythingNonce] = useState(0);
   // Notes: a share waiting for "Keep as a note", the list to reload, a note to open.
   const [keeping, setKeeping] = useState<{ text: string; attachments: OutgoingAttachment[] } | null>(null);
   const [notesKey, setNotesKey] = useState(0);
@@ -155,7 +160,10 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       const u = new URL(href, window.location.origin);
       const id = u.searchParams.get('item');
       if (id) { setSheet(id); dismissNotice(); return true; }
-      if (u.searchParams.has('todo')) { setTab('todo'); setTodoOpen(true); dismissNotice(); return true; }
+      if (u.searchParams.has('todo')) {
+        if (getUiMode() === 'v2') setEverythingNonce(Date.now()); else { setTab('todo'); setTodoOpen(true); }
+        dismissNotice(); return true;
+      }
       // No target of its own (a digest, a health alert): the notifications list, on that one.
       if (u.searchParams.has('notifications')) { setHistoryOpen(true); return true; }
       return false;
@@ -401,6 +409,18 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [windowSize, setWindowSize] = useState(WINDOW * 2);
   const [loadingAll, setLoadingAll] = useState(false);
   const visible = shown.length > windowSize ? shown.slice(-windowSize) : shown;
+  // oc v2: one change, one card (todayRules), and a coach's line that only repeated it goes altogether.
+  const repeated = useMemo(() => {
+    if (!v2) return { dupes: new Map<string, Set<string>>(), gone: new Set<string>() };
+    const rows = visible.map(m => {
+      const x = extractItems(visibleText(m));
+      return { id: m.id, mine: m.role === 'user', ts: m.timestamp, items: x.items.map(i => i.id), text: x.text };
+    });
+    const dupes = duplicateCards(rows);
+    const gone = new Set(rows.filter(r => !r.mine && r.items.length > 0 && r.text.length < 200 && r.items.every(i => dupes.get(r.id)?.has(i))).map(r => r.id));
+    return { dupes, gone };
+  }, [v2, visible]);
+  dupesRef.current = repeated.dupes;
   const anchor = useRef<{ height: number; top: number } | null>(null);
   const showOlder = useCallback(() => {
     const el = scrollRef.current;
@@ -493,7 +513,15 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     setConvOpen(false); setLit(id);
     window.setTimeout(() => setLit(l => (l === id ? null : l)), 2000);
   }, []);
-  const renderChips = useCallback((items: Array<{ id: string; label: string }>, ctx?: { ts: number; onCards: () => void }) => {
+  const dupesRef = useRef<Map<string, Set<string>>>(new Map());
+  const nowRef = useRef(now.items); nowRef.current = now.items;
+  const renderNote = useCallback((note: ClaudeNote, itemId?: string) => (
+    <NoteCard note={note} itemId={itemId} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} />
+  ), [showOnToday]);
+  const renderChips = useCallback((all: Array<{ id: string; label: string }>, ctx?: { ts: number; msgId: string; onCards: () => void }) => {
+    const skip = ctx ? dupesRef.current.get(ctx.msgId) : undefined;
+    const items = skip ? all.filter(i => !skip.has(i.id)) : all;
+    if (!items.length) return null;
     const wa = items.filter(i => i.id.startsWith('wa-')), rest = items.filter(i => !i.id.startsWith('wa-'));
     return <>{wa.length > 0 && <WaCards ids={wa.map(i => i.id)} />}{rest.length > 0 && (v2 && ctx
       ? <ChangeCards items={rest} ts={ctx.ts} onOpen={setSheet} onShow={showOnToday} onCards={ctx.onCards} refresh={() => void refreshRef.current()} />
@@ -601,11 +629,19 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
           <div className="divide-y divide-[var(--pc-separator)] overflow-hidden rounded-[12px] bg-pc-surface">
             {found.todo.map(i => (
               <button key={i.id} type="button" onClick={() => setSheet(i.id)} className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left active:bg-[var(--pc-hover-strong)]">
+                {v2 ? <>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center self-center">{i.face && <ObjectFace face={i.face} size={28} />}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">{i.glance_title ?? i.title.replace(/\*\*/g, '')}</span>
+                    <span className="block text-[12px] text-pc-text-muted">{whenOf(i, now.today)?.text}</span>
+                  </span>
+                </> : <>
                 <span className="w-6 shrink-0 text-right text-[15px] font-bold tabular-nums" style={{ color: railOf(i) }}>{i.n ?? ''}</span>
                 <span className="min-w-0 flex-1">
                   <Title text={i.title} className="block truncate text-[15px]" />
                   <span className="mt-1 block"><DueChip item={i} today={now.today} mode={mode} /></span>
                 </span>
+                </>}
               </button>))}
           </div>
         </section>
@@ -693,13 +729,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         <div className="flex justify-center py-3"><span className="text-[12px] text-pc-text-muted">Start of the conversation</span></div>
       ) : null}
       {visible.map((msg, i) => {
+        if (repeated.gone.has(msg.id)) return null;
         const prev = visible[i - 1];
         const newDay = !prev || new Date(prev.timestamp).toDateString() !== new Date(msg.timestamp).toDateString();
         const firstOfRun = newDay || prev.role !== msg.role;
         return (
           <div key={msg.id} id={`d-${msg.id}`} className={`transition-colors duration-1000 ${firstOfRun && i > 0 ? 'pt-2' : ''} ${flash === msg.id ? 'rounded-[12px] bg-[rgba(var(--pc-accent-rgb),0.12)]' : ''}`}>
             {newDay && <div className="flex justify-center pb-2 pt-3"><span className="text-[12px] font-medium text-pc-text-muted">{dayLabel(msg.timestamp)}</span></div>}
-            <MessageBubble msg={msg} me={name || undefined} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips}
+            <MessageBubble msg={msg} me={name || undefined} onRetry={retry} onReply={onReply} showAvatar={firstOfRun} renderItems={renderChips} renderNote={v2 ? renderNote : undefined}
               selecting={selected !== null} selected={!!selected?.has(msg.id)} onSelect={toggleSelect} />
           </div>
         );
@@ -745,7 +782,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
       {keeping && <KeepNote base="/reg" shared={keeping} onKept={kept} onChat={toChat} onClose={() => setKeeping(null)} />}
       {historyOpen && <NotificationsSheet mode={mode} highlight={notice?.title}
         onOpenItem={id => { setHistoryOpen(false); dismissNotice(); setSheet(id); }}
-        onOpenTodo={() => { setHistoryOpen(false); dismissNotice(); setTab('todo'); setTodoOpen(true); }}
+        onOpenTodo={() => { setHistoryOpen(false); dismissNotice(); if (v2) setEverythingNonce(Date.now()); else { setTab('todo'); setTodoOpen(true); } }}
         onClose={() => { setHistoryOpen(false); dismissNotice(); }} />}
       {payeesOpen && <PayeesSheet onClose={() => setPayeesOpen(false)} onChanged={() => void refresh()} />}
       {menuFor && today && (
@@ -760,9 +797,11 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   // ---- oc v2: Today, with the conversation growing above the one composer (my.design v2/oc-v2-brief.md §6).
   if (v2) {
     const open = wide || convOpen;
+    const lastMsg = [...shown].reverse().find(m => previewOf(visibleText(m)));
+    const lastLine = lastMsg ? { mine: lastMsg.role === 'user', text: previewOf(visibleText(lastMsg)), time: new Date(lastMsg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) } : null;
     const todayScreen = (
       <TodayV2 data={today} mode={mode} lit={lit} expired={expired && !today} initial={name ? name[0] : undefined} notice={noticeCard && <div className="pb-1">{noticeCard}</div>}
-        onEverything={() => { setTab('todo'); setTodoOpen(true); }} onSettings={() => setSettings(true)}
+        everythingNonce={everythingNonce} onSettings={() => setSettings(true)}
         onDone={i => void tileDone(i)} onOpen={i => setSheet(i.id)} onMenu={setMenuFor} />
     );
     return (
@@ -792,6 +831,14 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
             onFocusCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}
             onPointerDownCapture={e => { if (e.target instanceof HTMLTextAreaElement) setConvOpen(true); }}>
             {!sheet && !todoOpen && undoBar}
+            {/* The preview strip (brief): the last line of the conversation; tapping it opens it. */}
+            {!open && lastLine && (
+              <button type="button" onClick={() => setConvOpen(true)} aria-label="Open the conversation" className="press flex h-10 w-full items-center gap-2 border-b border-pc-border px-3 text-left">
+                {lastLine.mine ? <PersonMark name={name || 'M'} /> : <CoachMark />}
+                <span className="min-w-0 flex-1 truncate text-[14px]">{lastLine.text}</span>
+                <span className="shrink-0 text-[12px] text-pc-text-muted">{lastLine.time}</span>
+              </button>
+            )}
             <Composer key={prefill && !prefill.intent ? prefill.nonce : 0} onSend={(text, files) => { setConvOpen(true); send(text, files); }} prefill={prefill} hint={hint} onHintDismiss={() => setHint(null)} replyTo={replyTo} onReplyCancel={() => setReplyTo(null)} voice transcribe={transcribeAudio} placeholder="Say or type it" />
           </div>
         )}

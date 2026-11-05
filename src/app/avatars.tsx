@@ -13,7 +13,7 @@ export function CoachMark({ thinking, className = 'h-6 w-6' }: { thinking?: bool
 /** oc v2's person: a neutral disc with the initial. */
 export function PersonMark({ name }: { name: string }) {
   return (
-    <span role="img" aria-label={name} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#e9e9ee] text-[13px] font-bold leading-none text-[#b5179e]">{name[0]?.toUpperCase()}</span>
+    <span role="img" aria-label={name} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--pc-accent-tint)] text-[15px] font-extrabold leading-none text-[var(--pc-accent-ink)]">{name[0]?.toUpperCase()}</span>
   );
 }
 

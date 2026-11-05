@@ -24,7 +24,7 @@ export function ItemChips({ items, onOpen }: { items: Array<{ id: string; label:
         return (
           <button key={i.id} type="button" onClick={() => onOpen(i.id)}
             className={`inline-flex max-w-full items-center gap-1.5 rounded-full border border-pc-border bg-pc-elevated px-2.5 py-1 text-[13px] ${closed ? 'text-pc-text-muted line-through' : ''}`}>
-            {closed ? <Check size={13} className="shrink-0 text-emerald-600" /> : <Icon size={13} className="shrink-0 text-pc-accent" />}
+            {closed ? <Check size={13} className="shrink-0 text-emerald-600" /> : <Icon size={13} className="shrink-0 text-[var(--pc-accent-ink)]" />}
             <span className="truncate">{(s?.title ?? i.label ?? i.id).replace(/\*\*/g, '')}</span>
           </button>
         );

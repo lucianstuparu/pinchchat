@@ -42,6 +42,46 @@ export function whatChanged(s: ItemState, ts: number, today: string): string {
   return s.due_date ? `${verb} · ${s.due_date === today ? 'today' : formatDay(s.due_date)}` : verb;
 }
 
+// ---- A message that came from another session ("[From Claude] #81 Oferta…"): a card, no prefix.
+export interface ClaudeNote { text: string; n?: number; line: string }
+export function parseClaudeNote(text: string): ClaudeNote | null {
+  const m = /^\s*\[From Claude\]\s*/.exec(text);
+  if (!m) return null;
+  const body = text.slice(m[0].length).trim();
+  const num = /^#?(\d+)\b\s*[·:.-]?\s*/.exec(body);
+  const rest = num ? body.slice(num[0].length) : body;
+  const first = rest.replace(/\*\*/g, '').split(/(?<=[.!?])\s|\n/)[0].trim();
+  return { text: rest, n: num ? Number(num[1]) : undefined, line: first.length > 90 ? `${first.slice(0, 89)}…` : first };
+}
+
+/** The strip above the composer: the first 60 characters of a message as plain text. */
+export function previewOf(text: string): string {
+  const note = parseClaudeNote(text);
+  const plain = (note ? note.text : text).replace(/⟨[^⟩]*⟩/g, '').replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
+  return plain.length > 60 ? `${plain.slice(0, 60)}…` : plain;
+}
+
+const SAME_CHANGE = 3 * 60_000;
+/**
+ * One change, one card: when two messages minutes apart name the same item, only one keeps its card. The person's own side wins
+ * (a change made by hand); otherwise the first. Returns, per message id, the item ids it must not show.
+ */
+export function duplicateCards(msgs: Array<{ id: string; mine: boolean; ts: number; items: string[] }>): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const drop = (id: string, item: string) => out.set(id, (out.get(id) ?? new Set<string>()).add(item));
+  const last = new Map<string, { id: string; mine: boolean; ts: number }>();
+  for (const m of msgs) {
+    for (const item of m.items) {
+      const was = last.get(item);
+      if (was && m.ts - was.ts < SAME_CHANGE) {
+        if (m.mine && !was.mine) { drop(was.id, item); last.set(item, { id: m.id, mine: m.mine, ts: m.ts }); }
+        else drop(m.id, item);
+      } else last.set(item, { id: m.id, mine: m.mine, ts: m.ts });
+    }
+  }
+  return out;
+}
+
 /** Rough height, for placing tiles by index: stable, so a tile never jumps once it is drawn. */
 const weightOf = (i: NowItem) => 84 + ((i.glance_title ?? i.title).length > 16 ? 19 : 0);
 

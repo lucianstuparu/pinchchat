@@ -117,11 +117,11 @@ function PassingPill({ item, today, onOpen }: { item: NowItem; today: string; on
 
 const PILLS = 4;
 
-/** "57 more": the pile, by matter (the full pile, with its states, comes later: brief §6.4). */
-export function PileSheet({ items, today, onClose, onOpen }: { items: NowItem[]; today: string; onClose: () => void; onOpen: (i: NowItem) => void }) {
+/** "57 more" and Everything, by matter (the full pile and table, with their states, come later: brief §6.4; assumed, to confirm). */
+export function PileSheet({ items, today, heading, onClose, onOpen }: { items: NowItem[]; today: string; heading?: string; onClose: () => void; onOpen: (i: NowItem) => void }) {
   return (
-    <Sheet label={`${items.length} more`} onClose={onClose} className="max-h-[88dvh] overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
-      <h2 className="px-1 pb-2 pt-1 text-[22px] font-bold">{items.length} more</h2>
+    <Sheet label={heading ?? `${items.length} more`} onClose={onClose} className="max-h-[88dvh] overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 md:max-w-lg">
+      <h2 className="px-1 pb-2 pt-1 text-[22px] font-bold">{heading ?? `${items.length} more`}</h2>
       <div className="space-y-4">
         {pileOf(items).map(g => (
           <section key={g.matter} aria-label={g.matter}>
@@ -146,8 +146,8 @@ export interface TodayProps extends Handlers {
   data: TodayData | null;
   mode: 'light' | 'dark';
   expired?: boolean;
-  /** The grid button and "+n": the whole list (Everything, once it exists). */
-  onEverything: () => void;
+  /** A link to it (?todo) opens Everything too. */
+  everythingNonce?: number;
   /** The tile to light up for 2 s ("Show on Today"). */
   lit?: string | null;
   onSettings: () => void;
@@ -155,9 +155,11 @@ export interface TodayProps extends Handlers {
   notice?: ReactNode;
 }
 
-export function TodayV2({ data, mode, expired, onEverything, onSettings, initial, notice, lit, onDone, onOpen, onMenu }: TodayProps) {
+export function TodayV2({ data, mode, expired, everythingNonce, onSettings, initial, notice, lit, onDone, onOpen, onMenu }: TodayProps) {
   const handlers = { onDone, onOpen, onMenu };
-  const [pile, setPile] = useState(false);
+  const [pile, setPile] = useState<'later' | 'all' | null>(null);
+  const [seenNonce, setSeenNonce] = useState(0);
+  if (everythingNonce && everythingNonce !== seenNonce) { setSeenNonce(everythingNonce); setPile('all'); }
   useEffect(() => {
     if (lit) box.current?.querySelector(`[data-tile="${lit}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [lit]);
@@ -180,7 +182,7 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
   return (
     <div ref={box} className="h-full overflow-y-auto overscroll-contain" style={{ background: mode === 'dark' ? 'var(--pc-bg-base)' : 'var(--pc-bg-surface)' }}>
       <header className="flex items-center gap-1 px-2 pb-1 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={onEverything} aria-label="Everything" className="press flex h-10 w-10 items-center justify-center rounded-full"><LayoutGrid size={22} aria-hidden /></button>
+        <button type="button" onClick={() => setPile('all')} aria-label="Everything" className="press flex h-10 w-10 items-center justify-center rounded-full"><LayoutGrid size={22} aria-hidden /></button>
         <h1 className="min-w-0 flex-1 truncate pl-1 text-[22px] font-bold">Today</h1>
         <span className="shrink-0 pr-1 text-[13px] text-pc-text-muted">{date}</span>
         <button type="button" onClick={onSettings} aria-label="Settings" className="press flex h-10 w-10 items-center justify-center rounded-full">
@@ -216,19 +218,20 @@ export function TodayV2({ data, mode, expired, onEverything, onSettings, initial
               <div className="-mx-3 flex gap-2 overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
                 {data.passing_by.slice(0, PILLS).map(it => <PassingPill key={it.id} item={it} today={today} onOpen={onOpen} />)}
                 {data.passing_by.length > PILLS && (
-                  <button type="button" onClick={onEverything} aria-label={`${data.passing_by.length - PILLS} more passing by`}
+                  <button type="button" onClick={() => setPile('all')} aria-label={`${data.passing_by.length - PILLS} more passing by`}
                     className="press flex h-12 shrink-0 items-center rounded-full bg-[var(--pc-hover-strong)] px-4 text-[13px] font-semibold">+{data.passing_by.length - PILLS}</button>
                 )}
               </div>
             </section>
           )}
           {data.later_count > 0 && (
-            <button type="button" onClick={() => (data.later?.length ? setPile(true) : onEverything())}
+            <button type="button" onClick={() => setPile('later')}
               className="press flex h-12 w-full items-center justify-center rounded-[12px] bg-pc-elevated text-[16px] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)]">{data.later_count} more</button>
           )}
         </>}
       </div>
-      {pile && data?.later && <PileSheet items={data.later} today={today} onClose={() => setPile(false)} onOpen={onOpen} />}
+      {pile === 'later' && data && <PileSheet items={data.later ?? []} today={today} onClose={() => setPile(null)} onOpen={onOpen} />}
+      {pile === 'all' && data && <PileSheet heading="Everything" items={[...data.crucial, ...data.todo, ...(data.later ?? []), ...data.passing_by]} today={today} onClose={() => setPile(null)} onOpen={onOpen} />}
     </div>
   );
 }

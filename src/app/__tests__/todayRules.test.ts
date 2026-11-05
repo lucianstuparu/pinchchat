@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnsFor, whenOf, changedBy, pileOf, whatChanged } from '../todayRules';
+import { columnsFor, whenOf, changedBy, duplicateCards, parseClaudeNote, pileOf, previewOf, whatChanged } from '../todayRules';
 import type { NowItem } from '../api';
 
 const item = (o: Partial<NowItem>): NowItem => ({ id: 'x', title: 't', kind: 'task', store: 'tasks', scope: 'shared', status: 'todo', priority: 'P3', weight: 1, section: 'later', ...o });
@@ -26,6 +26,26 @@ describe('the review of 2026-11-05', () => {
     expect(whatChanged({ status: 'cancelled' }, ts, T)).toBe('Not needed');
     expect(whatChanged({ status: 'todo', created: '2026-11-05T09:59:50Z', due_date: T }, ts, T)).toBe('Added · today');
     expect(whatChanged({ status: 'todo', created: '2026-01-01T09:00:00Z' }, ts, T)).toBe('Changed');
+  });
+  it('a note from another session loses its prefix and gets a number and a line', () => {
+    const n = parseClaudeNote('[From Claude] #81 **Oferta** de credit: banca cere asigurarea. Mai mult text aici.');
+    expect(n?.n).toBe(81);
+    expect(n?.line).toBe('Oferta de credit: banca cere asigurarea.');
+    expect(parseClaudeNote('Oferta de credit')).toBeNull();
+    expect(previewOf('[From Claude] #81 **Oferta** ⟨art-1⟩')).toBe('81 Oferta'.slice(3));
+  });
+  it('the strip shows 60 characters of plain text', () => {
+    expect(previewOf('**a** b')).toBe('a b');
+    expect(previewOf('x'.repeat(70))).toBe(`${'x'.repeat(60)}…`);
+  });
+  it('one change, one card, on my side when it is mine', () => {
+    const t = 1_000_000;
+    const coachFirst = duplicateCards([{ id: 'c', mine: false, ts: t, items: ['130'] }, { id: 'm', mine: true, ts: t + 1000, items: ['130'] }]);
+    expect([...(coachFirst.get('c') ?? [])]).toEqual(['130']);
+    expect(coachFirst.has('m')).toBe(false);
+    const mineFirst = duplicateCards([{ id: 'm', mine: true, ts: t, items: ['130'] }, { id: 'c', mine: false, ts: t + 1000, items: ['130'] }]);
+    expect([...(mineFirst.get('c') ?? [])]).toEqual(['130']);
+    expect(duplicateCards([{ id: 'a', mine: false, ts: t, items: ['1'] }, { id: 'b', mine: false, ts: t + 3_600_000, items: ['1'] }]).size).toBe(0);
   });
   it('the pile groups by matter, largest first, single things under Other', () => {
     const a = { ...base, id: 'a', domain: 'casa-artlia' }, b = { ...base, id: 'b', domain: 'casa-artlia' };

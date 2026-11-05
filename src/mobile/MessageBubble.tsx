@@ -4,6 +4,7 @@ import { AlertCircle, Check, CheckSquare, ChevronDown, Clock, Copy, FileText, Mi
 import { markCopyables } from './copyables';
 import { AgentAvatar, MeAvatar, PersonAvatar } from '../app/avatars';
 import { getUiMode } from './uiMode';
+import { parseClaudeNote, type ClaudeNote } from '../app/todayRules';
 import type { Components } from 'react-markdown';
 import type { ChatMessage } from '../types';
 import { LazyMarkdown } from '../components/LazyMarkdown';
@@ -74,7 +75,9 @@ interface Props {
   /** First message of a run shows the sender's avatar; the rest keep its space. */
   showAvatar?: boolean;
   /** How to show the items a message names (default: cards with Done / Snooze). */
-  renderItems?: (items: Array<{ id: string; label: string }>, ctx?: { ts: number; onCards: () => void }) => ReactNode;
+  renderItems?: (items: Array<{ id: string; label: string }>, ctx?: { ts: number; msgId: string; onCards: () => void }) => ReactNode;
+  /** oc v2: a note from another session, as a card. */
+  renderNote?: (note: ClaudeNote, itemId?: string) => ReactNode;
   /** Multi-select (copy several messages): enter it from the long-press menu, tap to toggle. */
   selecting?: boolean;
   selected?: boolean;
@@ -119,7 +122,7 @@ const SWIPE_MAX = 72;
 const SWIPE_TRIGGER = 56;
 const LONG_PRESS_MS = 450;
 
-export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, selecting, selected, onSelect, me, shared }: Props) {
+export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply, showAvatar = true, renderItems, renderNote, selecting, selected, onSelect, me, shared }: Props) {
   const sender = msg.role === 'user' && shared ? senderOf(visibleText(msg)) : null;
   const other = sender?.name && me && sender.name !== me ? sender.name : null;   // someone else in a shared chat
   const mine = msg.role === 'user' && !other;
@@ -213,6 +216,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
   if (failed && !selecting) return <FailedTurn {...failed} time={formatTime(msg.timestamp)} showAvatar={showAvatar} />;
   // oc v2: thinking is the coach's mark breathing, with no empty bubble under it.
   if (V2 && typing) return <div className="flex gap-1.5 px-2 py-1"><Avatar mine={false} visible person={other} thinking /></div>;
+  const claudeNote = V2 && renderNote && !mine ? parseClaudeNote(text) : null;
+  if (claudeNote) return <div className="flex gap-1.5 px-2"><Avatar mine={false} visible={showAvatar} />{renderNote?.(claudeNote, items[0]?.id)}</div>;
 
   return (
     <div className={`relative flex gap-1.5 px-2 ${mine ? 'justify-end' : 'justify-start'} ${selecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--pc-accent-rgb),0.12)] rounded-[20px]' : ''}`}
@@ -248,8 +253,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
           touchMenu ? '[@media(pointer:coarse)]:select-none [@media(pointer:coarse)]:[-webkit-touch-callout:none]' : ''
         } ${
           mine
-            ? `rounded-tr-md ${V2 ? 'bg-[#ffe3ef] text-[#1c1c1e]' : 'bg-[var(--pc-mine,rgba(var(--pc-accent-rgb),0.18))] text-pc-text'}`
-            : 'rounded-tl-md bg-pc-surface text-pc-text'
+            ? `rounded-tr-md ${V2 ? 'bg-[#f1f0f3] text-[#1c1c1e]' : 'bg-[var(--pc-mine,rgba(var(--pc-accent-rgb),0.18))] text-pc-text'}`
+            : `rounded-tl-md ${V2 ? 'bg-[var(--pc-accent-tint)] text-[#1c1c1e]' : 'bg-pc-surface text-pc-text'}`
         }`}
       >
         {images.map((img, i) => (
@@ -286,7 +291,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry, onReply
             )}
           </>
         ) : null}
-        {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items, { ts: msg.timestamp, onCards: () => setCardsOnly(true) }) : <ItemActions items={items} />)}
+        {!typing && !msg.isStreaming && items.length > 0 && (renderItems ? renderItems(items, { ts: msg.timestamp, msgId: msg.id, onCards: () => setCardsOnly(true) }) : <ItemActions items={items} />)}
 
         <div className="flex items-center justify-end gap-1 -mb-0.5 mt-0.5 text-[12px] text-pc-text-muted select-none">
           <span>{formatTime(msg.timestamp)}</span>

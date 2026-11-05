@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { ObjectFace } from '../kit2/ObjectFace';
 import { act, fetchStates, type NowItem } from './api';
 import { ItemChips } from './ItemChips';
-import { changedBy, isClosedState, whatChanged, type ItemState } from './todayRules';
+import { changedBy, isClosedState, whatChanged, type ClaudeNote, type ItemState } from './todayRules';
 
 const UNDO_FOR = 10 * 60_000;
 
@@ -31,6 +31,32 @@ export function ChangeCard({ title, n, face, line, onUndo, onShow, undone }: {
           {onShow && <button type="button" onClick={onShow} className="press h-10 flex-1 text-[14px] font-bold">Show on Today</button>}
         </div>
       )}
+    </div>
+  );
+}
+
+/** A note from another session: its card, with the whole text behind "Show all". The item comes from its marker or its number. */
+export function NoteCard({ note, itemId, findByNumber, onShow }: { note: ClaudeNote; itemId?: string; findByNumber: (n: number) => string | undefined; onShow: (id: string) => void }) {
+  const id = itemId ?? (note.n != null ? findByNumber(note.n) : undefined);
+  const [state, setState] = useState<ItemState | null>(null);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    fetchStates([id]).then(r => { if (alive) setState(r.items[id] ?? null); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [id]);
+  const title = state?.glance_title ?? state?.title?.replace(/\*\*/g, '');
+  const n = state?.n ?? note.n;
+  const more = note.text.replace(/\*\*/g, '').trim().length > note.line.length;
+  return (
+    <div className="min-w-0 flex-1">
+      <ChangeCard n={n} face={state?.face} title={title ?? note.line} line={title ? note.line : ''}
+        onShow={id && state && !isClosedState(state.status) ? () => onShow(id) : undefined} />
+      {more && (
+        <button type="button" onClick={() => setAll(a => !a)} aria-expanded={all} className="press min-h-10 px-1 text-[15px] font-semibold text-[var(--pc-accent-ink)]">{all ? 'Show less' : 'Show all'}</button>
+      )}
+      {all && <p className="whitespace-pre-wrap px-1 pb-1 text-[15px] leading-snug">{note.text.replace(/\*\*/g, '').replace(/⟨[^⟩]*⟩/g, '')}</p>}
     </div>
   );
 }

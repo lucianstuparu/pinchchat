@@ -5,7 +5,7 @@
 export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 
 /** What a thing looks like (src/kit2/ObjectFace): a logo, a drawing, or a drawing with the logo on it. */
-export interface Face { logo?: string; object?: string; drawing?: string; /** The realm's two letters, when no object fits. */ mono?: string; name?: string }
+export interface Face { logo?: string; object?: string; drawing?: string; /** A brand's or the realm's letters, and the brand's colour. */ mono?: string; mono_color?: string; name?: string }
 
 export interface NowItem {
   id: string;
