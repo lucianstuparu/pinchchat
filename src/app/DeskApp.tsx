@@ -534,7 +534,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, []);
   const nowRef = useRef(now.items); nowRef.current = now.items;
   const renderNote = useCallback((note: ClaudeNote, itemId?: string) => (
-    <NoteCard note={note} itemId={itemId} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} refresh={() => void refreshRef.current()} />
+    <NoteCard note={note} itemId={itemId} onOpen={setSheet} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} refresh={() => void refreshRef.current()} />
   ), [showOnToday]);
   const renderChips = useCallback((all: Array<{ id: string; label: string }>, ctx?: { ts: number; msgId: string; onCards: () => void }) => {
     const skip = ctx ? dupesRef.current.get(ctx.msgId) : undefined;

@@ -105,7 +105,7 @@ function Harness() {
       {q.get('chat') && (
         <div className="absolute inset-0 z-50 space-y-3 bg-pc-base p-3">
           <div className="flex justify-end gap-1.5"><div className="rounded-[20px] rounded-tr-md bg-[#f1f0f3] px-3 py-1.5 text-[16px] text-[#1c1c1e]">sa sun la primaria maine</div><PersonMark name="Lucian" /></div>
-          <div className="flex gap-1.5"><CoachMark /><div className="min-w-0 flex-1"><ChangeCard n={204} title="Primăria · sună pentru act" face={{ object: 'phone' }} line="Added · tomorrow" onUndo={() => {}} onShow={() => {}} /></div></div>
+          <div className="flex gap-1.5"><CoachMark /><div className="min-w-0 flex-1"><ChangeCard n={204} title="Primăria · sună pentru act" face={{ object: 'phone' }} line="Added · tomorrow" onOpen={() => { document.title = 'opened'; }} onUndo={() => {}} onShow={() => {}} /></div></div>
           <div className="flex gap-1.5"><PersonMark name="Ludmila" /><span className="text-[13px]">Ludmila's disc</span></div>
           <div className="flex items-center gap-1.5"><CoachMark thinking /><span className="text-[13px]">thinking</span></div>
           <div className="flex items-end gap-3">{(['envelope', 'letter', 'stack', 'folder', 'phone', 'person'] as const).map(o => <ObjectFace key={o} face={{ object: o }} size={44} />)}<ObjectFace face={{ mono: 'CA' }} size={44} /><ObjectFace face={{ mono: 'aws', mono_color: '#ff9900' }} size={44} /><ObjectFace face={{ object: 'envelope', mono: 'SFR', mono_color: '#e2001a' }} size={44} /></div>

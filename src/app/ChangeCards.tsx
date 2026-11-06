@@ -1,6 +1,7 @@
 /**
  * The change card (my.design v2/oc-v2-brief.md §6.2): the answer to anything the coach changed, instead of prose that repeats
- * the person. Number and short title, one line of what changed, Undo, Show on Today. A message that only mentions an item
+ * the person. Number and short title, one line of what changed, Undo, Show on Today. Tapping the card opens the thing (Lucian 2026-11-06).
+ * A message that only mentions an item
  * keeps the plain chip: a card is for a change, judged from the item's own dates against the message's time.
  */
 import { useEffect, useState } from 'react';
@@ -12,19 +13,24 @@ import { changedBy, isClosedState, whatChanged, type ClaudeNote, type ItemState 
 
 const UNDO_FOR = 10 * 60_000;
 
-export function ChangeCard({ title, n, face, line, onUndo, onShow, undone }: {
+export function ChangeCard({ title, n, face, line, onOpen, onUndo, onShow, undone }: {
   title: string; n?: number; face?: NowItem['face']; line: string;
-  onUndo?: () => void; onShow?: () => void; undone?: boolean;
+  onOpen?: () => void; onUndo?: () => void; onShow?: () => void; undone?: boolean;
 }) {
+  const body = (
+    <>
+      {face && <ObjectFace face={face} size={28} />}
+      <span className="block min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-bold leading-tight">{n != null ? `${n} · ` : ''}{title}</span>
+        <span className="block truncate text-[13px] leading-tight text-pc-text-secondary">{undone ? 'Undone' : line}</span>
+      </span>
+    </>
+  );
   return (
     <div className="mt-1 min-w-[240px] overflow-hidden rounded-[12px] border border-pc-border bg-pc-elevated">
-      <div className="flex items-center gap-2.5 px-3 py-2.5">
-        {face && <ObjectFace face={face} size={28} />}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold leading-tight">{n != null ? `${n} · ` : ''}{title}</p>
-          <p className="truncate text-[13px] leading-tight text-pc-text-secondary">{undone ? 'Undone' : line}</p>
-        </div>
-      </div>
+      {onOpen
+        ? <button type="button" onClick={onOpen} className="press flex min-h-10 w-full items-center gap-2.5 px-3 py-2.5 text-left">{body}</button>
+        : <div className="flex items-center gap-2.5 px-3 py-2.5">{body}</div>}
       {(onUndo || onShow) && !undone && (
         <div className="flex border-t border-pc-border">
           {onUndo && <button type="button" onClick={onUndo} className="press h-10 flex-1 text-[14px] font-bold text-[var(--pc-accent-ink)]">Undo</button>}
@@ -37,7 +43,7 @@ export function ChangeCard({ title, n, face, line, onUndo, onShow, undone }: {
 }
 
 /** A note from another session: its card, with the whole text behind "Show all". The item comes from its marker or its number. */
-export function NoteCard({ note, itemId, findByNumber, onShow, refresh }: { note: ClaudeNote; itemId?: string; findByNumber: (n: number) => string | undefined; onShow: (id: string) => void; refresh?: () => void }) {
+export function NoteCard({ note, itemId, findByNumber, onOpen, onShow, refresh }: { note: ClaudeNote; itemId?: string; findByNumber: (n: number) => string | undefined; onOpen: (id: string) => void; onShow: (id: string) => void; refresh?: () => void }) {
   const id = itemId ?? (note.n != null ? findByNumber(note.n) : undefined);
   const [state, setState] = useState<ItemState | null>(null);
   const [all, setAll] = useState(false);
@@ -54,6 +60,7 @@ export function NoteCard({ note, itemId, findByNumber, onShow, refresh }: { note
   return (
     <div className="min-w-0 flex-1">
       <ChangeCard n={n} face={state?.face} title={title ?? note.line} line={title ? note.line : ''}
+        onOpen={id && state ? () => onOpen(id) : undefined}
         onShow={id && state && !isClosedState(state.status) ? () => onShow(id) : undefined} />
       {/* Which realm? One tap (review 01: Other is emptied by asking in the chat). */}
       {note.asksRealm && id && (placed
@@ -100,6 +107,7 @@ export function ChangeCards({ items, ts, onOpen, onShow, onCards, refresh }: {
         const open = !isClosedState(s.status);
         return (
           <ChangeCard key={i.id} n={s.n} face={s.face} title={s.glance_title ?? (s.title ?? i.label).replace(/\*\*/g, '')} line={whatChanged(s, ts, today)} undone={undone[i.id]}
+            onOpen={() => onOpen(i.id)}
             onUndo={canUndo ? () => { void act(i.id, 'undo').then(() => { setUndone(u => ({ ...u, [i.id]: true })); refresh(); }).catch(() => undefined); } : undefined}
             onShow={open ? () => onShow(i.id) : undefined} />
         );
