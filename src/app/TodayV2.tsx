@@ -12,6 +12,7 @@ import { ObjectFace } from '../kit2/ObjectFace';
 import { formatAmount, formatDay, type Away, type NowItem, type TellKind, type TodayData } from './api';
 import { columnsFor, coordinationFor, pileOf, reviewing, stepLine, toldLine, waitingLine, whenOf } from './todayRules';
 import { EverythingV2, ThingRow } from './EverythingV2';
+import { Glance } from './Glance';
 import { PersonMark } from './avatars';
 
 function Meta({ item, today }: { item: NowItem; today: string }) {
@@ -87,7 +88,7 @@ export function Tile({ item, today, lit, onDone, onOpen, onMenu }: { item: NowIt
       className={`cursor-pointer select-none rounded-[16px] bg-pc-elevated px-3 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.05)] transition-shadow ${lit ? 'ring-2 ring-pc-accent' : ''} ${reviewing(item, today) ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2.5">
         <Tick title={title} onDone={() => onDone(item)} />
-        <p className="min-w-0 flex-1 break-words text-[15px] font-bold leading-[1.25]">{title}</p>
+        <p className="min-w-0 flex-1 break-words text-[15px] leading-[1.25]"><Glance text={title} keyWords={item.glance_key} /></p>
         {item.face && <ObjectFace face={item.face} size={32} />}
       </div>
       <div className="mt-1.5 flex min-h-5 items-center justify-between gap-1 pl-8">
@@ -106,7 +107,7 @@ function CrucialTile({ item, today, large, short, lit, onDone, onOpen, onMenu }:
       className={`flex cursor-pointer select-none items-center gap-3 rounded-[16px] px-4 transition-shadow ${short ? 'py-1.5' : 'py-3'} ${lit ? 'ring-2 ring-pc-accent' : ''}`} style={{ background: 'var(--pc-accent-tint)' }}>
       <Tick title={title} onDone={() => onDone(item)} />
       <div className="min-w-0 flex-1">
-        <p className={`font-extrabold leading-[1.2] ${large ? 'break-words text-[17px]' : short ? 'truncate text-[15px]' : 'break-words text-[15px]'}`}>{title}</p>
+        <p className={`leading-[1.2] ${large ? 'break-words text-[17px]' : short ? 'truncate text-[15px]' : 'break-words text-[15px]'}`}><Glance text={title} keyWords={item.glance_key} bold="font-extrabold" /></p>
         <div className="mt-1 min-h-5"><Meta item={item} today={today} /><StepLine item={item} today={today} /></div>
       </div>
       {item.face && <ObjectFace face={item.face} size={large ? 56 : short ? 32 : 44} glow={large} />}
@@ -120,12 +121,15 @@ const Heading = ({ children }: { children: ReactNode }) => <h2 className="px-1 p
 function PassingPill({ item, today, onOpen }: { item: NowItem; today: string; onOpen: (i: NowItem) => void }) {
   const amount = formatAmount(item.amount, item.currency);
   const when = !item.due_date ? 'this month' : item.due_date === today ? 'today' : formatDay(item.due_date);
+  // The mark says who: the amount is what is left to say. Without a mark, the name.
+  const words = item.glance_title ?? item.title.replace(/\*\*/g, '');
+  const first = item.face?.mono_color ? amount || words : `${item.face?.name || words}${amount ? ` ${amount}` : ''}`;
   return (
     <button type="button" onClick={() => onOpen(item)}
       className="press flex h-12 max-w-[220px] shrink-0 items-center gap-2 rounded-full bg-[var(--pc-hover-strong)] py-1 pl-1.5 pr-4 text-left">
       {item.face && <ObjectFace face={item.face} size={36} />}
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold leading-tight">{item.face?.name || (item.glance_title ?? item.title)}{amount ? ` ${amount}` : ''}</span>
+        <span className="block truncate text-[13px] font-semibold leading-tight">{first}</span>
         <span className="block truncate text-[12px] leading-tight text-pc-text-secondary">{when} · automatic</span>
       </span>
     </button>
@@ -184,7 +188,7 @@ function WorthRow({ item, onOpen }: { item: NowItem; onOpen: (i: NowItem) => voi
     <button type="button" onClick={() => onOpen(item)} className="press flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center">{item.face && <ObjectFace face={item.face} size={28} />}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold leading-tight">{item.glance_title ?? item.title.replace(/\*\*/g, '')}</span>
+        <span className="block text-[15px] leading-tight"><Glance text={item.glance_title ?? item.title.replace(/\*\*/g, '')} keyWords={item.glance_key} /></span>
         <span className="block text-[13px] leading-tight text-pc-text-secondary">{item.parked?.why}</span>
       </span>
     </button>
@@ -356,7 +360,7 @@ export function TileMenu({ item, today, position, count, isCrucial, pinned, cruc
           <p className="px-1 pb-2 text-[16px] font-semibold">Which one does it replace?</p>
           {crucial.map(c => (
             <button key={c.id} type="button" onClick={() => make(c.id)} className={row}>
-              {c.face && <ObjectFace face={c.face} size={32} />}<span className="min-w-0 flex-1 truncate">{c.glance_title ?? c.title}</span>
+              {c.face && <ObjectFace face={c.face} size={32} />}<span className="min-w-0 flex-1 truncate font-normal"><Glance text={c.glance_title ?? c.title} keyWords={c.glance_key} /></span>
             </button>
           ))}
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnsFor, coordinationFor, everythingOf, reviewing, slipped, stepLine, toldLine, waitingLine, whenOf, changedBy, duplicateCards, parseClaudeNote, pileOf, previewOf, whatChanged } from '../todayRules';
+import { columnsFor, coordinationFor, everythingOf, reviewing, slipped, stepLine, toldLine, waitingLine, whenOf, changedBy, duplicateCards, parseClaudeNote, pileOf, previewOf, whatChanged, keyParts } from '../todayRules';
 import type { NowItem } from '../api';
 
 const item = (o: Partial<NowItem>): NowItem => ({ id: 'x', title: 't', kind: 'task', store: 'tasks', scope: 'shared', status: 'todo', priority: 'P3', weight: 1, section: 'later', ...o });
@@ -141,5 +141,17 @@ describe('plan 02', () => {
   });
   it('a matter name from the server wins', () => {
     expect(pileOf([item({ id: 'a', matter: 'SFR' }), item({ id: 'b', matter: 'SFR' })])[0].matter).toBe('SFR');
+  });
+});
+
+
+describe('keyParts', () => {
+  it('splits around the key, as written in the title, whatever the case', () => {
+    expect(keyParts('Scrie scrisoarea azi', 'scrisoarea')).toEqual(['Scrie ', 'scrisoarea', ' azi']);
+    expect(keyParts('Scrisoarea', 'scrisoarea')).toEqual(['', 'Scrisoarea', '']);
+  });
+  it('gives nothing to bold when there is no key or it is not in the words', () => {
+    expect(keyParts('Scrie', undefined)).toBeNull();
+    expect(keyParts('Scrie', 'oferta')).toBeNull();
   });
 });

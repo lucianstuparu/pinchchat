@@ -212,3 +212,10 @@ export function columnsFor(items: NowItem[], n: number): NowItem[][] {
   return cols;
 }
 
+
+/** A title split around its key word group: [before, key, after], or null when the key is not in it. */
+export function keyParts(text: string, key?: string): [string, string, string] | null {
+  if (!key) return null;
+  const at = text.toLocaleLowerCase().indexOf(key.toLocaleLowerCase());
+  return at < 0 ? null : [text.slice(0, at), text.slice(at, at + key.length), text.slice(at + key.length)];
+}

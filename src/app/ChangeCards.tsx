@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { ObjectFace } from '../kit2/ObjectFace';
+import { Glance } from './Glance';
 import { REALMS, realmName } from '../realms';
 import { act, fetchStates, type NowItem } from './api';
 import { ItemChips } from './ItemChips';
@@ -13,15 +14,15 @@ import { changedBy, isClosedState, whatChanged, type ClaudeNote, type ItemState 
 
 const UNDO_FOR = 10 * 60_000;
 
-export function ChangeCard({ title, n, face, line, onOpen, onUndo, onShow, undone }: {
-  title: string; n?: number; face?: NowItem['face']; line: string;
+export function ChangeCard({ title, keyWords, n, face, line, onOpen, onUndo, onShow, undone }: {
+  title: string; keyWords?: string; n?: number; face?: NowItem['face']; line: string;
   onOpen?: () => void; onUndo?: () => void; onShow?: () => void; undone?: boolean;
 }) {
   const body = (
     <>
       {face && <ObjectFace face={face} size={28} />}
       <span className="block min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold leading-tight">{n != null ? `${n} · ` : ''}{title}</span>
+        <span className="block truncate text-[15px] leading-tight">{n != null ? `${n} · ` : ''}<Glance text={title} keyWords={keyWords} /></span>
         <span className="block truncate text-[13px] leading-tight text-pc-text-secondary">{undone ? 'Undone' : line}</span>
       </span>
     </>
@@ -59,7 +60,7 @@ export function NoteCard({ note, itemId, findByNumber, onOpen, onShow, refresh }
   const more = note.text.replace(/\*\*/g, '').trim().length > note.line.length;
   return (
     <div className="min-w-0 flex-1">
-      <ChangeCard n={n} face={state?.face} title={title ?? note.line} line={title ? note.line : ''}
+      <ChangeCard n={n} face={state?.face} title={title ?? note.line} keyWords={state?.glance_key} line={title ? note.line : ''}
         onOpen={id && state ? () => onOpen(id) : undefined}
         onShow={id && state && !isClosedState(state.status) ? () => onShow(id) : undefined} />
       {/* Which realm? One tap (review 01: Other is emptied by asking in the chat). */}
@@ -106,7 +107,7 @@ export function ChangeCards({ items, ts, onOpen, onShow, onCards, refresh }: {
         const s = states[i.id];
         const open = !isClosedState(s.status);
         return (
-          <ChangeCard key={i.id} n={s.n} face={s.face} title={s.glance_title ?? (s.title ?? i.label).replace(/\*\*/g, '')} line={whatChanged(s, ts, today)} undone={undone[i.id]}
+          <ChangeCard key={i.id} n={s.n} face={s.face} title={s.glance_title ?? (s.title ?? i.label).replace(/\*\*/g, '')} keyWords={s.glance_key} line={whatChanged(s, ts, today)} undone={undone[i.id]}
             onOpen={() => onOpen(i.id)}
             onUndo={canUndo ? () => { void act(i.id, 'undo').then(() => { setUndone(u => ({ ...u, [i.id]: true })); refresh(); }).catch(() => undefined); } : undefined}
             onShow={open ? () => onShow(i.id) : undefined} />

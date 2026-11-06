@@ -46,6 +46,7 @@ import { ChangeCards, NoteCard } from './ChangeCards';
 import { extractItems } from '../mobile/messageItems';
 import { CoachMark, PersonMark } from './avatars';
 import { duplicateCards, previewOf, whenOf, type ClaudeNote } from './todayRules';
+import { Glance } from './Glance';
 import { ObjectFace } from '../kit2/ObjectFace';
 import { WaCards } from './WaCard';
 import { SettingsSheet } from './SettingsSheet';
@@ -650,7 +651,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
                 {v2 ? <>
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center self-center">{i.face && <ObjectFace face={i.face} size={28} />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">{i.glance_title ?? i.title.replace(/\*\*/g, '')}</span>
+                    <span className="block truncate text-[15px]"><Glance text={i.glance_title ?? i.title.replace(/\*\*/g, '')} keyWords={i.glance_key} /></span>
                     <span className="block text-[12px] text-pc-text-muted">{whenOf(i, now.today)?.text}</span>
                   </span>
                 </> : <>

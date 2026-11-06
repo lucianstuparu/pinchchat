@@ -31,6 +31,8 @@ export interface NowItem {
   title: string;
   /** oc v2: four words at most; the title stays the full one. */
   glance_title?: string;
+  /** The word group shown bold; the coach job writes it, the server sends it only while it is in glance_title. */
+  glance_key?: string;
   /** Who owes it, and since when it has been waiting (or its last change). */
   waits_for?: string; waiting_since?: string; updated_at?: string;
   face?: Face;
@@ -85,7 +87,7 @@ export interface Sheet {
   item: Record<string, unknown> & { id: string; title: string; status: string; store: string; scope: string };
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
   /** oc v2's sheet. */
-  face?: Face; glance_title?: string; realm_id?: string;
+  face?: Face; glance_title?: string; glance_key?: string; realm_id?: string;
   matter?: { name: string; things: number; state: string; brief: Brief | null } | null;
 }
 

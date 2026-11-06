@@ -7,6 +7,7 @@ import { Flag } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { ObjectFace } from '../kit2/ObjectFace';
 import type { NowItem } from './api';
+import { Glance } from './Glance';
 import { everythingOf, stepLine, whenOf } from './todayRules';
 
 export function ThingRow({ item, today, onOpen }: { item: NowItem; today: string; onOpen: (i: NowItem) => void }) {
@@ -16,7 +17,7 @@ export function ThingRow({ item, today, onOpen }: { item: NowItem; today: string
     <button type="button" onClick={() => onOpen(item)} className="press flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center">{item.face && <ObjectFace face={item.face} size={28} />}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold leading-tight">{item.glance_title ?? item.title.replace(/\*\*/g, '')}</span>
+        <span className="block text-[15px] leading-tight"><Glance text={item.glance_title ?? item.title.replace(/\*\*/g, '')} keyWords={item.glance_key} /></span>
         {line && <span className="block text-[12px] leading-tight text-pc-text-muted">{line}</span>}
       </span>
       {when && <span className={`inline-flex shrink-0 items-center gap-1 text-[12px] ${when.tone === 'late' ? 'font-semibold' : when.tone === 'today' ? 'font-semibold text-[var(--pc-today)]' : 'text-pc-text-muted'}`}>{when.tone === 'late' && <Flag size={12} strokeWidth={2.5} aria-hidden />}{when.text}</span>}

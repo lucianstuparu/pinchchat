@@ -20,21 +20,21 @@ const mode = q.get('theme') === 'dark' ? 'dark' : 'light';
 const state = q.get('state') ?? 'full';
 const today = new Date().toISOString().slice(0, 10);
 const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
-const face = (_letters: string, _color: string, name: string, object?: string): Face => ({ name, object: object ?? 'doc' });
+const face = (letters: string, color: string, name: string, object?: string): Face => (['CPAM', 'SFR', 'AWS', 'EDF', 'Anthropic'].includes(name) ? { name, mono: letters, mono_color: color } : { name, object: object ?? 'doc' });
 let id = 0;
 const item = (o: Partial<NowItem>): NowItem => ({ id: `tsk-2026-11-05-${String(++id).padStart(6, '0')}`, title: '', kind: 'task', store: 'tasks', scope: 'shared', status: 'todo', priority: 'P3', weight: 1, section: 'later', ...o });
 const full: TodayData = {
   today, last_open: null, day: { date: today, crucial: [] },
   crucial: [
-    item({ n: 159, glance_title: 'Trimite plicul CPAM', title: 'Trimite plicul cu cererea la **CPAM**', due_date: day(-2), face: face('CP', '#1d6fb8', 'CPAM', 'envelope') }),
-    item({ n: 130, glance_title: 'Confirmă lui Bérenger', title: 'Confirmă lui **Bérenger**', due_date: day(-6), face: face('BC', '#3d5a80', 'BC Immobilier', 'phone') }),
+    item({ n: 159, glance_title: 'Trimite cererea', glance_key: 'cererea', title: 'Trimite plicul cu cererea la **CPAM**', due_date: day(-2), face: face('CP', '#1d6fb8', 'CPAM', 'envelope') }),
+    item({ n: 130, glance_title: 'Confirmă lui Bérenger', glance_key: 'Bérenger', title: 'Confirmă lui **Bérenger**', due_date: day(-6), face: face('BC', '#3d5a80', 'BC Immobilier', 'phone') }),
   ],
   todo: [
-    item({ n: 28, glance_title: 'Bonus SFR · scrisoare', due_date: day(12), face: face('SF', '#a8326e', 'SFR', 'stack') }),
-    item({ n: 128, glance_title: 'Dr Myers · vaccinuri', due_date: day(-6), face: face('DM', '#0e7c66', 'Dr Myers', 'phone') }),
+    item({ n: 28, glance_title: 'Scrie scrisoarea', glance_key: 'scrisoarea', due_date: day(12), face: face('SF', '#a8326e', 'SFR', 'stack') }),
+    item({ n: 128, glance_title: 'Dr Myers · vaccinuri', glance_key: 'vaccinuri', due_date: day(-6), face: face('DM', '#0e7c66', 'Dr Myers', 'phone') }),
     item({ n: 134, glance_title: 'Flavi · IBM', due_date: day(-3), face: face('FL', '#7c5cd6', 'Flavi') }),
     item({ n: 164, glance_title: 'Export Lucidchart', due_date: day(4), face: face('LU', '#b25a00', 'Lucidchart') }),
-    item({ n: 151, glance_title: 'Plantează semințele', due_date: day(3), face: face('', '#5c6b1f', '', 'pot') }),
+    item({ n: 151, glance_title: 'Plantează semințele', glance_key: 'semințele', due_date: day(3), face: face('', '#5c6b1f', '', 'pot') }),
     item({ n: 168, glance_title: 'Prăjituri pentru Lia', due_date: today, section: 'today', face: face('PA', '#b25a00', 'patiserie') }),
   ],
   passing_by: [
@@ -56,7 +56,7 @@ const full: TodayData = {
 // The bands of plan 02.
 const realms = ['desk', 'casa-artlia', 'finance', 'people', 'projects', 'house', 'other'];
 [...full.crucial, ...full.todo, ...(full.later ?? []), ...full.passing_by].forEach((i, x) => { i.realm_id = realms[x % realms.length]; i.matter = (i.glance_title ?? '').split(' · ')[1] ? (i.glance_title ?? '').split(' · ')[0] : i.face?.name; if (x % 2 === 0) i.step = { first: 'Open it', minutes: 3 + x, where: x % 4 ? 'phone' : 'laptop', by: 'coach' }; });
-full.must = [item({ n: 183, glance_title: 'Frizer · programează tunsoarea', due_date: today, section: 'today', face: { object: 'phone' }, step: { first: 'Call', minutes: 3, where: 'phone' } })];
+full.must = [item({ n: 183, glance_title: 'Frizer · programează tunsoarea', glance_key: 'tunsoarea', due_date: today, section: 'today', face: { object: 'phone' }, step: { first: 'Call', minutes: 3, where: 'phone' } })];
 full.waiting_you = [
   item({ n: 130, glance_title: 'Bérenger · confirmă creditul', status: 'waiting', promise: { to: 'Bérenger Marchand', said: 'by Thursday', by: day(-1), on: day(-6) }, realm_id: 'casa-artlia' }),
   item({ n: 131, glance_title: 'Sara · RSVP', promise: { to: 'Sara', on: day(-9) }, realm_id: 'people' }),
