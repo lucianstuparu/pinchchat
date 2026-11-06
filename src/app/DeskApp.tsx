@@ -34,11 +34,13 @@ import { useDeepSearch } from '../ui/useDeepSearch';
 import { AskRow, Marked, SearchGroup, SearchRow, SearchingLine } from '../ui/SearchParts';
 import { loadedMatch, markedParts, plainOf, wordParts } from '../ui/searchText';
 import { useDelayedFlag } from '../ui/progress';
-import { act, fetchLoops, fetchNow, fetchToday, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem, type TodayData, type Watching } from './api';
+import { act, fetchLoops, fetchNow, fetchToday, transcribeAudio, whoami, SessionExpired, type Loop, type NowItem, type TellKind, type TodayData, type Watching } from './api';
 import { DueChip, Title, TodoPanel, type TodoTab } from './Todo';
 import { TOPIC_COLORS, groupTodo, matches, plainTitle, railOf } from './todoRules';
 import { opsFor, type Move } from '../ui/dragRules';
 import { ItemSheet } from './ItemSheet';
+import { ItemSheetV2 } from './ItemSheetV2';
+import { TellSheet } from './TellSheet';
 import { ItemChips } from './ItemChips';
 import { ChangeCards, NoteCard } from './ChangeCards';
 import { extractItems } from '../mobile/messageItems';
@@ -184,6 +186,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   const [convOpen, setConvOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<NowItem | null>(null);
   const [payeesOpen, setPayeesOpen] = useState(false);
+  const [telling, setTelling] = useState<{ id: string; title: string; kind: TellKind; name: string } | null>(null);
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -231,15 +234,20 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   };
 
   // ---- oc v2: Today's actions. Optimistic like To do; the server's answer then replaces it.
-  const withoutTile = (id: string) => setToday(d => (d ? { ...d, crucial: d.crucial.filter(i => i.id !== id), todo: d.todo.filter(i => i.id !== id) } : d));
+  const withoutTile = (id: string) => setToday(d => (d ? { ...d, crucial: d.crucial.filter(i => i.id !== id), todo: d.todo.filter(i => i.id !== id), must: d.must?.filter(i => i.id !== id), top: d.top?.filter(i => i.id !== id), waiting_you: d.waiting_you?.filter(i => i.id !== id), later: d.later?.filter(i => i.id !== id) } : d));
+  const awaySeen = (id: string) => {
+    if (!todayRef.current?.away) return;
+    setToday(d => (d ? { ...d, away: undefined } : d));
+    void act(id, 'away-seen').catch(() => undefined);
+  };
   const tileDone = async (item: NowItem) => {
-    withoutTile(item.id);
+    withoutTile(item.id); awaySeen(item.id);
     try { await act(item.id, 'done'); offerUndo(item.id, `Done: ${short(item)}`); }
     catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
   };
   const dropTile = async (item: NowItem) => {
-    withoutTile(item.id);
+    withoutTile(item.id); awaySeen(item.id);
     try { await act(item.id, 'drop'); offerUndo(item.id, `Not needed: ${short(item)}`); }
     catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
     finally { void refresh(); }
@@ -249,6 +257,16 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     await act(item.id, 'crucial', { on, ...(replace ? { replace } : {}) });
     dayUndo(item.id, `${on ? 'Crucial' : 'Not crucial'}: ${short(item)}`);
     void refresh();
+  };
+  const moveToTop = async (item: NowItem, on: boolean) => {
+    awaySeen(item.id);
+    try { await act(item.id, 'tile-top', { on }); dayUndo(item.id, `${on ? 'Moved to top' : 'Back from the top'}: ${short(item)}`); }
+    catch (e) { setHint(e instanceof Error ? e.message : 'Could not change it'); }
+    finally { void refresh(); }
+  };
+  const wayBack = (id: string) => {
+    awaySeen(id);
+    void act(id, 'step-start').catch(() => undefined).finally(() => { setSheet(id); void refresh(); });
   };
   const moveTile = async (item: NowItem, to: number) => {
     setToday(d => { if (!d) return d; const rest = d.todo.filter(i => i.id !== item.id); rest.splice(to, 0, item); return { ...d, todo: rest }; });
@@ -516,7 +534,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
   }, []);
   const nowRef = useRef(now.items); nowRef.current = now.items;
   const renderNote = useCallback((note: ClaudeNote, itemId?: string) => (
-    <NoteCard note={note} itemId={itemId} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} />
+    <NoteCard note={note} itemId={itemId} onShow={showOnToday} findByNumber={n => nowRef.current.find(i => i.n === n)?.id} refresh={() => void refreshRef.current()} />
   ), [showOnToday]);
   const renderChips = useCallback((all: Array<{ id: string; label: string }>, ctx?: { ts: number; msgId: string; onCards: () => void }) => {
     const skip = ctx ? dupesRef.current.get(ctx.msgId) : undefined;
@@ -767,7 +785,22 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
 
   const layers = (
     <>
-      {sheet && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
+      {sheet && v2 && (
+        <ItemSheetV2 id={sheet} person={person} crucialIds={today?.day.crucial ?? []} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => { awaySeen(sheet); void refresh(); }}
+          onAsk={(t, s) => { setSheet(null); setConvOpen(true); putInComposer(t, s); }}
+          onActed={(id, label) => offerUndo(id, label)}
+          onCrucial={async (id, title, on) => {
+            await act(id, 'crucial', { on });
+            dayUndo(id, `${on ? 'Crucial' : 'Not crucial'}: ${title}`);
+            void refresh();
+          }}
+          onTell={req => setTelling(req)} />
+      )}
+      {telling && (
+        <TellSheet {...telling} person={person} onClose={() => setTelling(null)}
+          onDone={line => { const id = telling.id; setTelling(null); offerUndo(id, line); void refresh(); }} />
+      )}
+      {sheet && !v2 && <ItemSheet id={sheet} footer={undo ? undoBar : null} onClose={() => setSheet(null)} onChanged={() => void refresh()} onAsk={(t, s) => { setSheet(null); putInComposer(t, s); }}
         onActed={(id, action, title, later) => {
           const said: Partial<Record<string, string>> = { done: 'Done', drop: 'Not needed', snooze: later ?? 'Put off', reopen: 'Reopened', priority: 'Priority changed', edit: 'Saved', 'loop-close': 'Settled', 'went-wrong': 'Now a task' };
           if (said[action]) offerUndo(id, `${said[action]}: ${plainTitle(title)}`);
@@ -786,7 +819,9 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
         onClose={() => { setHistoryOpen(false); dismissNotice(); }} />}
       {payeesOpen && <PayeesSheet onClose={() => setPayeesOpen(false)} onChanged={() => void refresh()} />}
       {menuFor && today && (
-        <TileMenu item={menuFor} isCrucial={today.day.crucial.includes(menuFor.id)} crucial={today.crucial}
+        <TileMenu item={menuFor} today={today.today} isCrucial={today.day.crucial.includes(menuFor.id)} crucial={today.crucial}
+          pinned={!!today.top?.some(i => i.id === menuFor.id)} onTop={on => void moveToTop(menuFor, on)}
+          onTell={kind => setTelling({ id: menuFor.id, title: menuFor.glance_title ?? menuFor.title, kind, name: menuFor.promise?.to ?? '' })}
           position={today.todo.findIndex(i => i.id === menuFor.id)} count={today.todo.length} onClose={() => setMenuFor(null)}
           onCrucial={(on, replace) => setCrucial(menuFor, on, replace)} onMove={to => void moveTile(menuFor, to)}
           onLater={() => setSheet(menuFor.id)} onOpen={() => setSheet(menuFor.id)} onDrop={() => void dropTile(menuFor)} />
@@ -801,7 +836,7 @@ function Desk({ gw, look, mode, onLook }: { gw: ReturnType<typeof useGateway>; l
     const lastLine = lastMsg ? { mine: lastMsg.role === 'user', text: previewOf(visibleText(lastMsg)), time: new Date(lastMsg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) } : null;
     const todayScreen = (
       <TodayV2 data={today} mode={mode} lit={lit} expired={expired && !today} initial={name ? name[0] : undefined} notice={noticeCard && <div className="pb-1">{noticeCard}</div>}
-        everythingNonce={everythingNonce} onSettings={() => setSettings(true)}
+        everythingNonce={everythingNonce} onSettings={() => setSettings(true)} onWayBack={wayBack} onOpenId={setSheet}
         onDone={i => void tileDone(i)} onOpen={i => setSheet(i.id)} onMenu={setMenuFor} />
     );
     return (

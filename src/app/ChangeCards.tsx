@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { ObjectFace } from '../kit2/ObjectFace';
+import { REALMS, realmName } from '../realms';
 import { act, fetchStates, type NowItem } from './api';
 import { ItemChips } from './ItemChips';
 import { changedBy, isClosedState, whatChanged, type ClaudeNote, type ItemState } from './todayRules';
@@ -36,10 +37,11 @@ export function ChangeCard({ title, n, face, line, onUndo, onShow, undone }: {
 }
 
 /** A note from another session: its card, with the whole text behind "Show all". The item comes from its marker or its number. */
-export function NoteCard({ note, itemId, findByNumber, onShow }: { note: ClaudeNote; itemId?: string; findByNumber: (n: number) => string | undefined; onShow: (id: string) => void }) {
+export function NoteCard({ note, itemId, findByNumber, onShow, refresh }: { note: ClaudeNote; itemId?: string; findByNumber: (n: number) => string | undefined; onShow: (id: string) => void; refresh?: () => void }) {
   const id = itemId ?? (note.n != null ? findByNumber(note.n) : undefined);
   const [state, setState] = useState<ItemState | null>(null);
   const [all, setAll] = useState(false);
+  const [placed, setPlaced] = useState<string | null>(null);
   useEffect(() => {
     if (!id) return;
     let alive = true;
@@ -53,7 +55,13 @@ export function NoteCard({ note, itemId, findByNumber, onShow }: { note: ClaudeN
     <div className="min-w-0 flex-1">
       <ChangeCard n={n} face={state?.face} title={title ?? note.line} line={title ? note.line : ''}
         onShow={id && state && !isClosedState(state.status) ? () => onShow(id) : undefined} />
-      {more && (
+      {/* Which realm? One tap (review 01: Other is emptied by asking in the chat). */}
+      {note.asksRealm && id && (placed
+        ? <p className="px-1 pt-1 text-[13px] font-semibold text-[#0e7c5f]">{realmName(placed)}</p>
+        : <div className="flex flex-wrap gap-1.5 pt-1.5" role="group" aria-label="Which realm">
+            {REALMS.map(r => <button key={r.id} type="button" onClick={() => { void act(id, 'edit', { realm_id: r.id }).then(() => { setPlaced(r.id); refresh?.(); }).catch(() => undefined); }} className="press min-h-10 rounded-full bg-[var(--pc-hover-strong)] px-3 text-[14px] font-semibold">{r.name}</button>)}
+          </div>)}
+      {more && !note.asksRealm && (
         <button type="button" onClick={() => setAll(a => !a)} aria-expanded={all} className="press min-h-10 px-1 text-[15px] font-semibold text-[var(--pc-accent-ink)]">{all ? 'Show less' : 'Show all'}</button>
       )}
       {all && <p className="whitespace-pre-wrap px-1 pb-1 text-[15px] leading-snug">{note.text.replace(/\*\*/g, '').replace(/⟨[^⟩]*⟩/g, '')}</p>}

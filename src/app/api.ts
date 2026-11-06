@@ -7,6 +7,13 @@ export type Section = 'overdue' | 'today' | 'week' | 'waiting' | 'later';
 /** What a thing looks like (src/kit2/ObjectFace): a logo, a drawing, or a drawing with the logo on it. */
 export interface Face { logo?: string; object?: string; drawing?: string; /** A brand's or the realm's letters, and the brand's colour. */ mono?: string; mono_color?: string; name?: string }
 
+/** oc v2: the next move (my.design v2/oc-v2-brief.md §7.4, §14.1). */
+export interface Step { first: string; verb?: string; minutes?: number; where?: string; shape?: string; why?: string; by?: 'person' | 'coach'; draft?: string; recovery?: string; started?: string }
+export interface Move { first: string; why?: string; minutes?: number; where?: string }
+/** What the person told someone they would do; `told` keeps each time they kept them informed (§13.5). */
+export interface Promise_ { to: string; said?: string; by?: string; on?: string; told?: Array<{ at: string; kind: string; how?: 'sent' | 'copied' }> }
+export type TellKind = 'late' | 'update' | 'more-time' | 'confirm' | 'give';
+
 export interface NowItem {
   id: string;
   /** The short number, household-wide ("22 done"). */
@@ -29,6 +36,8 @@ export interface NowItem {
   face?: Face;
   /** oc v2: in Passing by because its payee is marked automatic. */
   automatic?: boolean;
+  step?: Step; alternatives?: Move[]; readiness?: string; realm_id?: string; matter?: string;
+  promise?: Promise_; waiting_on?: string; parked?: { on: string; why?: string }; review_on?: string; given_to?: string;
   kind: string;
   store: 'admin' | 'tasks' | 'loops' | 'shopping' | 'pantry';
   scope: 'private' | 'shared';
@@ -75,9 +84,16 @@ export interface Sheet {
   today: string;
   item: Record<string, unknown> & { id: string; title: string; status: string; store: string; scope: string };
   origin: { kind: 'message' | 'mail'; id: string; ts?: string; text?: string; type?: string } | null;
+  /** oc v2's sheet. */
+  face?: Face; glance_title?: string; realm_id?: string;
+  matter?: { name: string; things: number; state: string; brief: Brief | null } | null;
 }
 
-export type ItemAction = 'crucial' | 'tile-move' | 'day-undo' | 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order' | 'went-wrong';
+/** The matter's brief (§13.4): rows with nothing are hidden, never shown empty. */
+export interface DatedLine { date: string; what: string }
+export interface Brief { name?: string; purpose?: string; state?: string; tried?: string[]; ruled_out?: string[]; confirmed?: DatedLine[]; estimated?: DatedLine[]; evidence?: string[]; open?: string[]; written_on?: string; written_by?: string; by_person?: string[] }
+
+export type ItemAction = 'step-set' | 'step-pick' | 'step-reject' | 'step-start' | 'step-stop' | 'step-next' | 'think' | 'review-tomorrow' | 'park' | 'unpark' | 'readiness' | 'promise-set' | 'promise-tell' | 'give' | 'brief-correct' | 'tile-top' | 'away-seen' | 'crucial' | 'tile-move' | 'day-undo' | 'done' | 'snooze' | 'drop' | 'reopen' | 'priority' | 'edit' | 'undo' | 'to-task' | 'loop-close' | 'focus' | 'order' | 'went-wrong';
 
 export class SessionExpired extends Error {}
 
@@ -103,7 +119,11 @@ export interface TodayData {
   today: string; last_open: string | null;
   day: { date: string; crucial: string[]; picked?: string[]; closed_at?: string; in_the_way?: string };
   crucial: NowItem[]; todo: NowItem[]; passing_by: NowItem[]; later_count: number; /** The pile: open things not on show. */ later?: NowItem[];
+  /** The bands of §14.2 and §15.1. */
+  away?: Away; waiting_you?: NowItem[]; top?: NowItem[]; must?: NowItem[]; worth?: NowItem[]; parked?: NowItem[]; passed_by?: NowItem[]; done_today?: NowItem[];
 }
+export interface AwayLine { id?: string; face?: Face; text: string; missed?: boolean }
+export interface Away { days: number; lines: AwayLine[]; more: number; way_back: { id: string; label: string; minutes?: number } | null }
 export const fetchToday = () => post<TodayData>('/reg/today', {});
 export interface Payee { key: string; name: string; count: number; amount?: number; currency?: string; auto: boolean }
 export const fetchPayees = () => post<{ payees: Payee[] }>('/reg/payees', {}).then(r => r.payees);
@@ -111,6 +131,9 @@ export const setPayee = (payee: string, auto: boolean) => post<{ ok: boolean; wa
 export const fetchLoops = () => post<{ today: string; loops: Loop[] }>('/reg/loops', {});
 export const fetchSheet = (item: string) => post<Sheet>('/reg/item', { item });
 export const fetchStates = (items: string[]) => post<{ items: Record<string, Partial<NowItem>>; today: string }>('/reg/status', { items });
+/** A coordination message: written by the server, sent only by the person's tap (TellSheet). */
+export interface TellDraft { to: string; contact: { id: string; name: string; lang: string; channel: string; phone: boolean } | null; text: string }
+export const fetchTell = (item: string, kind: TellKind, opts: { shorter?: boolean; nodate?: boolean; to?: string } = {}) => post<TellDraft>('/reg/tell', { item, kind, ...opts });
 export const act = (item: string, action: ItemAction, extra: Record<string, unknown> = {}) =>
   post<{ ok: boolean; status: string; remind_on?: string; priority?: string; title: string; task?: { id: string }; next_due?: string }>('/reg/act', { item, action, ...extra });
 

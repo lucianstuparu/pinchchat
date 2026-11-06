@@ -1,11 +1,13 @@
 /**
  * Dev-only harness (vite dev, /tools/harness/today.html): Today v2 with sample data, to measure at the test sizes without the
- * gateway or the desk API. ?state=empty|loading|full, ?theme=dark, ?menu=1 opens a tile's menu.
+ * gateway or the desk API. ?state=empty|loading|full, ?theme=dark, ?menu=1 opens a tile's menu, ?sheet=step|none|running|promise|parked|watch opens item sheet v2, ?tell=1 the Tell sheet, ?away=1 adds the card after an absence.
  */
 import ReactDOM from 'react-dom/client';
 import { useState } from 'react';
 import '../../src/index.css';
-import { PileSheet, TileMenu, TodayV2 } from '../../src/app/TodayV2';
+import { TileMenu, TodayV2 } from '../../src/app/TodayV2';
+import { ItemSheetV2 } from '../../src/app/ItemSheetV2';
+import { TellSheet } from '../../src/app/TellSheet';
 import { ChangeCard } from '../../src/app/ChangeCards';
 import { CoachMark, PersonMark } from '../../src/app/avatars';
 import { lookVars } from '../../src/app/themes';
@@ -51,6 +53,43 @@ const full: TodayData = {
     item({ n: 45, title: 'x', glance_title: 'Chitara · caută profesor', face: { mono: 'CH' } }),
   ],
 };
+// The bands of plan 02.
+const realms = ['desk', 'casa-artlia', 'finance', 'people', 'projects', 'house', 'other'];
+[...full.crucial, ...full.todo, ...(full.later ?? []), ...full.passing_by].forEach((i, x) => { i.realm_id = realms[x % realms.length]; i.matter = (i.glance_title ?? '').split(' · ')[1] ? (i.glance_title ?? '').split(' · ')[0] : i.face?.name; if (x % 2 === 0) i.step = { first: 'Open it', minutes: 3 + x, where: x % 4 ? 'phone' : 'laptop', by: 'coach' }; });
+full.must = [item({ n: 183, glance_title: 'Frizer · programează tunsoarea', due_date: today, section: 'today', face: { object: 'phone' }, step: { first: 'Call', minutes: 3, where: 'phone' } })];
+full.waiting_you = [
+  item({ n: 130, glance_title: 'Bérenger · confirmă creditul', status: 'waiting', promise: { to: 'Bérenger Marchand', said: 'by Thursday', by: day(-1), on: day(-6) }, realm_id: 'casa-artlia' }),
+  item({ n: 131, glance_title: 'Sara · RSVP', promise: { to: 'Sara', on: day(-9) }, realm_id: 'people' }),
+];
+full.top = [item({ n: 200, glance_title: 'Ușa · alege modelul', face: { object: 'door' }, promise: { to: 'Bérenger', told: [{ at: new Date().toISOString(), kind: 'late', how: 'sent' }] }, step: { first: 'Open', minutes: 10, where: 'laptop' }, realm_id: 'house' })];
+full.worth = [item({ n: 210, glance_title: 'Export · păstrează istoricul', parked: { on: day(-3), why: 'saves ten minutes a week' }, realm_id: 'projects' })];
+full.parked = full.worth;
+full.passed_by = [item({ n: 1, glance_title: 'EDF · pay electricity', due_date: day(-9), automatic: true, face: { mono: 'EDF', mono_color: '#fe5716' }, realm_id: 'desk' })];
+full.done_today = [item({ n: 300, glance_title: 'Plic · trimis', status: 'done' })];
+if (q.get('away')) full.away = { days: 3, more: 2, lines: [
+  { id: 'a', text: 'missed · Trimite plicul CPAM', missed: true, face: { object: 'envelope' } },
+  { id: 'b', text: 'Crédit Mutuel · verifică oferta: waiting', face: { mono: 'CM', mono_color: '#c8102e' } },
+  { id: 'c', text: 'AWS passed by', face: { mono: 'aws', mono_color: '#ff9900' } },
+  { id: 'd', text: 'Bérenger is waiting for your answer', face: { object: 'person' } },
+], way_back: { id: 'a', label: 'Check the offer', minutes: 5 } };
+// Item sheet v2 and the Tell sheet read through the API: answered here, nothing leaves the page.
+const sheetMode = q.get('sheet');
+const sheetItem: Record<string, unknown> = { id: 'tsk-2026-11-05-000001', n: 28, title: 'Scrisoare **SFR** pentru bonusul de 300 €', status: 'todo', store: 'tasks', scope: 'private', kind: 'task', due_date: day(11), notes: 'Letter drafted on 2 Nov. | parked idea', payee: 'SFR', amount: 300, currency: 'EUR',
+  ...(sheetMode === 'none' ? {} : { step: { first: 'Citește scrisoarea, trimite-o recomandat', verb: 'Citește', minutes: 3, where: 'phone', shape: 'awkward', by: sheetMode === 'yours' ? 'person' : 'coach', why: 'cuvintele sunt scrise', draft: sheetMode === 'running' ? 'Madame, Monsieur, je vous écris au sujet de la reprise de 300 €.' : undefined, recovery: 'if it goes badly: Médiateur, within two months', ...(sheetMode === 'running' ? { started: new Date(Date.now() - 300_000).toISOString() } : {}) },
+    alternatives: [{ first: 'Sună SFR, scriptul e gata', why: 'au răspuns la telefon data trecută' }, { first: 'Așteaptă cei 27 € de la Certideal', why: 'riscă fereastra de două luni' }] }),
+  ...(sheetMode === 'promise' ? { promise: { to: 'Bérenger', said: 'by Thursday', by: day(-1), on: day(-6), told: [] } } : {}),
+  ...(sheetMode === 'parked' ? { parked: { on: day(-2), why: 'saves ten minutes a week' } } : {}),
+  ...(sheetMode === 'watch' ? { kind: 'watch', status: 'watching' } : {}) };
+const realFetch = window.fetch;
+window.fetch = async (url, init) => {
+  const u = String(url);
+  const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  if (u.includes('/reg/item')) return json({ today, item: sheetItem, origin: null, face: { object: 'stack', mono: 'SFR', mono_color: '#e2001a' }, glance_title: 'SFR · trimite scrisoarea', realm_id: 'desk',
+    matter: { name: 'SFR', things: 8, state: 'in hand', brief: { purpose: 'get the 300 € bonus SFR refused on 22 Oct', state: 'Letter drafted, review and send', tried: ['chat + callback, 27 Oct: verbal yes only'], ruled_out: ['waiting for an e-mail: they never sent one'], confirmed: [{ date: day(11), what: 'your deadline' }], estimated: [{ date: day(46), what: 'Médiateur window' }], evidence: ['Certideal mails 19.09, 25.09'], open: ['Is it two months or 60 days?'], written_on: day(-1), written_by: 'coach' } } });
+  if (u.includes('/reg/tell')) return json({ to: 'Bérenger', contact: q.get('tell') === 'copy' ? null : { id: 'c', name: 'Bérenger', lang: 'fr', channel: 'whatsapp', phone: true }, text: 'Bonjour Bérenger, désolé pour le retard. Le crédit est approuvé, je vous confirme les détails.' });
+  if (u.includes('/reg/')) return json({ ok: true });
+  return realFetch(url, init);
+};
 const data = state === 'loading' ? null : state === 'empty' ? { ...full, crucial: [], todo: [], passing_by: [], later_count: 0 } : full;
 
 function Harness() {
@@ -61,7 +100,8 @@ function Harness() {
         <TodayV2 data={data} mode={mode} initial="L" onSettings={() => {}} onDone={() => {}} onOpen={() => {}} onMenu={setMenu} />
       </div>
       <div className="shrink-0 border-t border-pc-border bg-pc-base p-2"><textarea rows={1} placeholder="Say or type it" className="block w-full resize-none rounded-[12px] bg-pc-surface p-3 text-[16px]" /></div>
-      {q.get('pile') && <PileSheet items={full.later ?? []} today={today} onClose={() => {}} onOpen={() => {}} />}
+      {sheetMode && <ItemSheetV2 id="tsk-2026-11-05-000001" person="lucian" crucialIds={q.get('two') ? ['a', 'b'] : []} onClose={() => {}} onChanged={() => {}} onAsk={() => {}} onActed={() => {}} onCrucial={() => Promise.resolve()} onTell={() => {}} />}
+      {q.get('tell') && <TellSheet id="tsk-2026-11-05-000001" title="Bérenger · confirmă creditul" kind="late" name="Bérenger" person="lucian" onClose={() => {}} onDone={() => {}} />}
       {q.get('chat') && (
         <div className="absolute inset-0 z-50 space-y-3 bg-pc-base p-3">
           <div className="flex justify-end gap-1.5"><div className="rounded-[20px] rounded-tr-md bg-[#f1f0f3] px-3 py-1.5 text-[16px] text-[#1c1c1e]">sa sun la primaria maine</div><PersonMark name="Lucian" /></div>
@@ -71,7 +111,7 @@ function Harness() {
           <div className="flex items-end gap-3">{(['envelope', 'letter', 'stack', 'folder', 'phone', 'person'] as const).map(o => <ObjectFace key={o} face={{ object: o }} size={44} />)}<ObjectFace face={{ mono: 'CA' }} size={44} /><ObjectFace face={{ mono: 'aws', mono_color: '#ff9900' }} size={44} /><ObjectFace face={{ object: 'envelope', mono: 'SFR', mono_color: '#e2001a' }} size={44} /></div>
         </div>
       )}
-      {menu && <TileMenu item={menu} position={0} count={6} isCrucial={false} crucial={full.crucial} onClose={() => setMenu(null)}
+      {menu && <TileMenu item={q.get('menu') === 'promise' ? full.waiting_you![0] : menu} today={today} onTop={() => {}} onTell={() => {}} position={0} count={6} isCrucial={false} crucial={full.crucial} onClose={() => setMenu(null)}
         onCrucial={() => Promise.reject(new Error('two already'))} onMove={() => {}} onLater={() => {}} onOpen={() => {}} onDrop={() => {}} />}
     </div>
   );
