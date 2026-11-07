@@ -25,7 +25,7 @@ import { clearShareParam, pendingShareId, takeSharedContent } from '../share/sha
 import { ShopPicker } from './ShopPicker';
 import { GroupCards } from './GroupCards';
 import { GROUPS, GROUP_NAMES, groupColours, groupOf, type Group } from './groups';
-import { atStore, fold, isWish, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
+import { atStore, fold, isNeverTag, isWish, neverTag, newAskId, newStore, newItemId, newPhotoRef, plainReply, storeTagsOf, suggest, type Ask, type Item, type Known, type Op, type Product, type Store } from './logic';
 import { NovaBadge, ProductRow, ProductSheet, ProductsSheet } from './Products';
 import { shrinkPhoto } from './photos';
 import { canReadClipboard, clipboardImages, pastedFiles } from '../lib/clipboard';
@@ -37,7 +37,7 @@ import { daysUntil, newPantryId } from './pantry';
 import { useShop } from './useShop';
 import { InStore } from './InStore';
 import { ShopLogo, ShopLogos } from './ShopLogo';
-import { countOf, extrasAsk, newTrip, readTrip, shotsAsk, writeTrip, type Trip } from './trip';
+import { askBatches, countOf, extrasAsk, newTrip, photosOf, readTrip, shotsAsk, writeTrip, type Trip } from './trip';
 import { disablePush, enablePush, getPushState, type PushState } from '../mobile/pushNotifications';
 
 const STORE_KEY = 'shop:store';
@@ -199,14 +199,13 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     if (food.length || t.extras.length || shots.length) {
       const ops: Op[] = food.map(i => ({ op: 'pantry-add', id: newPantryId(), title: i.title, product: i.product,
         qty: t.count?.[i.id] ? String(t.count[i.id]) : i.qty }));
-      // At most 6 photos per ask (the server's limit; a 7th was silently dropped on 2026-10-28): one ask per 6.
-      for (let k = 0; k < t.extras.length; k += 6) {
-        const part = t.extras.slice(k, k + 6);
-        ops.push({ op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), part.length), store: t.store, photos: part.map(e => e.ref) });
+      // At most 6 photos per ask (the server's limit; a 7th was silently dropped on 2026-10-28), a product's photos together.
+      for (const part of askBatches(t.extras)) {
+        ops.push({ op: 'ask', id: newAskId(), text: extrasAsk(storeName(t.store), part.map(e => photosOf(e).length)), store: t.store, photos: part.flatMap(e => photosOf(e).map(p => p.ref)) });
       }
-      for (let k = 0; k < shots.length; k += 6) {
-        const part = shots.slice(k, k + 6).map(s => ({ ...s, title: snap.items.find(i => i.id === s.id)?.title ?? '' }));
-        ops.push({ op: 'ask', id: newAskId(), text: shotsAsk(storeName(t.store), part), store: t.store, photos: part.map(s => s.ref) });
+      for (const part of askBatches(shots)) {
+        const named = part.map(s => ({ id: s.id, title: snap.items.find(i => i.id === s.id)?.title ?? '', count: photosOf(s).length }));
+        ops.push({ op: 'ask', id: newAskId(), text: shotsAsk(storeName(t.store), named), store: t.store, photos: part.flatMap(s => photosOf(s).map(p => p.ref)) });
       }
       pendingAsk.current = { ops, timer: window.setTimeout(sendPending, 6500) };
     }
@@ -241,7 +240,7 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
     return (
       <>
         <InStore trip={trip} onTrip={setTrip} items={snap.items} stores={stores} purchases={snap.purchases ?? []} products={products}
-          storeName={storeName} mode={mode} apply={apply} onPaid={pay} onLeave={() => setTrip(null)} onChangeShop={() => setTripPicking(true)}
+          storeName={storeName} apply={apply} onPaid={pay} onLeave={() => setTrip(null)} onChangeShop={() => setTripPicking(true)}
           askBar={<AddBar prefill={null} store={trip.store} stores={stores} known={snap.known} items={snap.items} asks={allAsks} onAdd={apply} />} />
         {tripPicking && (
           <ShopPicker stores={stores} counts={shopCounts} recent={boughtAt} current={trip.store}
@@ -259,8 +258,8 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
         {search !== null ? (
           <SearchHeader value={search} onChange={setSearch} onCancel={() => setSearch(null)} placeholder="Search the list and products" />
         ) : (
-          <AppHeader title={store ? storeName(store) : 'Shopping'} initial={person ? person[0].toUpperCase() : '…'} onSettings={() => setSettings(true)}
-            subtitle={syncLabel ? <>{sync === 'offline' && <CloudOff size={12} />}{syncLabel}</> : store ? `${countAt(store)} to get here` : `${open.length} on the list`}
+          <AppHeader title="Shopping" initial={person ? person[0].toUpperCase() : '…'} onSettings={() => setSettings(true)}
+            subtitle={syncLabel ? <>{sync === 'offline' && <CloudOff size={12} />}{syncLabel}</> : `${open.length} on the list`}
             actions={<>
               {(sync === 'offline' || sync === 'signed-out') && (
                 <IconButton label="Try again" onClick={() => (sync === 'signed-out' ? window.location.reload() : void refresh())}><RefreshCw size={20} /></IconButton>
@@ -272,8 +271,20 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               <IconButton label="Search" onClick={() => setSearch('')}><Search size={22} /></IconButton>
             </>} />
         )}
+        {/* A filter that is on says so in words, with the way out beside it (Lucian, 2026-11-07: "I just see a filtered list without realizing"). */}
+        {search === null && store && (
+          <div className="flex items-center gap-1 bg-[rgba(var(--pc-accent-rgb),0.22)] pl-1 pr-1.5" role="status">
+            <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog" aria-label={`Only ${storeName(store)}: ${countAt(store)} of ${open.length} on the list. Change shop`}
+              className="press flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[8px] px-2 text-left text-[15px] font-semibold">
+              <ShopLogo tag={store} name="" size={22} />
+              <span className="truncate">Only {storeName(store)}</span>
+              <span className="shrink-0 font-normal tabular-nums">{countAt(store)} of {open.length}</span>
+            </button>
+            <button type="button" onClick={() => setStore(null)} className="press h-9 shrink-0 rounded-full bg-pc-base px-3.5 text-[15px] font-semibold">Show all</button>
+          </div>
+        )}
         {search === null && (
-          <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 pt-0.5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Shops">
+          <div className={`flex gap-2 overflow-x-auto px-3 pb-2.5 ${store ? 'pt-2.5' : 'pt-0.5'} [&::-webkit-scrollbar]:hidden`} style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Shops">
             <button type="button" onClick={() => (store ? startTrip(store) : setTripPicking(true))}
               className="press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[rgba(var(--pc-accent-rgb),0.5)] pl-3 pr-3.5 text-[15px] font-medium text-[var(--pc-accent-ink)]">
               <ShoppingCart size={15} aria-hidden />In the shop
@@ -282,7 +293,6 @@ function Shop({ look, mode, onLook }: { look: Look; mode: 'light' | 'dark'; onLo
               className={`press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full pl-3 pr-2.5 text-[15px] font-medium ${store ? 'bg-pc-accent text-[var(--pc-on-accent)]' : 'bg-pc-surface text-pc-text active:bg-[var(--pc-hover-strong)]'}`}>
               {store ? <ShopLogo tag={store} name={storeName(store)} size={20} /> : <><StoreIcon size={15} aria-hidden />All shops</>}<ChevronDown size={15} aria-hidden className="opacity-70" />
             </button>
-            {store && <Chip on={false} onClick={() => setStore(null)} label="All shops" n={open.length} />}
             {quick.map(s => <Chip key={s.tag} on={false} onClick={() => setStore(s.tag)} label={s.name} logo={<ShopLogo tag={s.tag} name="" size={20} />} n={shopCounts[s.tag]} />)}
           </div>
         )}
@@ -470,7 +480,7 @@ function Row({ item, stores, storeName, onTick, onOpen, today, hideStore, tinted
   const [flash, setFlash] = useState(false);
   const done = item.status !== 'open';
   const shops = storeTagsOf(item, stores).filter(t => t !== hideStore);
-  const other = item.tags.filter(t => !stores.some(s => s.tag === t));
+  const other = item.tags.filter(t => !stores.some(s => s.tag === t) && !isNeverTag(t));
   const due = item.kind === 'return' && item.due_date ? daysTo(item.due_date, today) : null;
   const tap = () => {
     if (done) { onTick(item); return; }
@@ -700,7 +710,7 @@ function ItemSheet({ item, stores, today, mode, onClose, apply, product, onProdu
   const [priv, setPriv] = useState(item.scope === 'private');
   const [group, setGroup] = useState<Group>(groupOf(item));
   const toggle = (t: string) => setTags(ts => (ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t]));
-  const others = tags.filter(t => !stores.some(s => s.tag === t));
+  const others = tags.filter(t => !stores.some(s => s.tag === t) && !isNeverTag(t));
   const chosen = tags.filter(t => stores.some(s => s.tag === t));
   const [picking, setPicking] = useState(false);
 
@@ -765,7 +775,7 @@ function ItemSheet({ item, stores, today, mode, onClose, apply, product, onProdu
 
         {picking && (
           <ShopPicker stores={stores.filter(s => !chosen.includes(s.tag))} current={null} z={50}
-            onPick={tag => { if (tag) setTags(ts => [...ts, tag]); setPicking(false); }}
+            onPick={tag => { if (tag) setTags(ts => [...ts.filter(t => t !== neverTag(tag)), tag]); setPicking(false); }}
             onCreate={name => { apply({ op: 'shop', name }); const t = newStore(name).tag; setTags(ts => (ts.includes(t) ? ts : [...ts, t])); setPicking(false); }}
             onClose={() => setPicking(false)} />
         )}

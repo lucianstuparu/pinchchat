@@ -106,8 +106,16 @@ export function rankShops(stores: Store[], typed: string, counts: Record<string,
 export const storeTagsOf = (item: Pick<Item, 'tags'>, stores: Store[]) => (item.tags || []).filter(t => stores.some(s => s.tag === t));
 
 /** Does an item belong on the list at this shop? Items with no shop tag belong everywhere. */
+/**
+ * "Never at this shop" (Lucian, 2026-11-07): a hidden tag on the item, so it syncs and works offline with
+ * the existing edit, with no change on the server. Choosing that shop for the item again removes it.
+ */
+export const neverTag = (store: string) => `not-${store}`;
+export const isNeverTag = (tag: string) => tag.startsWith('not-');
+
 export function atStore(item: Pick<Item, 'tags'>, store: string | null, stores: Store[]): boolean {
   const own = storeTagsOf(item, stores);
+  if (store && (item.tags || []).includes(neverTag(store))) return false;
   if (!store || own.length === 0) return true;
   const s = stores.find(x => x.tag === store);
   return own.includes(store) || (s?.also ?? []).some(t => own.includes(t));
